@@ -57,6 +57,7 @@ const char *printmonth[] = {"xxx", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 uint8_t DisplayIsOn = 0;
 uint8_t displaybuf[DISPLAY_WIDTH * DISPLAY_HEIGHT / 8] = {0};
+static uint8_t plotbuf[DISPLAY_WIDTH * DISPLAY_HEIGHT / 8] = {0};
 
 QRCode qrcode;
 
@@ -81,6 +82,9 @@ void init_display(bool verbose) {
 #else
     oledInit(OLED_128x64, true, false, -1, -1, 400000L);
 #endif
+
+    // set display buffer
+    oledSetBackBuffer(displaybuf);
 
     // clear display
     oledSetContrast(DISPLAYCONTRAST);
@@ -108,7 +112,7 @@ void init_display(bool verbose) {
                                                               : "ext.");
 
       // give user some time to read or take picture
-      oledDumpBuffer(NULL);
+      oledDumpBuffer(displaybuf);
       delay(2000);
       oledFill(0x00, 1);
 #endif // VERBOSE
@@ -131,7 +135,7 @@ void init_display(bool verbose) {
         dp_printf(80, i + 3, FONT_NORMAL, 0, "%4.4s", deveui + i * 4);
 
       // give user some time to read or take picture
-      oledDumpBuffer(NULL);
+      oledDumpBuffer(displaybuf);
       delay(8000);
       oledSetContrast(DISPLAYCONTRAST);
       oledFill(0x00, 1);
@@ -175,7 +179,7 @@ void refreshTheDisplay(bool nextPage) {
     }
 
     draw_page(t, DisplayPage);
-    oledDumpBuffer(NULL);
+    oledDumpBuffer(displaybuf);
 
     I2C_MUTEX_UNLOCK(); // release i2c bus access
 
@@ -251,9 +255,9 @@ void draw_page(time_t t, uint8_t page) {
       dp_printf(0, 4, FONT_SMALL, 0, "B:%.2fV", batt_voltage / 1000.0);
 #endif
 #if (HAS_GPS)
-    if (gps.location.age() < 1500) // if no fix then display Sats value inverse
+    if (gps_hasfix())
       dp_printf(48, 4, FONT_SMALL, 0, "Sats:%.2d", gps.satellites.value());
-    else
+    else // if no fix then display Sats value inverse
       dp_printf(48, 4, FONT_SMALL, 1, "Sats:%.2d", gps.satellites.value());
 #endif
     dp_printf(96, 4, FONT_SMALL, 0, "ch:%02d", channel);
@@ -295,13 +299,13 @@ void draw_page(time_t t, uint8_t page) {
 
     // page 1: pax graph
   case 1:
-    oledDumpBuffer(displaybuf);
+    oledDumpBuffer(plotbuf);
     break; // page1
 
     // page 2: GPS
   case 2:
 #if (HAS_GPS)
-    if (gps.location.age() < 1500) {
+    if (gps_hasfix()) {
       // line 5: clear "No fix"
       if (wasnofix) {
         dp_printf(16, 5, FONT_STRETCHED, 0, "      ");
@@ -339,7 +343,10 @@ void draw_page(time_t t, uint8_t page) {
 #ifdef HAS_BME680
     // line 6-7: IAQ
     dp_printf(0, 6, FONT_STRETCHED, 0, "IAQ:%-3.0f", bme_status.iaq);
-#endif
+#else  // is BME280 or BMP180
+    // line 6-7: Pre
+    dp_printf(0, 6, FONT_STRETCHED, 0, "PRE:%-2.1f", bme_status.pressure);
+#endif // HAS_BME
 
 #else
     dp_printf(16, 5, FONT_STRETCHED, 1, "No BME");
@@ -499,24 +506,22 @@ void oledPlotCurve(uint16_t count, bool reset) {
     if (col < DISPLAY_WIDTH - 1) // matrix not full -> increment column
       col++;
     else // matrix full -> scroll left 1 dot
-      oledScrollBufferHorizontal(displaybuf, DISPLAY_WIDTH, DISPLAY_HEIGHT,
-                                 true);
+      oledScrollBufferHorizontal(plotbuf, DISPLAY_WIDTH, DISPLAY_HEIGHT, true);
 
   } else // clear current dot
-    oledDrawPixel(displaybuf, col, row, 0);
+    oledDrawPixel(plotbuf, col, row, 0);
 
   // scroll down, if necessary
   while ((count - v_scroll) > DISPLAY_HEIGHT - 1)
     v_scroll++;
   if (v_scroll)
-    oledScrollBufferVertical(displaybuf, DISPLAY_WIDTH, DISPLAY_HEIGHT,
-                             v_scroll);
+    oledScrollBufferVertical(plotbuf, DISPLAY_WIDTH, DISPLAY_HEIGHT, v_scroll);
 
   // set new dot
   // row = DISPLAY_HEIGHT - 1 - (count - v_scroll) % DISPLAY_HEIGHT;
   row = DISPLAY_HEIGHT - 1 - count - v_scroll;
   last_count = count;
-  oledDrawPixel(displaybuf, col, row, 1);
+  oledDrawPixel(plotbuf, col, row, 1);
 }
 
 #endif // HAS_DISPLAY

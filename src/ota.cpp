@@ -49,6 +49,10 @@ void start_ota_update() {
 #else
   oledInit(OLED_128x64, ANGLE_FLIPY, false, -1, -1, 400000L);
 #endif
+
+  // set display buffer
+  oledSetBackBuffer(displaybuf);
+
   oledFill(0, 1);
   dp_printf(0, 0, 0, 1, "SOFTWARE UPDATE");
   dp_printf(0, 1, 0, 0, "WiFi connect  ..");
@@ -56,7 +60,7 @@ void start_ota_update() {
   dp_printf(0, 3, 0, 0, "Fetching      ..");
   dp_printf(0, 4, 0, 0, "Downloading   ..");
   dp_printf(0, 5, 0, 0, "Rebooting     ..");
-  oledDumpBuffer(NULL);
+  oledDumpBuffer(displaybuf);
 #endif
 
   ESP_LOGI(TAG, "Starting Wifi OTA update");
@@ -309,12 +313,12 @@ void ota_display(const uint8_t row, const std::string status,
     dp_printf(0, 7, 0, 0, "                ");
     dp_printf(0, 7, 0, 0, msg.substr(0, 16).c_str());
   }
-  oledDumpBuffer(NULL);
+  oledDumpBuffer(displaybuf);
 #endif
 }
 
 // callback function to show download progress while streaming data
-static void show_progress(unsigned long current, unsigned long size) {
+void show_progress(unsigned long current, unsigned long size) {
 #ifdef HAS_DISPLAY
   char buf[17];
   snprintf(buf, 17, "%-9lu (%3lu%%)", current, current * 100 / size);

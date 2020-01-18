@@ -9,7 +9,6 @@ void irqHandler(void *pvParameters) {
   configASSERT(((uint32_t)pvParameters) == 1); // FreeRTOS check
 
   uint32_t InterruptStatus;
-  static bool mask_irq = false;
 
   // task remains in blocked state until it is notified by an irq
   for (;;) {
@@ -19,69 +18,78 @@ void irqHandler(void *pvParameters) {
                     portMAX_DELAY);   // wait forever
 
     if (InterruptStatus & UNMASK_IRQ) // interrupt handler to be enabled?
-      mask_irq = false;
-
-      // suppress processing if interrupt handler is disabled
-      // or time critical lmic jobs are pending in next 100ms
+      InterruptStatus &= ~MASK_IRQ;   // then clear irq mask flag
+    // else suppress processing if interrupt handler is disabled
+    // or time critical lmic jobs are pending in next 100ms
+    else if ((InterruptStatus & MASK_IRQ)
 #if (HAS_LORA)
-    else if (mask_irq || os_queryTimeCriticalJobs(ms2osticks(100)))
-#else
-    else if (mask_irq)
+             || os_queryTimeCriticalJobs(ms2osticks(100))
 #endif
+    )
       continue;
-
-    else if (InterruptStatus & MASK_IRQ) { // interrupt handler to be disabled?
-      mask_irq = true;
-      continue;
-    }
 
 // button pressed?
 #ifdef HAS_BUTTON
-    if (InterruptStatus & BUTTON_IRQ)
+    if (InterruptStatus & BUTTON_IRQ) {
       readButton();
+      InterruptStatus &= ~BUTTON_IRQ;
+    }
 #endif
 
 // display needs refresh?
 #ifdef HAS_DISPLAY
-    if (InterruptStatus & DISPLAY_IRQ)
+    if (InterruptStatus & DISPLAY_IRQ) {
       refreshTheDisplay();
+      InterruptStatus &= ~DISPLAY_IRQ;
+    }
 #endif
 
 // LED Matrix display needs refresh?
 #ifdef HAS_MATRIX_DISPLAY
-    if (InterruptStatus & MATRIX_DISPLAY_IRQ)
+    if (InterruptStatus & MATRIX_DISPLAY_IRQ) {
       refreshTheMatrixDisplay();
+      InterruptStatus &= ~MATRIX_DISPLAY_IRQ;
+    }
 #endif
-
-// BME sensor data to be read?
-#if (HAS_BME)
-    if (InterruptStatus & BME_IRQ)
-      bme_storedata(&bme_status);
-#endif
-
-    // are cyclic tasks due?
-    if (InterruptStatus & CYCLIC_IRQ)
-      doHousekeeping();
 
 #if (TIME_SYNC_INTERVAL)
     // is time to be synced?
     if (InterruptStatus & TIMESYNC_IRQ) {
       now(); // ensure sysTime is recent
       calibrateTime();
+      InterruptStatus &= ~TIMESYNC_IRQ;
     }
 #endif
 
+// BME sensor data to be read?
+#if (HAS_BME)
+    if (InterruptStatus & BME_IRQ) {
+      bme_storedata(&bme_status);
+      InterruptStatus &= ~BME_IRQ;
+    }
+#endif
+
+    // are cyclic tasks due?
+    if (InterruptStatus & CYCLIC_IRQ) {
+      doHousekeeping();
+      InterruptStatus &= ~CYCLIC_IRQ;
+    }
+
 // do we have a power event?
 #if (HAS_PMU)
-    if (InterruptStatus & PMU_IRQ)
+    if (InterruptStatus & PMU_IRQ) {
       AXP192_powerevent_IRQ();
+      InterruptStatus &= ~PMU_IRQ;
+    }
 #endif
 
     // is time to send the payload?
-    if (InterruptStatus & SENDCYCLE_IRQ)
+    if (InterruptStatus & SENDCYCLE_IRQ) {
       sendData();
-  }
-}
+      InterruptStatus &= ~SENDCYCLE_IRQ;
+    }
+  } // for
+} // irqHandler()
 
 // esp32 hardware timer triggered interrupt service routines
 // they notify the irq handler task

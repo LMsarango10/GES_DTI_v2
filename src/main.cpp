@@ -323,6 +323,11 @@ void setup() {
   assert(spi_init() == ESP_OK);
 #endif
 
+#ifdef HAS_SDCARD
+  if (sdcardInit())
+    strcat_P(features, " SD");
+#endif
+
 #if (VENDORFILTER)
   strcat_P(features, " FILTER");
 #endif
@@ -390,6 +395,8 @@ void setup() {
   strcat_P(features, " BME680");
 #elif defined HAS_BME280
   strcat_P(features, " BME280");
+#elif defined HAS_BMP180
+  strcat_P(features, " BMP180");
 #endif
   if (bme_init())
     ESP_LOGI(TAG, "Starting BME sensor...");

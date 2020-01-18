@@ -18,6 +18,14 @@
 #define SPI_SCLK GPIO_NUM_18
 #define SPI_CS   GPIO_NUM_5
 
+// enable only if you want to store a local paxcount table on the device
+#define HAS_SDCARD  1      // this board has an SD-card-reader/writer
+// Pins for SD-card
+#define SDCARD_CS    (13)
+#define SDCARD_MOSI  (15)
+#define SDCARD_MISO  (2)
+#define SDCARD_SCLK  (14)
+
 // enable only if device has these sensors, otherwise comment these lines
 // tutorial to connect BME sensor see here:
 // https://sbamueller.wordpress.com/2019/02/26/paxcounter-mit-umweltsensor/
@@ -35,6 +43,10 @@
 //#define HAS_BME 1 // Enable BME sensors in general
 //#define HAS_BME280 GPIO_NUM_21, GPIO_NUM_22 // SDA, SCL
 //#define BME280_ADDR 0x76 // change to 0x77 depending on your wiring
+
+// BMP180 sensor on I2C bus
+//#define HAS_BMP180
+//#define BMP180_ADDR 0x77
 
 // user defined sensors
 //#define HAS_SENSORS 1 // comment out if device has user defined sensors

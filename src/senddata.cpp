@@ -51,6 +51,11 @@ void SendPayload(uint8_t port, sendprio_t prio) {
   spi_enqueuedata(&SendBuffer);
 #endif
 
+// write data to sdcard, if present
+#ifdef HAS_SDCARD
+  sdcardWriteData(macs_wifi, macs_ble);
+#endif
+
 } // SendPayload
 
 // interrupt triggered function to prepare payload to send
@@ -58,7 +63,9 @@ void sendData() {
 
   uint8_t bitmask = cfg.payloadmask;
   uint8_t mask = 1;
+  #if (HAS_GPS) 
   gpsStatus_t gps_status;
+  #endif
 
   while (bitmask) {
     switch (bitmask & mask) {
@@ -72,17 +79,17 @@ void sendData() {
       if (cfg.blescan)
         payload.addCount(macs_ble, MAC_SNIFF_BLE);
 #endif
-#if (HAS_GPS) 
+#if (HAS_GPS)
       if (GPSPORT == COUNTERPORT) {
         // send GPS position only if we have a fix
-        if (gps.location.isValid()) {
+        if (gps_hasfix()) {
           gps_storelocation(&gps_status);
           payload.addGPS(gps_status);
         } else
           ESP_LOGD(TAG, "No valid GPS position");
       }
 #endif
-#if (PAYLOAD_OPENSENSEBOX)      
+#if (PAYLOAD_OPENSENSEBOX)
       if (cfg.wifiscan)
         payload.addCount(macs_wifi, MAC_SNIFF_WIFI);
       if (cfg.blescan)
@@ -110,11 +117,11 @@ void sendData() {
       break;
 #endif
 
-#if (HAS_GPS) 
+#if (HAS_GPS)
     case GPS_DATA:
       if (GPSPORT != COUNTERPORT) {
         // send GPS position only if we have a fix
-        if (gps.location.isValid()) {
+        if (gps_hasfix()) {
           gps_storelocation(&gps_status);
           payload.reset();
           payload.addGPS(gps_status);

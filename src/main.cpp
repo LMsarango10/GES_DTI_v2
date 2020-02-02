@@ -79,7 +79,7 @@ triggers pps 1 sec impulse
 configData_t cfg; // struct holds current device configuration
 char lmic_event_msg[LMIC_EVENTMSG_LEN]; // display buffer for LMIC event message
 uint8_t volatile channel = 0;           // channel rotation counter
-uint16_t volatile macs_total = 0, macs_wifi = 0, macs_ble = 0,
+uint16_t volatile macs_total = 0, macs_wifi = 0, macs_ble = 0, macs_bt = 0,
                   batt_voltage = 0; // globals for display
 
 hw_timer_t *ppsIRQ = NULL, *displayIRQ = NULL, *matrixDisplayIRQ = NULL;
@@ -92,7 +92,9 @@ timesource_t timeSource = _unsynced;
 
 // container holding unique MAC address hashes with Memory Alloctor using PSRAM,
 // if present
-std::set<uint16_t, std::less<uint16_t>, Mallocator<uint16_t>> macs;
+std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_wifi;
+std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_ble;
+std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_bt;
 
 // initialize payload encoder
 PayloadConvert payload(PAYLOAD_BUFFER_SIZE);

@@ -337,8 +337,14 @@ esp_err_t lora_stack_init(bool do_join) {
   return ESP_OK;
 }
 
-void lora_enqueuedata(MessageBuffer_t *message) {
+bool check_queue_available()
+{
+  return uxQueueSpacesAvailable(LoraSendQueue) > 0;
+}
+
+bool lora_enqueuedata(MessageBuffer_t *message) {
   // enqueue message in LORA send queue
+  bool enqueued = false;
   BaseType_t ret = pdFALSE;
   MessageBuffer_t DummyBuffer;
   sendprio_t prio = message->MessagePrio;
@@ -348,7 +354,8 @@ void lora_enqueuedata(MessageBuffer_t *message) {
     // clear some space in queue if full, then fallthrough to prio_normal
     if (uxQueueSpacesAvailable(LoraSendQueue) == 0) {
       xQueueReceive(LoraSendQueue, &DummyBuffer, (TickType_t)0);
-      ESP_LOGW(TAG, "LORA sendqueue purged, data is lost");
+      sdcardWriteFrame(&DummyBuffer);
+      ESP_LOGW(TAG, "LORA sendqueue purged, data is sent to SD card");
     }
   case prio_normal:
     ret = xQueueSendToFront(LoraSendQueue, (void *)message, (TickType_t)0);
@@ -362,10 +369,12 @@ void lora_enqueuedata(MessageBuffer_t *message) {
     snprintf(lmic_event_msg + 14, LMIC_EVENTMSG_LEN - 14, "<>");
     ESP_LOGW(TAG, "LORA sendqueue is full");
   } else {
+    enqueued = true;
     // add Lora send queue length to display
     snprintf(lmic_event_msg + 14, LMIC_EVENTMSG_LEN - 14, "%2u",
              uxQueueMessagesWaiting(LoraSendQueue));
   }
+  return enqueued;
 }
 
 void lora_queuereset(void) { xQueueReset(LoraSendQueue); }

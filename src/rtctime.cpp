@@ -72,7 +72,7 @@ time_t get_rtctime(void) {
     I2C_MUTEX_UNLOCK();
     return timeIsValid(t);
   } else {
-    ESP_LOGE(TAG, "RTC get time failure");
+    ESP_LOGD(TAG, "RTC get time failure");
     return 0; // failure
   }
 } // get_rtctime()

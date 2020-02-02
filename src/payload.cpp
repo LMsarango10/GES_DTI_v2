@@ -25,6 +25,23 @@ void PayloadConvert::addCount(uint16_t value, uint8_t snifftype) {
   buffer[cursor++] = lowByte(value);
 }
 
+void PayloadConvert::addSalt(uint16_t value) {
+  buffer[cursor++] = (value >> 8) & 0xFF;
+  buffer[cursor++] = (value ) & 0xFF;
+}
+
+void PayloadConvert::setupMac(uint16_t amount) {
+  buffer[cursor++] = (amount >> 8) & 0xFF;
+  buffer[cursor++] = (amount ) & 0xFF;
+}
+
+void PayloadConvert::addMac(uint32_t value) {
+  buffer[cursor++] = (value >> 24) & 0xFF;
+  buffer[cursor++] = (value >> 16) & 0xFF;
+  buffer[cursor++] = (value >> 8) & 0xFF;
+  buffer[cursor++] = (value ) & 0xFF;
+}
+
 void PayloadConvert::addAlarm(int8_t rssi, uint8_t msg) {
   buffer[cursor++] = rssi;
   buffer[cursor++] = msg;
@@ -312,8 +329,8 @@ void PayloadConvert::writeBitmap(bool a, bool b, bool c, bool d, bool e, bool f,
 
 #elif ((PAYLOAD_ENCODER == 3) || (PAYLOAD_ENCODER == 4))
 
-void PayloadConvert::addByte(uint8_t value) { 
-  /* 
+void PayloadConvert::addByte(uint8_t value) {
+  /*
   not implemented
   */ }
 

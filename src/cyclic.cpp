@@ -19,6 +19,32 @@ void doHousekeeping() {
   // update uptime counter
   uptime();
 
+  #ifdef HAS_SDCARD
+MessageBuffer_t message;
+int nSent = 0;
+while(check_queue_available() && sdcardReadFrame(&message, nSent + 1) >= 0)
+{
+  message.MessagePrio = prio_normal;
+  if(!lora_enqueuedata(&message))
+  {
+    // wait for next sendMessage cycle
+    break;
+  }
+  else
+  {
+    ESP_LOGI(TAG, "Enqueue stored message to lora queue");
+    nSent += 1;
+  }
+}
+if(nSent > 0)
+{
+  sdRemoveFirstLines(nSent);
+}
+/*if (msent)
+  printSdFile();*/
+
+#endif
+
   // check if update mode trigger switch was set
   if (RTC_runmode == RUNMODE_UPDATE) {
     // check battery status if we can before doing ota
@@ -134,10 +160,13 @@ uint32_t getFreeRAM() {
 
 void reset_counters() {
 #if ((WIFICOUNTER) || (BLECOUNTER))
-  macs.clear();   // clear all macs container
+  macs_list_wifi.clear();   // clear all macs container
+  macs_list_ble.clear();   // clear all macs container
+  macs_list_bt.clear();   // clear all macs container
   macs_total = 0; // reset all counters
   macs_wifi = 0;
   macs_ble = 0;
+  macs_bt = 0;
 #ifdef HAS_DISPLAY
   oledPlotCurve(0, true);
 #endif

@@ -38,8 +38,10 @@
 #define MY_OLED_SCL (22)
 #define MY_OLED_RST NOT_A_PIN
 
+#define HAS_RTC MY_OLED_SDA, MY_OLED_SCL // SDA, SCL
+
 // Pins for LORA chip SPI interface, reset line and interrupt lines
-#define LORA_SCK  (5) 
+#define LORA_SCK  (5)
 #define LORA_CS   (18)
 #define LORA_MISO (19)
 #define LORA_MOSI (27)

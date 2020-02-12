@@ -5,13 +5,26 @@
 #include "macsniff.h"
 
 // Bluetooth specific includes
-#include <esp_bt.h>
-#include <esp_bt_main.h>
-#include <esp_gap_ble_api.h>
-#include <esp_blufi_api.h> // needed for BLE_ADDR types, do not remove
-#include <esp_coexist.h>
+#include "soc/timer_group_struct.h"
+#include "soc/timer_group_reg.h"
+
+#define RX_BLE 35
+#define TX_BLE 14
+#define EN_BLE 12
+#define BLESerial Serial1
+#define RX_BT 15
+#define TX_BT 13
+#define EN_BT 2
+#define BTSerial Serial2
+
+#define BTLE_SCAN_TIME 20
 
 void start_BLEscan(void);
 void stop_BLEscan(void);
+void initBLE(void);
+void initBT(void);
+void btHandler(void *pvParameters);
+void BLECycle(void);
+void BTCycle(void);
 
 #endif

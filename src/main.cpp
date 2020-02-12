@@ -276,19 +276,29 @@ void setup() {
 // start BLE scan callback if BLE function is enabled in NVRAM configuration
 // or switch off bluetooth, if not compiled
 #if (BLECOUNTER)
+  TaskHandle_t btHandlerTask = NULL;
   strcat_P(features, " BLE");
   if (cfg.blescan) {
+    ESP_LOGI(TAG, "Starting Bluetooth LE...");
+    //initBLE();
+    //BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
+  }
+  strcat_P(features, " BT");
+  if (cfg.btscan) {
     ESP_LOGI(TAG, "Starting Bluetooth...");
-    start_BLEscan();
-  } else
-    btStop();
-#else
-  // remove bluetooth stack to gain more free memory
-  btStop();
-  ESP_ERROR_CHECK(esp_bt_mem_release(ESP_BT_MODE_BTDM));
-  ESP_ERROR_CHECK(esp_coex_preference_set(
-      ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
+    //initBT();
+    //BTCycler.attach(BTLE_SCAN_TIME, BTCycle);
+  }
+  xTaskCreatePinnedToCore(btHandler,      // task function
+                          "bthandler",    // name of task
+                          4096,            // stack size of task
+                          (void *)1,       // parameter of the task
+                          1,               // priority of the task
+                          &btHandlerTask, // task handle
+                          1);              // CPU core
 #endif
+ESP_ERROR_CHECK(esp_coex_preference_set(
+    ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
 
 // initialize gps
 #if (HAS_GPS)

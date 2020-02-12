@@ -12,7 +12,8 @@ static const char TAG[] = __FILE__;
 uint16_t salt;
 
 uint16_t get_salt(void) {
-  return salt;
+  salt = cfg.salt;
+  return cfg.salt;
 }
 
 int8_t isBeacon(uint64_t mac) {
@@ -42,20 +43,13 @@ uint64_t macConvert(uint8_t *paddr) {
 }
 
 bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
-
   if (!salt) // ensure we have salt (appears after radio is turned on)
     return false;
 
-  char buff[10]; // temporary buffer for printf
+  char buff[32]; // temporary buffer for printf
   bool added = false;
   int8_t beaconID;    // beacon number in test monitor mode
-  uint16_t hashedmac; // temporary buffer for generated hash value
-  uint32_t *mac;      // temporary buffer for shortened MAC
-
-  // only last 3 MAC Address bytes are used for MAC address anonymization
-  // but since it's uint32 we take 4 bytes to avoid 1st value to be 0.
-  // this gets MAC in msb (= reverse) order, but doesn't matter for hashing it.
-  mac = (uint32_t *)(paddr + 2);
+  uint64_t hashedmac; // temporary buffer for generated hash value
 
 #if (VENDORFILTER)
   uint32_t *oui; // temporary buffer for vendor OUI
@@ -71,7 +65,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     // and increment counter on display
     // https://en.wikipedia.org/wiki/MAC_Address_Anonymization
 
-    ESP_LOGI(TAG, "MAC is: %02X%02X%02X%02X%02X%02X", paddr[0],paddr[1],paddr[2],paddr[3],paddr[4],paddr[5]);
+    //ESP_LOGI(TAG, "MAC is: %02X%02X%02X%02X%02X%02X", paddr[0],paddr[1],paddr[2],paddr[3],paddr[4],paddr[5]);
     snprintf(buff, sizeof(buff), "%02X%02X%02X%02X%02X%02X",
              paddr[0],paddr[1],paddr[2],paddr[3],paddr[4],paddr[5]);
     //ESP_LOGI(TAG, "Content of buff is: %s", buff);
@@ -155,7 +149,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     // Log scan result
     if(added)
     ESP_LOGD(TAG,
-             "%s %s RSSI %ddBi -> salted MAC %s -> Hash %04X -> WiFi:%d  "
+             "%s %s RSSI %ddBi -> salted MAC %s -> Hash %s -> WiFi:%d  "
              "BLE:%d -> BLTH:%d -> "
              "%d Bytes left",
              added ? "new  " : "known",

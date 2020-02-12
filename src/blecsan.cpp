@@ -10,258 +10,247 @@ https://github.com/nkolban/esp32-snippets/tree/master/BLE/scanner
 // local Tag for logging
 static const char TAG[] = "bluetooth";
 
-const char *bt_addr_t_to_string(esp_ble_addr_type_t type) {
-  switch (type) {
-  case BLE_ADDR_TYPE_PUBLIC:
-    return "BLE_ADDR_TYPE_PUBLIC";
-  case BLE_ADDR_TYPE_RANDOM:
-    return "BLE_ADDR_TYPE_RANDOM";
-  case BLE_ADDR_TYPE_RPA_PUBLIC:
-    return "BLE_ADDR_TYPE_RPA_PUBLIC";
-  case BLE_ADDR_TYPE_RPA_RANDOM:
-    return "BLE_ADDR_TYPE_RPA_RANDOM";
-  default:
-    return "Unknown addr_t";
+int readResponse(HardwareSerial* port, char* buff, int b_size, uint32_t timeout=3000)
+{
+  port->setTimeout(timeout);
+  int bytesRead = port->readBytesUntil('\n',buff, b_size);
+  if(bytesRead > 0)
+  {
+    buff[bytesRead] = 0;
+    return bytesRead;
   }
-} // bt_addr_t_to_string
+  else if (bytesRead < 0) return -1;
+  return 0;
+}
 
-const char *btsig_gap_type(uint32_t gap_type) {
-  switch (gap_type) {
-  case 0x01:
-    return "Flags";
-  case 0x02:
-    return "Incomplete List of 16-bit Service Class UUIDs";
-  case 0x03:
-    return "Complete List of 16-bit Service Class UUIDs";
-  case 0x04:
-    return "Incomplete List of 32-bit Service Class UUIDs";
-  case 0x05:
-    return "Complete List of 32-bit Service Class UUIDs";
-  case 0x06:
-    return "Incomplete List of 128-bit Service Class UUIDs";
-  case 0x07:
-    return "Complete List of 128-bit Service Class UUIDs";
-  case 0x08:
-    return "Shortened Local Name";
-  case 0x09:
-    return "Complete Local Name";
-  case 0x0A:
-    return "Tx Power Level";
-  case 0x0D:
-    return "Class of Device";
-  case 0x0E:
-    return "Simple Pairing Hash C/C-192";
-  case 0x0F:
-    return "Simple Pairing Randomizer R/R-192";
-  case 0x10:
-    return "Device ID/Security Manager TK Value";
-  case 0x11:
-    return "Security Manager Out of Band Flags";
-  case 0x12:
-    return "Slave Connection Interval Range";
-  case 0x14:
-    return "List of 16-bit Service Solicitation UUIDs";
-  case 0x1F:
-    return "List of 32-bit Service Solicitation UUIDs";
-  case 0x15:
-    return "List of 128-bit Service Solicitation UUIDs";
-  case 0x16:
-    return "Service Data - 16-bit UUID";
-  case 0x20:
-    return "Service Data - 32-bit UUID";
-  case 0x21:
-    return "Service Data - 128-bit UUID";
-  case 0x22:
-    return "LE Secure Connections Confirmation Value";
-  case 0x23:
-    return "LE Secure Connections Random Value";
-  case 0x24:
-    return "URI";
-  case 0x25:
-    return "Indoor Positioning";
-  case 0x26:
-    return "Transport Discovery Data";
-  case 0x17:
-    return "Public Target Address";
-  case 0x18:
-    return "Random Target Address";
-  case 0x19:
-    return "Appearance";
-  case 0x1A:
-    return "Advertising Interval";
-  case 0x1B:
-    return "LE Bluetooth Device Address";
-  case 0x1C:
-    return "LE Role";
-  case 0x1D:
-    return "Simple Pairing Hash C-256";
-  case 0x1E:
-    return "Simple Pairing Randomizer R-256";
-  case 0x3D:
-    return "3D Information Data";
-  case 0xFF:
-    return "Manufacturer Specific Data";
+bool assertResponse(const char* expected, char* received, int bytesRead)
+{
+  if(bytesRead <= 0) return false;
+  return strstr(received, expected) != nullptr;
+}
 
-  default:
-    return "Unknown type";
+bool sendAndReadOkResponse(HardwareSerial* port, const char* command)
+{
+  ESP_LOGD(TAG, "Command: %s", command);
+  port->println(command);
+  port->flush();
+  char buffer[64];
+  int bytesRead = readResponse(port, buffer, sizeof(buffer));
+  return assertResponse("OK\r", buffer, bytesRead);
+}
+
+int getDetectedDevices(char* buff, int buffLen)
+{
+  if (!assertResponse("Devices Found", buff, buffLen)) return -1;
+  return strtoul(buff + 14, NULL, 10);
+}
+
+void getMac(char* buff, uint8_t* out)
+{
+  for (int i =1 ; i < 7; i++)
+  {
+    char tempbuff[3];
+    tempbuff[0] = buff[2*i];
+    tempbuff[1] = buff[2*i + 1];
+    tempbuff[2] = 0;
+    out[i-1] = strtoul(tempbuff, NULL, 16) & 0xFF;
   }
-} // btsig_gap_type
+  return;
+}
 
-// using IRAM_:ATTR here to speed up callback function
-IRAM_ATTR void gap_callback_handler(esp_gap_ble_cb_event_t event,
-                                    esp_ble_gap_cb_param_t *param) {
-  esp_ble_gap_cb_param_t *p = (esp_ble_gap_cb_param_t *)param;
+int getMacsFromBT(char* buff, int bytesRead)
+{
+  if (bytesRead <= 0 )
+    return 0;
 
-  ESP_LOGV(TAG, "BT payload rcvd -> type: 0x%.2x -> %s", *p->scan_rst.ble_adv,
-           btsig_gap_type(*p->scan_rst.ble_adv));
+  int startPos = 5;
+  char* endPtr = nullptr;
+  unsigned long p1 = strtoul(buff + startPos, &endPtr, 16);
+  unsigned long p2 = strtoul(endPtr+1, &endPtr, 16);
+  unsigned long p3 = strtoul(endPtr+1, &endPtr, 16);
+  unsigned long btClass = strtoul(endPtr+1, &endPtr, 16) ;
+  int16_t rssi = strtol(endPtr+1, NULL, 16) &0xFFFF;
 
-  switch (event) {
-  case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT:
-    // restart scan
-    ESP_ERROR_CHECK(esp_ble_gap_start_scanning(BLESCANTIME));
-    break;
+  ESP_LOGD(TAG, "Parse input: MAC: %04X%02X%06X, BT Class: %06X, RSSI: %d", p1, p2, p3, btClass, rssi);
 
-  case ESP_GAP_BLE_SCAN_RESULT_EVT:
-    // evaluate scan results
-    if (p->scan_rst.search_evt ==
-        ESP_GAP_SEARCH_INQ_CMPL_EVT) // Inquiry complete, scan is done
-    {                                // restart scan
-      ESP_ERROR_CHECK(esp_ble_gap_start_scanning(BLESCANTIME));
-      return;
+  uint8_t mac[6];
+  mac[0] = (p1 >> 8) & 0xFF;
+  mac[1] = (p1) & 0xFF;
+  mac[2] = (p2) & 0xFF;
+  mac[3] = (p3 >> 16) & 0xFF;
+  mac[4] = (p3 >> 8) & 0xFF;
+  mac[5] = (p3) & 0xFF;
+
+  char tempBuffer[64];
+  sprintf(tempBuffer, "Device MAC: ");
+  for (int n = 0; n < 6; n++)
+  {
+    sprintf(tempBuffer + 2*n, "%02X",mac[n]);
+  }
+  ESP_LOGD(TAG, "MAC parsed: %s", tempBuffer);
+  mac_add((uint8_t *)mac, rssi, MAC_SNIFF_BT);
+  return 0;
+}
+
+int getMacsFromBLE(int totalMacs)
+{
+  if (totalMacs <= 0 )
+    return 0;
+  BLESerial.println("AT+SHOW");
+  char buffer[64];
+  long start_time = millis();
+  for (int i =0; i<totalMacs; i++)
+  {
+    int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+    if (!assertResponse("Device", buffer, bytesRead)) return -1;
+    int deviceN = strtoul(buffer + 7, NULL, 10);
+    bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+    if (bytesRead != 15 || !assertResponse("0x", buffer, bytesRead))
+    {
+      ESP_LOGE(TAG, "error reading mac, ignoring");
+      continue;
     }
-
-    if (p->scan_rst.search_evt ==
-        ESP_GAP_SEARCH_INQ_RES_EVT) // Inquiry result for a peer device
-    {                               // evaluate sniffed packet
-      ESP_LOGV(TAG, "Device address (bda): %02x:%02x:%02x:%02x:%02x:%02x",
-               BT_BD_ADDR_HEX(p->scan_rst.bda));
-      ESP_LOGV(TAG, "Addr_type           : %s",
-               bt_addr_t_to_string(p->scan_rst.ble_addr_type));
-      ESP_LOGV(TAG, "RSSI                : %d", p->scan_rst.rssi);
-
-      if ((cfg.rssilimit) &&
-          (p->scan_rst.rssi < cfg.rssilimit)) { // rssi is negative value
-        ESP_LOGI(TAG, "BLTH RSSI %d -> ignoring (limit: %d)", p->scan_rst.rssi,
-                 cfg.rssilimit);
-        break;
-      }
-
-#if (VENDORFILTER)
-
-      if ((p->scan_rst.ble_addr_type == BLE_ADDR_TYPE_RANDOM) ||
-          (p->scan_rst.ble_addr_type == BLE_ADDR_TYPE_RPA_RANDOM)) {
-        ESP_LOGV(TAG, "BT device filtered");
-        break;
-      }
-
-#endif
-
-      // add this device and show new count total if it was not previously added
-      mac_add((uint8_t *)p->scan_rst.bda, p->scan_rst.rssi, MAC_SNIFF_BLE);
-
-      /* to be improved in vendorfilter if:
-      
-
-
-      // you can search for elements in the payload using the
-      // function esp_ble_resolve_adv_data()
-      //
-      // Like this, that scans for the "Complete name" (looking inside the
-      payload buffer)
-      // uint8_t len;
-      // uint8_t *data = esp_ble_resolve_adv_data(p->scan_rst.ble_adv,
-      ESP_BLE_AD_TYPE_NAME_CMPL, &len);
-
-      filter BLE devices using their advertisements to get filter alternative to
-      vendor OUI if vendorfiltering is on, we ...
-      - want to count: mobile phones and tablets
-      - don't want to count: beacons, peripherals (earphones, headsets,
-      printers), cars and machines see
-      https://github.com/nkolban/ESP32_BLE_Arduino/blob/master/src/BLEAdvertisedDevice.cpp
-
-      http://www.libelium.com/products/meshlium/smartphone-detection/
-
-      https://www.question-defense.com/2013/01/12/bluetooth-cod-bluetooth-class-of-deviceclass-of-service-explained
-
-      https://www.bluetooth.com/specifications/assigned-numbers/baseband
-
-      "The Class of Device (CoD) in case of Bluetooth which allows us to
-      differentiate the type of device (smartphone, handsfree, computer,
-      LAN/network AP). With this parameter we can differentiate among
-      pedestrians and vehicles."
-
-      */
-
-    } // evaluate sniffed packet
-    break;
-
-  default:
-    break;
+    uint8_t mac[6];
+    getMac(buffer, mac);
+    char tempBuffer[64];
+    sprintf(tempBuffer, "Device #%d MAC: ", deviceN);
+    for (int n = 0; n < 6; n++)
+    {
+      sprintf(tempBuffer + 2*n, "%02X",mac[n]);
+    }
+    ESP_LOGD(TAG, "%s", tempBuffer);
+    mac_add((uint8_t *)mac, 100, MAC_SNIFF_BLE);
   }
-} // gap_callback_handler
+  while(BLESerial.available())
+  {
+    BLESerial.read();
+  }
+  return 0;
+}
 
-esp_err_t register_ble_callback(void) {
-  ESP_LOGI(TAG, "Register GAP callback");
+void initBLE()
+{
+  digitalWrite(EN_BLE, HIGH);
+  pinMode(EN_BLE, OUTPUT);
+  BLESerial.begin(9600, SERIAL_8N1, RX_BLE, TX_BLE);
+  sendAndReadOkResponse(&BLESerial,"AT");
+  BLESerial.println("AT+ROLE1");
+  char buffer[64];
+  int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+  if( !assertResponse("+ROLE=1\r", buffer, bytesRead) )
+  {
+    ESP_LOGE(TAG, "ERROR INITIALIZING BLE");
+    return;
+  }
+  readResponse(&BLESerial, buffer, sizeof(buffer));
+  if( !assertResponse("OK\r", buffer, bytesRead) )
+  {
+    ESP_LOGE(TAG,"ERROR INITIALIZING BLE");
+    return;
+  }
+  ESP_LOGD(TAG, "BLE Initialized as Master");
+  delay(2500);
+}
 
-  // This function is called to occur gap event, such as scan result.
-  // register the scan callback function to the gap module
-  ESP_ERROR_CHECK(esp_ble_gap_register_callback(&gap_callback_handler));
 
-  static esp_ble_scan_params_t ble_scan_params = {
-    .scan_type = BLE_SCAN_TYPE_PASSIVE,
-    .own_addr_type = BLE_ADDR_TYPE_RANDOM,
+void BLECycle(void)
+{
+  if(!cfg.blescan) return;
+  ESP_LOGD(TAG, "cycling ble scan");
+  ESP_LOGD(TAG, "Set BLE inquiry mode");
+  char buffer[64];
+  sendAndReadOkResponse(&BLESerial,"AT+INQ");
+  int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+  if(! assertResponse("+INQS\r", buffer, bytesRead))
+  {
+    ESP_LOGE(TAG, "Error setting BLE INQ mode");
+    return;
+  }
 
-#if (VENDORFILTER)
-    .scan_filter_policy = BLE_SCAN_FILTER_ALLOW_WLIST_PRA_DIR,
-  // ADV_IND, ADV_NONCONN_IND, ADV_SCAN_IND packets are used for broadcasting
-  // data in broadcast applications (e.g., Beacons), so we don't want them in
-  // vendorfilter mode
-#else
-    .scan_filter_policy = BLE_SCAN_FILTER_ALLOW_ALL,
-#endif
+  //ENTER INQ MODE
+  ESP_LOGD(TAG, "start INQ mode ");
+  long start_time = millis();
+  while(millis() - start_time < (BTLE_SCAN_TIME/2) * 1000)
+  {
+    bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+    if(assertResponse("+INQE\r", buffer, bytesRead))
+    {
+      ESP_LOGD(TAG, "finish INQ mode ");
+      bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+      int devicesDetected = getDetectedDevices(buffer, bytesRead);
+      ESP_LOGD(TAG, "%d devices detected", devicesDetected);
+      getMacsFromBLE(devicesDetected);
+      break;
+    }
+  }
+  return;
+}
 
-    .scan_interval =
-        (uint16_t)(cfg.blescantime * 10 / 0.625),    // Time = N * 0.625 msec
-    .scan_window = (uint16_t)(BLESCANWINDOW / 0.625) // Time = N * 0.625 msec
-  };
+void initBT()
+{
+  pinMode(EN_BT, OUTPUT);  // this pin will pull the HC-05 pin 34 (key pin) HIGH to switch module to AT mode
+  digitalWrite(EN_BT, HIGH);
+  BTSerial.begin(38400, SERIAL_8N1, RX_BT, TX_BT);  // HC-05 default speed in AT command more
+  ESP_LOGD(TAG, "Initialize BT inquiry mode");
+  if (!(
+    sendAndReadOkResponse(&BTSerial, "AT") &&
+    sendAndReadOkResponse(&BTSerial,"AT+RMAAD") &&
+    sendAndReadOkResponse(&BTSerial,"AT+ROLE=1") &&
+    sendAndReadOkResponse(&BTSerial,"AT+RESET")))
+    {
+      ESP_LOGE(TAG, "Error initializing BT");
+    }
+  delay(2000);
+  if (!(
+    sendAndReadOkResponse(&BTSerial,"AT+CMODE=1") &&
+    sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
+    sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7")))
+    {
+      ESP_LOGE(TAG, "Error initializing BT");
+    }
+  ESP_LOGD(TAG, "BT initialized as Master");
+}
 
-  ESP_LOGI(TAG, "Set GAP scan parameters");
+void BTCycle(void)
+{
+  if(!cfg.btscan) return;
+  ESP_LOGD(TAG, "cycling bt scan");
 
-  // This function is called to set scan parameters.
-  ESP_ERROR_CHECK(esp_ble_gap_set_scan_params(&ble_scan_params));
+  long startTime = millis();
+  BTSerial.print("AT+INQ\r\n");
+  BTSerial.flush();
+  char buffer[64];
+  int bytesRead = 0;
 
-  return ESP_OK;
+  while (millis() - startTime < (BTLE_SCAN_TIME)*1000)
+  {
+    bytesRead = readResponse(&BTSerial, buffer, sizeof(buffer), 500);
+    if(assertResponse("OK\r", buffer, bytesRead))
+    {
+      ESP_LOGD(TAG, "finish INQ mode");
+      break;
+    }
+    if(assertResponse("+INQ:", buffer, bytesRead))
+    {
+      ESP_LOGD(TAG, "Got message %s", buffer);
+      getMacsFromBT(buffer, bytesRead);
+    }
+    delay(10);
+  }
+  return;
+}
 
-} // register_ble_callback
-
-void start_BLEscan(void) {
-#if (BLECOUNTER)
-  ESP_LOGI(TAG, "Initializing bluetooth scanner ...");
-
-  ESP_ERROR_CHECK(esp_coex_preference_set(
-      ESP_COEX_PREFER_BALANCE)); // configure Wifi/BT coexist lib
-
-  // Initialize BT controller to allocate task and other resource.
-  btStart();
-  ESP_ERROR_CHECK(esp_bluedroid_init());
-  ESP_ERROR_CHECK(esp_bluedroid_enable());
-
-  // Register callback function for capturing bluetooth packets
-  ESP_ERROR_CHECK(register_ble_callback());
-
-  ESP_LOGI(TAG, "Bluetooth scanner started");
-#endif // BLECOUNTER
-} // start_BLEscan
-
-void stop_BLEscan(void) {
-#if (BLECOUNTER)
-  ESP_LOGI(TAG, "Shutting down bluetooth scanner ...");
-  ESP_ERROR_CHECK(esp_ble_gap_register_callback(NULL));
-  ESP_ERROR_CHECK(esp_bluedroid_disable());
-  ESP_ERROR_CHECK(esp_bluedroid_deinit());
-  btStop(); // disable bt_controller
-  ESP_ERROR_CHECK(esp_coex_preference_set(
-      ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
-  ESP_LOGI(TAG, "Bluetooth scanner stopped");
-#endif // BLECOUNTER
-} // stop_BLEscan
+void btHandler(void *pvParameters)
+{
+  delay(500);
+  initBT();
+  delay(500);
+  initBLE();
+  while(true)
+  {
+    BTCycle();
+    delay(5000);
+    BLECycle();
+    delay(5000);
+  }
+}

@@ -46,6 +46,20 @@ void set_rssi(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set RSSI limit to %d", cfg.rssilimit);
 }
 
+void set_salt(uint8_t val[]){
+  cfg.salt = (val[0]*256)+val[1];
+  ESP_LOGI(TAG, "1st byte is: %d", val[0]);
+  ESP_LOGI(TAG, "2nd byte is: %d", val[1]);
+  ESP_LOGI(TAG, "Remote command: set SALT to %d", cfg.salt);
+}
+
+void get_userSalt(uint8_t val[]) {
+  ESP_LOGI(TAG, "Remote command: get SALT");
+  payload.reset();
+  payload.addSalt(cfg.salt);
+  SendPayload(CONFIGPORT, prio_high);
+}
+
 void set_sendcycle(uint8_t val[]) {
   cfg.sendcycle = val[0];
   // update send cycle interrupt [seconds
@@ -70,8 +84,6 @@ void set_blescantime(uint8_t val[]) {
            cfg.blescantime / float(100));
   // stop & restart BLE scan task to apply new parameter
   if (cfg.blescan) {
-    stop_BLEscan();
-    start_BLEscan();
   }
 }
 
@@ -217,16 +229,24 @@ void set_blescan(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set BLE scanner to %s", val[0] ? "on" : "off");
   cfg.blescan = val[0] ? 1 : 0;
   if (cfg.blescan)
-    start_BLEscan();
+  {
+  }
   else {
     macs_ble = 0; // clear BLE counter
-    stop_BLEscan();
   }
 }
 
 void set_btscan(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set BT scanner to %s", val[0] ? "on" : "off");
   cfg.btscan = val[0] ? 1 : 0;
+  if (cfg.btscan)
+  {
+
+  }
+  else
+  {
+    macs_bt = 0;
+  }
 }
 
 void set_wifiscan(uint8_t val[]) {
@@ -360,11 +380,13 @@ static cmd_t table[] = {
     {0x11, set_monitor, 1, true},       {0x12, set_beacon, 7, false},
     {0x13, set_sensor, 2, true},        {0x14, set_payloadmask, 1, true},
     {0x15, set_bme, 1, true},           {0x16, set_batt, 1, true},
-    {0x17, set_wifiscan, 1, true},      {0x0e, set_btscan, 1, true},
+    {0x17, set_wifiscan, 1, true},      {0x18, set_salt, 2, true},
+    {0x0e, set_btscan, 1, true},
     {0x80, get_config, 0, false},
     {0x81, get_status, 0, false},       {0x83, get_batt, 0, false},
     {0x84, get_gps, 0, false},          {0x85, get_bme, 0, false},
     {0x86, get_time, 0, false},         {0x87, set_time, 0, false},
+    {0x88, get_userSalt, 0, false},
     {0x99, set_flush, 0, false}};
 
 static const uint8_t cmdtablesize =

@@ -80,6 +80,7 @@ typedef struct {
   uint8_t monitormode;   // 0=disabled, 1=enabled
   uint8_t runmode;       // 0=normal, 1=update
   uint8_t payloadmask;   // bitswitches for payload data
+  uint16_t salt;
   char version[10];      // Firmware version
   uint8_t
       bsecstate[BSEC_MAX_STATE_BLOB_SIZE + 1]; // BSEC state for BME680 sensor
@@ -127,7 +128,7 @@ extern bool volatile TimePulseTick; // 1sec pps flag set by GPS or RTC
 extern timesource_t timeSource;
 extern hw_timer_t *displayIRQ, *matrixDisplayIRQ, *ppsIRQ;
 extern SemaphoreHandle_t I2Caccess;
-extern TaskHandle_t irqHandlerTask, ClockTask;
+extern TaskHandle_t irqHandlerTask, ClockTask, btHandlerTask;
 extern TimerHandle_t WifiChanTimer;
 extern Timezone myTZ;
 extern time_t userUTCTime;

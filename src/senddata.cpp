@@ -121,17 +121,17 @@ void sendData() {
         }
         // Space for Dummy MAC generation:
         // change 100 for the amount of MACs desired in a 2 minute interval.
-        if(!sent){
+        /*if(!sent){
           for (int i =0; i < 400; i++)
           {
             dummy_mac=(uint32_t)random(10000);
             macs_vector.push_back(dummy_mac);
-          }//hasta aqui*/
+          }//hasta aqui
           sent = true;
-        }
+        }*/
 
         uint16_t total_macs = macs_vector.size();
-        ESP_LOGI(TAG, "Total MAC counter currently is at: %d", total_macs);
+        ESP_LOGI(TAG, "Total WIFI MAC counter currently is at: %d", total_macs);
         while (total_macs != 0) {
           uint16_t macs_to_send = 0;
           if (total_macs <= 11) {
@@ -147,10 +147,10 @@ void sendData() {
             payload.addMac(macs_vector.back());
             macs_vector.pop_back();
           }
-          ESP_LOGI(TAG, "Macs being sent in this payload: %d", macs_to_send);
-          ESP_LOGI(TAG, "Lenght of Payload is: %d", sizeof(payload));
+          //ESP_LOGI(TAG, "Macs being sent in this payload: %d", macs_to_send);
+          //ESP_LOGI(TAG, "Lenght of Payload is: %d", sizeof(payload));
           SendPayload(WIFIMACSPORT, prio_low);
-          ESP_LOGI(TAG, "enqueue mac message");
+          //ESP_LOGI(TAG, "enqueue mac message");
         }
       }
       if (cfg.blescan)
@@ -169,7 +169,7 @@ void sendData() {
           macs_vector.push_back(dummy_mac);
         }//hasta aqui*/
         uint16_t total_macs = macs_vector.size();
-        ESP_LOGI(TAG, "Total MAC counter currently is at: %d", total_macs);
+        ESP_LOGI(TAG, "Total BLE MAC counter currently is at: %d", total_macs);
         while (total_macs != 0) {
           uint16_t macs_to_send = 0;
           if (total_macs <= 11) {
@@ -185,17 +185,17 @@ void sendData() {
             payload.addMac(macs_vector.back());
             macs_vector.pop_back();
           }
-          ESP_LOGI(TAG, "Macs being sent in this payload: %d", macs_to_send);
-          ESP_LOGI(TAG, "Lenght of Payload is: %d", sizeof(payload));
+          //ESP_LOGI(TAG, "Macs being sent in this payload: %d", macs_to_send);
+          //ESP_LOGI(TAG, "Lenght of Payload is: %d", sizeof(payload));
           SendPayload(BLEMACSPORT, prio_low);
-          ESP_LOGI(TAG, "enqueue mac message");
+          //ESP_LOGI(TAG, "enqueue mac message");
         }
       }
       if (cfg.btscan)
       {
         std::vector<uint32_t> macs_vector;
         uint32_t dummy_mac;
-        for (auto m : macs_list_wifi) {
+        for (auto m : macs_list_bt) {
           // ESP_LOGI(TAG, "%X", m);
           macs_vector.push_back(m);
         }
@@ -207,7 +207,7 @@ void sendData() {
           macs_vector.push_back(dummy_mac);
         }//hasta aqui*/
         uint16_t total_macs = macs_vector.size();
-        ESP_LOGI(TAG, "Total MAC counter currently is at: %d", total_macs);
+        ESP_LOGI(TAG, "Total BT MAC counter currently is at: %d", total_macs);
         while (total_macs != 0) {
           uint16_t macs_to_send = 0;
           if (total_macs <= 11) {
@@ -223,10 +223,10 @@ void sendData() {
             payload.addMac(macs_vector.back());
             macs_vector.pop_back();
           }
-          ESP_LOGI(TAG, "Macs being sent in this payload: %d", macs_to_send);
-          ESP_LOGI(TAG, "Lenght of Payload is: %d", sizeof(payload));
+          //ESP_LOGI(TAG, "Macs being sent in this payload: %d", macs_to_send);
+          //ESP_LOGI(TAG, "Lenght of Payload is: %d", sizeof(payload));
           SendPayload(BTMACSPORT, prio_low);
-          ESP_LOGI(TAG, "enqueue mac message");
+          //ESP_LOGI(TAG, "enqueue mac message");
         }
       }
       // clear counter if not in cumulative counter mode

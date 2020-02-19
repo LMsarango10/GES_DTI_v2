@@ -31,7 +31,7 @@ bool assertResponse(const char* expected, char* received, int bytesRead)
 
 bool sendAndReadOkResponse(HardwareSerial* port, const char* command)
 {
-  ESP_LOGD(TAG, "Command: %s", command);
+  ESP_LOGV(TAG, "Command: %s", command);
   port->println(command);
   port->flush();
   char buffer[64];
@@ -71,7 +71,7 @@ int getMacsFromBT(char* buff, int bytesRead)
   unsigned long btClass = strtoul(endPtr+1, &endPtr, 16) ;
   int16_t rssi = strtol(endPtr+1, NULL, 16) &0xFFFF;
 
-  ESP_LOGD(TAG, "Parse input: MAC: %04X%02X%06X, BT Class: %06X, RSSI: %d", p1, p2, p3, btClass, rssi);
+  ESP_LOGV(TAG, "Parse input: MAC: %04X%02X%06X, BT Class: %06X, RSSI: %d", p1, p2, p3, btClass, rssi);
 
   uint8_t mac[6];
   mac[0] = (p1 >> 8) & 0xFF;
@@ -87,7 +87,7 @@ int getMacsFromBT(char* buff, int bytesRead)
   {
     sprintf(tempBuffer + 2*n, "%02X",mac[n]);
   }
-  ESP_LOGD(TAG, "MAC parsed: %s", tempBuffer);
+  ESP_LOGV(TAG, "MAC parsed: %s", tempBuffer);
   mac_add((uint8_t *)mac, rssi, MAC_SNIFF_BT);
   return 0;
 }
@@ -118,7 +118,7 @@ int getMacsFromBLE(int totalMacs)
     {
       sprintf(tempBuffer + 2*n, "%02X",mac[n]);
     }
-    ESP_LOGD(TAG, "%s", tempBuffer);
+    ESP_LOGV(TAG, "%s", tempBuffer);
     mac_add((uint8_t *)mac, 100, MAC_SNIFF_BLE);
   }
   while(BLESerial.available())
@@ -156,8 +156,8 @@ void initBLE()
 void BLECycle(void)
 {
   if(!cfg.blescan) return;
-  ESP_LOGD(TAG, "cycling ble scan");
-  ESP_LOGD(TAG, "Set BLE inquiry mode");
+  ESP_LOGV(TAG, "cycling ble scan");
+  ESP_LOGV(TAG, "Set BLE inquiry mode");
   char buffer[64];
   sendAndReadOkResponse(&BLESerial,"AT+INQ");
   int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
@@ -168,17 +168,17 @@ void BLECycle(void)
   }
 
   //ENTER INQ MODE
-  ESP_LOGD(TAG, "start INQ mode ");
+  ESP_LOGV(TAG, "start INQ mode ");
   long start_time = millis();
   while(millis() - start_time < (BTLE_SCAN_TIME/2) * 1000)
   {
     bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
     if(assertResponse("+INQE\r", buffer, bytesRead))
     {
-      ESP_LOGD(TAG, "finish INQ mode ");
+      ESP_LOGV(TAG, "finish INQ mode ");
       bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
       int devicesDetected = getDetectedDevices(buffer, bytesRead);
-      ESP_LOGD(TAG, "%d devices detected", devicesDetected);
+      ESP_LOGV(TAG, "%d devices detected", devicesDetected);
       getMacsFromBLE(devicesDetected);
       break;
     }
@@ -207,6 +207,7 @@ void initBT()
     sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7")))
     {
       ESP_LOGE(TAG, "Error initializing BT");
+      return;
     }
   ESP_LOGD(TAG, "BT initialized as Master");
 }
@@ -214,7 +215,7 @@ void initBT()
 void BTCycle(void)
 {
   if(!cfg.btscan) return;
-  ESP_LOGD(TAG, "cycling bt scan");
+  ESP_LOGV(TAG, "cycling bt scan");
 
   long startTime = millis();
   BTSerial.print("AT+INQ\r\n");
@@ -227,12 +228,12 @@ void BTCycle(void)
     bytesRead = readResponse(&BTSerial, buffer, sizeof(buffer), 500);
     if(assertResponse("OK\r", buffer, bytesRead))
     {
-      ESP_LOGD(TAG, "finish INQ mode");
+      ESP_LOGV(TAG, "finish INQ mode");
       break;
     }
     if(assertResponse("+INQ:", buffer, bytesRead))
     {
-      ESP_LOGD(TAG, "Got message %s", buffer);
+      ESP_LOGV(TAG, "Got message %s", buffer);
       getMacsFromBT(buffer, bytesRead);
     }
     delay(10);

@@ -9,9 +9,9 @@
 // Local logging tag
 static const char TAG[] = __FILE__;
 
-uint16_t salt;
+uint32_t salt;
 
-uint16_t get_salt(void) {
+uint32_t get_salt(void) {
   salt = cfg.salt;
   return cfg.salt;
 }

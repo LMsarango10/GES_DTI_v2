@@ -68,7 +68,7 @@ typedef struct {
   uint8_t screenon;    // 0=disabled, 1=enabled
   uint8_t countermode; // 0=cyclic unconfirmed, 1=cumulative, 2=cyclic confirmed
   int16_t rssilimit;   // threshold for rssilimiter, negative value!
-  uint8_t sendcycle;   // payload send cycle [seconds/2]
+  uint16_t sendcycle;   // payload send cycle [seconds/2]
   uint8_t wifichancycle; // wifi channel switch cycle [seconds/100]
   uint8_t blescantime;   // BLE scan cycle duration [seconds]
   uint8_t blescan;       // 0=disabled, 1=enabled
@@ -80,7 +80,7 @@ typedef struct {
   uint8_t monitormode;   // 0=disabled, 1=enabled
   uint8_t runmode;       // 0=normal, 1=update
   uint8_t payloadmask;   // bitswitches for payload data
-  uint16_t salt;
+  uint32_t salt;
   char version[10];      // Firmware version
   uint8_t
       bsecstate[BSEC_MAX_STATE_BLOB_SIZE + 1]; // BSEC state for BME680 sensor

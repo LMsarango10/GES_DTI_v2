@@ -293,7 +293,7 @@ void setup() {
                           "bthandler",    // name of task
                           4096,            // stack size of task
                           (void *)1,       // parameter of the task
-                          1,               // priority of the task
+                          0,               // priority of the task
                           &btHandlerTask, // task handle
                           1);              // CPU core
 #endif
@@ -450,7 +450,7 @@ ESP_ERROR_CHECK(esp_coex_preference_set(
 #endif // HAS_BUTTON
 
   // cyclic function interrupts
-  sendcycler.attach(SENDCYCLE * 2, sendcycle);
+  sendcycler.attach(cfg.sendcycle * 2, sendcycle);
   housekeeper.attach(HOMECYCLE, housekeeping);
 
 #if (TIME_SYNC_INTERVAL)

@@ -36,7 +36,7 @@ void defaultConfig() {
   cfg.rgblum = RGBLUMINOSITY;      // RGB Led luminosity (0..100%)
   cfg.monitormode = 0;             // 0=disabled, 1=enabled
   cfg.payloadmask = PAYLOADMASK;   // all payload switched on
-  cfg.salt = 0xFFFF;
+  cfg.salt = 0xFFFFFFFF;
   cfg.bsecstate[BSEC_MAX_STATE_BLOB_SIZE] = {
       0}; // init BSEC state for BME680 sensor
 
@@ -83,6 +83,7 @@ void saveConfig() {
   if (err == ESP_OK) {
     int8_t flash8 = 0;
     int16_t flash16 = 0;
+    int32_t flash32 = 0;
     size_t required_size;
     uint8_t bsecstate_buffer[BSEC_MAX_STATE_BLOB_SIZE + 1];
     char storedversion[10];
@@ -139,6 +140,10 @@ void saveConfig() {
         flash8 != cfg.blescan)
       nvs_set_i8(my_handle, "blescanmode", cfg.blescan);
 
+    if (nvs_get_i8(my_handle, "btscanmode", &flash8) != ESP_OK ||
+        flash8 != cfg.btscan)
+      nvs_set_i8(my_handle, "btscanmode", cfg.btscan);
+
     if (nvs_get_i8(my_handle, "wifiscanmode", &flash8) != ESP_OK ||
         flash8 != cfg.wifiscan)
       nvs_set_i8(my_handle, "wifiscanmode", cfg.wifiscan);
@@ -166,6 +171,10 @@ void saveConfig() {
     if (nvs_get_i16(my_handle, "rssilimit", &flash16) != ESP_OK ||
         flash16 != cfg.rssilimit)
       nvs_set_i16(my_handle, "rssilimit", cfg.rssilimit);
+
+    if (nvs_get_i32(my_handle, "salt", &flash32) != ESP_OK ||
+        flash32 != cfg.salt)
+      nvs_set_i32(my_handle, "salt", cfg.salt);
 
     err = nvs_commit(my_handle);
     nvs_close(my_handle);
@@ -198,6 +207,7 @@ void loadConfig() {
   else {
     int8_t flash8 = 0;
     int16_t flash16 = 0;
+    int32_t flash32 = 0;
     size_t required_size;
 
     // check if configuration stored in NVRAM matches PROGVERSION
@@ -328,6 +338,14 @@ void loadConfig() {
       saveConfig();
     }
 
+    if (nvs_get_i8(my_handle, "btscanmode", &flash8) == ESP_OK) {
+      cfg.btscan = flash8;
+      ESP_LOGI(TAG, "BTscanmode = %d", flash8);
+    } else {
+      ESP_LOGI(TAG, "BTscanmode set to default %d", cfg.btscan);
+      saveConfig();
+    }
+
     if (nvs_get_i8(my_handle, "wifiscanmode", &flash8) == ESP_OK) {
       cfg.wifiscan = flash8;
       ESP_LOGI(TAG, "WIFIscanmode = %d", flash8);
@@ -357,6 +375,14 @@ void loadConfig() {
       ESP_LOGI(TAG, "Monitor mode = %d", flash8);
     } else {
       ESP_LOGI(TAG, "Monitor mode set to default %d", cfg.monitormode);
+      saveConfig();
+    }
+
+    if (nvs_get_i32(my_handle, "salt", &flash32) == ESP_OK) {
+      cfg.monitormode = flash32;
+      ESP_LOGI(TAG, "Salt = %d", flash32);
+    } else {
+      ESP_LOGI(TAG, "Salt set to default %d", cfg.monitormode);
       saveConfig();
     }
 

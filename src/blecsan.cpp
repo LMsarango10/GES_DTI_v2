@@ -128,28 +128,48 @@ int getMacsFromBLE(int totalMacs)
   return 0;
 }
 
-void initBLE()
+bool reinitBLE()
 {
-  digitalWrite(EN_BLE, HIGH);
-  pinMode(EN_BLE, OUTPUT);
-  BLESerial.begin(9600, SERIAL_8N1, RX_BLE, TX_BLE);
-  sendAndReadOkResponse(&BLESerial,"AT");
-  BLESerial.println("AT+ROLE1");
-  char buffer[64];
-  int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
-  if( !assertResponse("+ROLE=1\r", buffer, bytesRead) )
+  if(!sendAndReadOkResponse(&BLESerial,"AT"))
   {
-    ESP_LOGE(TAG, "ERROR INITIALIZING BLE");
-    return;
+    ESP_LOGE(TAG, "ERROR INITIALIZING BLE, No AT response");
+    return false;
   }
-  readResponse(&BLESerial, buffer, sizeof(buffer));
-  if( !assertResponse("OK\r", buffer, bytesRead) )
+  char buffer[64];
+  BLESerial.println("AT+ROLE");
+  int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+  if(bytesRead <= 0)
   {
-    ESP_LOGE(TAG,"ERROR INITIALIZING BLE");
-    return;
+    ESP_LOGE(TAG, "ERROR INITIALIZING BLE, No response");
+    return false;
+  }
+  if(!assertResponse("+ROLE=1\r", buffer, bytesRead))
+  {
+    BLESerial.println("AT+ROLE1");
+    bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+
+    if( !assertResponse("+ROLE=1\r", buffer, bytesRead) )
+    {
+      ESP_LOGE(TAG, "ERROR INITIALIZING BLE AT ROLE");
+      return false;
+    }
+    readResponse(&BLESerial, buffer, sizeof(buffer));
+    if( !assertResponse("OK\r", buffer, bytesRead) )
+    {
+      ESP_LOGE(TAG,"ERROR INITIALIZING BLE OK TIMEOUT");
+      return false;
+    }
   }
   ESP_LOGD(TAG, "BLE Initialized as Master");
-  delay(2500);
+  return true;
+}
+
+bool initBLE()
+{
+  pinMode(EN_BLE, OUTPUT);
+  digitalWrite(EN_BLE, HIGH);
+  BLESerial.begin(9600, SERIAL_8N1, RX_BLE, TX_BLE);
+  return reinitBLE();
 }
 
 
@@ -185,21 +205,17 @@ void BLECycle(void)
   }
   return;
 }
-
-void initBT()
+bool reinitBT()
 {
-  pinMode(EN_BT, OUTPUT);  // this pin will pull the HC-05 pin 34 (key pin) HIGH to switch module to AT mode
-  digitalWrite(EN_BT, HIGH);
-  BTSerial.begin(38400, SERIAL_8N1, RX_BT, TX_BT);  // HC-05 default speed in AT command more
-  ESP_LOGD(TAG, "Initialize BT inquiry mode");
   if (!(
-    sendAndReadOkResponse(&BTSerial, "AT") &&
+    sendAndReadOkResponse(&BTSerial, "AT+ORGL") &&
     sendAndReadOkResponse(&BTSerial,"AT+RMAAD") &&
-    sendAndReadOkResponse(&BTSerial,"AT+ROLE=1") &&
-    sendAndReadOkResponse(&BTSerial,"AT+RESET")))
+    sendAndReadOkResponse(&BTSerial,"AT+ROLE=1")))
     {
       ESP_LOGE(TAG, "Error initializing BT");
+      return false;
     }
+  sendAndReadOkResponse(&BTSerial,"AT+RESET");
   delay(2000);
   if (!(
     sendAndReadOkResponse(&BTSerial,"AT+CMODE=1") &&
@@ -207,9 +223,18 @@ void initBT()
     sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7")))
     {
       ESP_LOGE(TAG, "Error initializing BT");
-      return;
+      return false;
     }
   ESP_LOGD(TAG, "BT initialized as Master");
+  return true;
+}
+bool initBT(long baud)
+{
+  pinMode(EN_BT, OUTPUT);  // this pin will pull the HC-05 pin 34 (key pin) HIGH to switch module to AT mode
+  digitalWrite(EN_BT, HIGH);
+  BTSerial.begin(baud, SERIAL_8N1, RX_BT, TX_BT);  // HC-05 default speed in AT command more
+  ESP_LOGD(TAG, "Initialize BT inquiry mode at %d", baud);
+  return reinitBT();
 }
 
 void BTCycle(void)
@@ -229,7 +254,7 @@ void BTCycle(void)
     if(assertResponse("OK\r", buffer, bytesRead))
     {
       ESP_LOGV(TAG, "finish INQ mode");
-      break;
+      return;
     }
     if(assertResponse("+INQ:", buffer, bytesRead))
     {
@@ -238,20 +263,26 @@ void BTCycle(void)
     }
     delay(10);
   }
+  ESP_LOGE(TAG, "Timeout while scanning BT");
   return;
 }
 
 void btHandler(void *pvParameters)
 {
-  delay(500);
-  initBT();
-  delay(500);
-  initBLE();
+  delay(1000);
+  bool btInitialized = initBT(38400);
+  bool bleInitialized = initBLE();
   while(true)
   {
     BTCycle();
     delay(5000);
+    if(!btInitialized) {
+      btInitialized = reinitBT();
+    }
     BLECycle();
     delay(5000);
+    if(!bleInitialized) {
+      bleInitialized = reinitBLE();
+    }
   }
 }

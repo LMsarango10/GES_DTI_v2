@@ -21,8 +21,8 @@
 
 void start_BLEscan(void);
 void stop_BLEscan(void);
-void initBLE(void);
-void initBT(void);
+bool initBLE(void);
+bool initBT(long baud);
 void btHandler(void *pvParameters);
 void BLECycle(void);
 void BTCycle(void);

@@ -12,5 +12,9 @@
 
 bool sdcardInit( void );
 void sdcardWriteData( uint16_t, uint16_t);
+int sdcardReadFrame(MessageBuffer_t *message, int N);
+void sdcardWriteFrame(MessageBuffer_t *message);
+void sdRemoveFirstLines(int N);
+void printSdFile();
 
 #endif

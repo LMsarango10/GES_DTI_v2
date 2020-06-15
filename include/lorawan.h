@@ -40,8 +40,9 @@ void os_getDevKey(u1_t *buf);
 void os_getArtEui(u1_t *buf);
 void os_getDevEui(u1_t *buf);
 void showLoraKeys(void);
+bool check_queue_available();
 void lora_send(void *pvParameters);
-void lora_enqueuedata(MessageBuffer_t *message);
+bool lora_enqueuedata(MessageBuffer_t *message);
 void lora_queuereset(void);
 void IRAM_ATTR myEventCallback(void *pUserData, ev_t ev);
 void IRAM_ATTR myRxCallback(void *pUserData, uint8_t port,

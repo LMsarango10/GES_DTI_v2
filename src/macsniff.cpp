@@ -9,11 +9,11 @@
 // Local logging tag
 static const char TAG[] = __FILE__;
 
-uint16_t salt;
+uint32_t salt;
 
-uint16_t get_salt(void) {
-  salt = (uint16_t)random(65536); // get new 16bit random for salting hashes
-  return salt;
+uint32_t get_salt(void) {
+  salt = cfg.salt;
+  return cfg.salt;
 }
 
 int8_t isBeacon(uint64_t mac) {
@@ -42,62 +42,94 @@ uint64_t macConvert(uint8_t *paddr) {
   return (__builtin_bswap64(*mac) >> 16);
 }
 
-bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type) {
-
+bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
   if (!salt) // ensure we have salt (appears after radio is turned on)
     return false;
 
-  char buff[10]; // temporary buffer for printf
+  char buff[32]; // temporary buffer for printf
   bool added = false;
   int8_t beaconID;    // beacon number in test monitor mode
-  uint16_t hashedmac; // temporary buffer for generated hash value
-  uint32_t *mac;      // temporary buffer for shortened MAC
-
-  // only last 3 MAC Address bytes are used for MAC address anonymization
-  // but since it's uint32 we take 4 bytes to avoid 1st value to be 0.
-  // this gets MAC in msb (= reverse) order, but doesn't matter for hashing it.
-  mac = (uint32_t *)(paddr + 2);
+  uint64_t hashedmac; // temporary buffer for generated hash value
 
 #if (VENDORFILTER)
   uint32_t *oui; // temporary buffer for vendor OUI
   oui = (uint32_t *)paddr;
 
   // use OUI vendor filter list only on Wifi, not on BLE
-  if ((sniff_type == MAC_SNIFF_BLE) ||
-      std::find(vendors.begin(), vendors.end(), __builtin_bswap32(*oui) >> 8) !=
-          vendors.end()) {
+  if ((sniff_type == MAC_SNIFF_BLE) || (sniff_type == MAC_SNIFF_BT) ||
+      std::find(vendors_list.begin(), vendors_list.end(), __builtin_bswap32(*oui) >> 8) !=
+          vendors_list.end()) {
 #endif
 
     // salt and hash MAC, and if new unique one, store identifier in container
     // and increment counter on display
     // https://en.wikipedia.org/wiki/MAC_Address_Anonymization
 
-    snprintf(buff, sizeof(buff), "%08X",
-             *mac + (uint32_t)salt);      // convert unsigned 32-bit salted MAC
-                                          // to 8 digit hex string
-    hashedmac = rokkit(&buff[3], 5);      // hash MAC 8 digit -> 5 digit
-    auto newmac = macs.insert(hashedmac); // add hashed MAC, if new unique
-    added = newmac.second ? true
+    //ESP_LOGI(TAG, "MAC is: %02X%02X%02X%02X%02X%02X", paddr[0],paddr[1],paddr[2],paddr[3],paddr[4],paddr[5]);
+    snprintf(buff, sizeof(buff), "%02X%02X%02X%02X%02X%02X",
+             paddr[0],paddr[1],paddr[2],paddr[3],paddr[4],paddr[5]);
+    //ESP_LOGI(TAG, "Content of buff is: %s", buff);
+                   // convert unsigned 32-bit salted MAC
+     /*                                     // to 8 digit hex string
+    hashedmac = rokkit(&buff[0], 5);      // hash MAC 8 digit -> 5 digit*/
+    char out[METIS_OUTPUT_HASH_LENGTH];
+    uint8_t in[METIS_OUTPUT_HASH_LENGTH];
+    for(int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++) in[n] = 0;
+    for(int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++) out[n] = 0;
+    memcpy(in, paddr, 6);
+    metis_digest_mac_salt(in, salt, out);
+    memcpy(&hashedmac, out, METIS_OUTPUT_HASH_LENGTH);
+
+    uint32_t hashedmacH = (hashedmac >> 32) & 0xFFFFFFFF;
+    uint32_t hashedmacL = (hashedmac) & 0xFFFFFFFF;
+    char hashedmacbuff[20];
+    snprintf(hashedmacbuff, sizeof hashedmacbuff, "%08X%08X", hashedmacH,hashedmacL);
+
+    switch(sniff_type)
+    {
+      case MAC_SNIFF_WIFI:
+      {
+        auto newmac = macs_list_wifi.insert(hashedmacL); // add hashed MAC, if new unique
+        added = newmac.second ? true
                           : false; // true if hashed MAC is unique in container
-
-    // Count only if MAC was not yet seen
-    if (added) {
-      // increment counter and one blink led
-      if (sniff_type == MAC_SNIFF_WIFI) {
-        macs_wifi++; // increment Wifi MACs counter
+        if (added)
+        {
+          macs_wifi++; // increment Wifi MACs counter
 #if (HAS_LED != NOT_A_PIN) || defined(HAS_RGB_LED)
-        blink_LED(COLOR_GREEN, 50);
+          blink_LED(COLOR_GREEN, 50);
 #endif
+        }
+        break;
       }
-#if (BLECOUNTER)
-      else if (sniff_type == MAC_SNIFF_BLE) {
-        macs_ble++; // increment BLE Macs counter
+      case MAC_SNIFF_BLE:
+      {
+        auto newmac = macs_list_ble.insert(hashedmacL); // add hashed MAC, if new unique
+        added = newmac.second ? true
+                          : false; // true if hashed MAC is unique in container
+        if (added)
+        {
+          macs_ble++; // increment Wifi MACs counter
 #if (HAS_LED != NOT_A_PIN) || defined(HAS_RGB_LED)
-        blink_LED(COLOR_MAGENTA, 50);
+          blink_LED(COLOR_MAGENTA, 50);
 #endif
+        }
+        break;
       }
+      case MAC_SNIFF_BT:
+      {
+        auto newmac = macs_list_bt.insert(hashedmacL); // add hashed MAC, if new unique
+        added = newmac.second ? true
+                          : false; // true if hashed MAC is unique in container
+        if (added)
+        {
+          macs_bt++; // increment Wifi MACs counter
+#if (HAS_LED != NOT_A_PIN) || defined(HAS_RGB_LED)
+          blink_LED(COLOR_BLUE_MAGENTA, 50);
 #endif
-
+        }
+        break;
+      }
+    }
       // in beacon monitor mode check if seen MAC is a known beacon
       if (cfg.monitormode) {
         beaconID = isBeacon(macConvert(paddr));
@@ -110,18 +142,19 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type) {
           payload.addAlarm(rssi, beaconID);
           SendPayload(BEACONPORT, prio_high);
         }
-      };
+      }
 
-    } // added
+     // added
 
     // Log scan result
-    ESP_LOGV(TAG,
-             "%s %s RSSI %ddBi -> salted MAC %s -> Hash %04X -> WiFi:%d  "
-             "BLTH:%d -> "
+    if(added)
+    ESP_LOGD(TAG,
+             "%s %s RSSI %ddBi -> salted MAC %s -> Hash %s -> WiFi:%d  "
+             "BLE:%d -> BLTH:%d -> "
              "%d Bytes left",
              added ? "new  " : "known",
-             sniff_type == MAC_SNIFF_WIFI ? "WiFi" : "BLTH", rssi, buff,
-             hashedmac, macs_wifi, macs_ble, getFreeRAM());
+             sniff_type == MAC_SNIFF_WIFI ? "WiFi" : sniff_type == MAC_SNIFF_BLE ? "BLE" : "BLTH", rssi, buff,
+             hashedmacbuff, macs_wifi, macs_ble, macs_bt, getFreeRAM());
 
 #if (VENDORFILTER)
   } else {

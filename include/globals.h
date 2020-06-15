@@ -68,10 +68,11 @@ typedef struct {
   uint8_t screenon;    // 0=disabled, 1=enabled
   uint8_t countermode; // 0=cyclic unconfirmed, 1=cumulative, 2=cyclic confirmed
   int16_t rssilimit;   // threshold for rssilimiter, negative value!
-  uint8_t sendcycle;   // payload send cycle [seconds/2]
+  uint16_t sendcycle;   // payload send cycle [seconds/2]
   uint8_t wifichancycle; // wifi channel switch cycle [seconds/100]
   uint8_t blescantime;   // BLE scan cycle duration [seconds]
   uint8_t blescan;       // 0=disabled, 1=enabled
+  uint8_t btscan;       // 0=disabled, 1=enabled
   uint8_t wifiscan;      // 0=disabled, 1=enabled
   uint8_t wifiant;       // 0=internal, 1=external (for LoPy/LoPy4)
   uint8_t vendorfilter;  // 0=disabled, 1=enabled
@@ -79,6 +80,7 @@ typedef struct {
   uint8_t monitormode;   // 0=disabled, 1=enabled
   uint8_t runmode;       // 0=normal, 1=update
   uint8_t payloadmask;   // bitswitches for payload data
+  uint32_t salt;
   char version[10];      // Firmware version
   uint8_t
       bsecstate[BSEC_MAX_STATE_BLOB_SIZE + 1]; // BSEC state for BME680 sensor
@@ -111,20 +113,22 @@ typedef struct {
   float gas;             // raw gas sensor signal
 } bmeStatus_t;
 
-extern std::set<uint16_t, std::less<uint16_t>, Mallocator<uint16_t>> macs;
+extern std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_ble;
+extern std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_bt;
+extern std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_wifi;
 extern std::array<uint64_t, 0xff>::iterator it;
 extern std::array<uint64_t, 0xff> beacons;
 
 extern configData_t cfg;                       // current device configuration
 extern char lmic_event_msg[LMIC_EVENTMSG_LEN]; // display buffer
 extern uint8_t volatile channel;               // wifi channel rotation counter
-extern uint16_t volatile macs_total, macs_wifi, macs_ble,
+extern uint16_t volatile macs_total, macs_wifi, macs_ble, macs_bt,
     batt_voltage;                   // display values
 extern bool volatile TimePulseTick; // 1sec pps flag set by GPS or RTC
 extern timesource_t timeSource;
 extern hw_timer_t *displayIRQ, *matrixDisplayIRQ, *ppsIRQ;
 extern SemaphoreHandle_t I2Caccess;
-extern TaskHandle_t irqHandlerTask, ClockTask;
+extern TaskHandle_t irqHandlerTask, ClockTask, btHandlerTask;
 extern TimerHandle_t WifiChanTimer;
 extern Timezone myTZ;
 extern time_t userUTCTime;

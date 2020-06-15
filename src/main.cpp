@@ -79,7 +79,7 @@ triggers pps 1 sec impulse
 configData_t cfg; // struct holds current device configuration
 char lmic_event_msg[LMIC_EVENTMSG_LEN]; // display buffer for LMIC event message
 uint8_t volatile channel = 0;           // channel rotation counter
-uint16_t volatile macs_total = 0, macs_wifi = 0, macs_ble = 0,
+uint16_t volatile macs_total = 0, macs_wifi = 0, macs_ble = 0, macs_bt = 0,
                   batt_voltage = 0; // globals for display
 
 hw_timer_t *ppsIRQ = NULL, *displayIRQ = NULL, *matrixDisplayIRQ = NULL;
@@ -92,7 +92,9 @@ timesource_t timeSource = _unsynced;
 
 // container holding unique MAC address hashes with Memory Alloctor using PSRAM,
 // if present
-std::set<uint16_t, std::less<uint16_t>, Mallocator<uint16_t>> macs;
+std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_wifi;
+std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_ble;
+std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_bt;
 
 // initialize payload encoder
 PayloadConvert payload(PAYLOAD_BUFFER_SIZE);
@@ -274,19 +276,29 @@ void setup() {
 // start BLE scan callback if BLE function is enabled in NVRAM configuration
 // or switch off bluetooth, if not compiled
 #if (BLECOUNTER)
+  TaskHandle_t btHandlerTask = NULL;
   strcat_P(features, " BLE");
   if (cfg.blescan) {
+    ESP_LOGI(TAG, "Starting Bluetooth LE...");
+    //initBLE();
+    //BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
+  }
+  strcat_P(features, " BT");
+  if (cfg.btscan) {
     ESP_LOGI(TAG, "Starting Bluetooth...");
-    start_BLEscan();
-  } else
-    btStop();
-#else
-  // remove bluetooth stack to gain more free memory
-  btStop();
-  ESP_ERROR_CHECK(esp_bt_mem_release(ESP_BT_MODE_BTDM));
-  ESP_ERROR_CHECK(esp_coex_preference_set(
-      ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
+    //initBT();
+    //BTCycler.attach(BTLE_SCAN_TIME, BTCycle);
+  }
+  xTaskCreatePinnedToCore(btHandler,      // task function
+                          "bthandler",    // name of task
+                          4096,            // stack size of task
+                          (void *)1,       // parameter of the task
+                          0,               // priority of the task
+                          &btHandlerTask, // task handle
+                          1);              // CPU core
 #endif
+ESP_ERROR_CHECK(esp_coex_preference_set(
+    ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
 
 // initialize gps
 #if (HAS_GPS)
@@ -438,7 +450,7 @@ void setup() {
 #endif // HAS_BUTTON
 
   // cyclic function interrupts
-  sendcycler.attach(SENDCYCLE * 2, sendcycle);
+  sendcycler.attach(cfg.sendcycle * 2, sendcycle);
   housekeeper.attach(HOMECYCLE, housekeeping);
 
 #if (TIME_SYNC_INTERVAL)

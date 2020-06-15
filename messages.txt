@@ -1,0 +1,49 @@
+All messages are sent through the port 2
+
+-Set send time (time x2):
+10 t1 t2
+t1 t2 = time t1 -> high, t2 -> low
+
+Example:  Set time to 2 minutes
+Time should be 120s, the configuration multiplies by two (Time = 60)
+Message: 10 00 60
+
+-Set salt
+24 s1 s2
+
+Example: Set salt to 32010
+High byte for 32010 is 0x7D(s1 = 125) and lower byte is 0x0A(s2 = 10)
+Message: 24 125 10
+
+-Set RSSI limit
+01 rssi
+
+Example: set rssi to -70:
+01 70
+
+Example: disable rssi filter:
+01 00
+
+-Enable/Disable BLE:
+14 enable
+
+Example: Enable BLE
+14 01
+
+Example: Disable BLE
+14 00
+
+-Enable/Disable BT:
+25 enable
+
+-Enable/Disable Wifi:
+23 enable
+
+-Full Reset device:
+09 00
+
+-Flush queue
+09 03
+
+-Reset all settings
+09 02

@@ -15,7 +15,7 @@
 #define RX_BT 15
 #define TX_BT 13
 #define EN_BT 2
-#define BTSerial Serial2
+#define BTSerial Serial1
 
 #define BTLE_SCAN_TIME 20
 

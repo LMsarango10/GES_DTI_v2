@@ -164,11 +164,21 @@ bool reinitBLE()
   return true;
 }
 
+void initBTSerial(long baud)
+{
+  BTSerial.begin(baud, SERIAL_8N1, RX_BT, TX_BT);
+}
+
+void initBLESerial()
+{
+  BLESerial.begin(9600, SERIAL_8N1, RX_BLE, TX_BLE);
+}
+
 bool initBLE()
 {
   pinMode(EN_BLE, OUTPUT);
   digitalWrite(EN_BLE, HIGH);
-  BLESerial.begin(9600, SERIAL_8N1, RX_BLE, TX_BLE);
+  initBLESerial();
   return reinitBLE();
 }
 
@@ -176,6 +186,7 @@ bool initBLE()
 void BLECycle(void)
 {
   if(!cfg.blescan) return;
+  initBLESerial();
   ESP_LOGV(TAG, "cycling ble scan");
   ESP_LOGV(TAG, "Set BLE inquiry mode");
   char buffer[64];
@@ -232,14 +243,15 @@ bool initBT(long baud)
 {
   pinMode(EN_BT, OUTPUT);  // this pin will pull the HC-05 pin 34 (key pin) HIGH to switch module to AT mode
   digitalWrite(EN_BT, HIGH);
-  BTSerial.begin(baud, SERIAL_8N1, RX_BT, TX_BT);  // HC-05 default speed in AT command more
+  initBTSerial(baud);  // HC-05 default speed in AT command more
   ESP_LOGD(TAG, "Initialize BT inquiry mode at %d", baud);
   return reinitBT();
 }
 
-void BTCycle(void)
+void BTCycle(long baud)
 {
   if(!cfg.btscan) return;
+  initBTSerial(baud);
   ESP_LOGV(TAG, "cycling bt scan");
 
   long startTime = millis();
@@ -274,7 +286,7 @@ void btHandler(void *pvParameters)
   bool bleInitialized = initBLE();
   while(true)
   {
-    BTCycle();
+    BTCycle(38400);
     delay(5000);
     if(!btInitialized) {
       btInitialized = reinitBT();

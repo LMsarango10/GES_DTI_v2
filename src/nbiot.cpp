@@ -45,7 +45,7 @@ void connectModem() {
     resetModem();
     configModem();
     unsigned long t0 = millis();
-    ESP_LOGI("Try connecting");
+    ESP_LOGI(TAG, "Try connecting");
     while (millis() < t0 + 60000) {
       if (networkReady()) {
         if (attachNetwork()) {
@@ -54,7 +54,7 @@ void connectModem() {
         }
         delay(1000);
       } else {
-        ESP_LOGI("Wait for network");
+        ESP_LOGI(TAG, "Wait for network");
         delay(5000);
       }
     }

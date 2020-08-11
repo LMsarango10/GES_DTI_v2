@@ -22,7 +22,7 @@ void doHousekeeping() {
   #ifdef HAS_SDCARD
 MessageBuffer_t message;
 int nSent = 0;
-while(check_queue_available() && sdcardReadFrame(&message, nSent + 1) >= 0)
+while(check_queue_available() > 0 && sdcardReadFrame(&message, nSent + 1) >= 0)
 {
   message.MessagePrio = prio_normal;
   if(!lora_enqueuedata(&message))
@@ -168,7 +168,7 @@ void reset_counters() {
   macs_ble = 0;
   macs_bt = 0;
 #ifdef HAS_DISPLAY
-  oledPlotCurve(0, true);
+  dp_plotCurve(0, true);
 #endif
 
 #endif

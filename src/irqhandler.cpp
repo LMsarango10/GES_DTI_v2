@@ -39,7 +39,7 @@ void irqHandler(void *pvParameters) {
 // display needs refresh?
 #ifdef HAS_DISPLAY
     if (InterruptStatus & DISPLAY_IRQ) {
-      refreshTheDisplay();
+      dp_refresh();
       InterruptStatus &= ~DISPLAY_IRQ;
     }
 #endif
@@ -86,6 +86,7 @@ void irqHandler(void *pvParameters) {
     // is time to send the payload?
     if (InterruptStatus & SENDCYCLE_IRQ) {
       sendData();
+      checkQueue();
       InterruptStatus &= ~SENDCYCLE_IRQ;
     }
   } // for

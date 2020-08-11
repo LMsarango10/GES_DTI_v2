@@ -337,9 +337,12 @@ esp_err_t lora_stack_init(bool do_join) {
   return ESP_OK;
 }
 
-bool check_queue_available()
-{
+bool check_queue_available() {
   return uxQueueSpacesAvailable(LoraSendQueue) > 0;
+}
+
+long get_lora_queue_pending_messages() {
+  return uxQueueMessagesWaitingFromISR(LoraSendQueue);
 }
 
 bool lora_enqueuedata(MessageBuffer_t *message) {
@@ -372,7 +375,7 @@ bool lora_enqueuedata(MessageBuffer_t *message) {
     enqueued = true;
     // add Lora send queue length to display
     snprintf(lmic_event_msg + 14, LMIC_EVENTMSG_LEN - 14, "%2u",
-             uxQueueMessagesWaiting(LoraSendQueue));
+             uxQueueMessagesWaitingFromISR(LoraSendQueue));
   }
   return enqueued;
 }
@@ -381,7 +384,7 @@ void lora_queuereset(void) { xQueueReset(LoraSendQueue); }
 
 #if (TIME_SYNC_LORAWAN)
 void IRAM_ATTR user_request_network_time_callback(void *pVoidUserUTCTime,
-                                                         int flagSuccess) {
+                                                  int flagSuccess) {
   // Explicit conversion from void* to uint32_t* to avoid compiler errors
   time_t *pUserUTCTime = (time_t *)pVoidUserUTCTime;
 
@@ -512,7 +515,7 @@ void myEventCallback(void *pUserData, ev_t ev) {
 
 // receive message handler
 void myRxCallback(void *pUserData, uint8_t port, const uint8_t *pMsg,
-                         size_t nMsg) {
+                  size_t nMsg) {
 
   // display type of received data
   if (nMsg)
@@ -609,6 +612,8 @@ void mac_decode(const uint8_t cmd[], const uint8_t cmdlen, const mac_t table[],
   } // command parsing loop
 
 } // mac_decode()
+
+QueueHandle_t lora_get_queue_handle() { return LoraSendQueue; }
 
 uint8_t getBattLevel() {
   /*

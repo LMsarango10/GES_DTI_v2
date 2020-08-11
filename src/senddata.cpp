@@ -1,6 +1,8 @@
 // Basic Config
 #include "senddata.h"
 
+static const char TAG[] = "senddata";
+
 Ticker sendcycler;
 bool sent = false;
 
@@ -47,6 +49,9 @@ void SendPayload(uint8_t port, sendprio_t prio) {
 // enqueue message in device's send queues
 #if (HAS_LORA)
   bool enqueued = lora_enqueuedata(&SendBuffer);
+#endif
+#if (!HAS_LORA && HAS_NBIOT)
+  bool enqueued = nb_enqueuedata(&SendBuffer);
 #endif
 #ifdef HAS_SPI
   spi_enqueuedata(&SendBuffer);
@@ -237,7 +242,7 @@ void sendData() {
       }
 #ifdef HAS_DISPLAY
       else
-        oledPlotCurve(macs_total, true);
+        dp_plotCurve(macs_total, true);
 #endif
       break;
 #endif
@@ -298,9 +303,28 @@ void sendData() {
 
 } // sendData()
 
+void checkQueue() {
+#if (HAS_LORA && HAS_NBIOT)
+  long loraMessages = get_lora_queue_pending_messages();
+  MessageBuffer_t SendBuffer;
+  auto loraQueueHandle = lora_get_queue_handle();
+  if (loraMessages >= MIN_SEND_MESSAGES_THRESHOLD){
+    ESP_LOGI(TAG, "Lora queue threshold reached, sending %d messages through NB", loraMessages);
+    // Transfer queue
+    while (xQueueReceive(loraQueueHandle, &SendBuffer, portMAX_DELAY) == pdTRUE) {
+      nb_enqueuedata(&SendBuffer);
+    }
+  }
+
+#endif
+}
+
 void flushQueues() {
 #if (HAS_LORA)
   lora_queuereset();
+#endif
+#if (HAS_NBIOT)
+  nb_queuereset();
 #endif
 #ifdef HAS_SPI
   spi_queuereset();

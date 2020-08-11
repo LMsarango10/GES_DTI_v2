@@ -13,6 +13,7 @@
 */
 
 #define HAS_LORA 1       // comment out if device shall not send data via LoRa
+#define HAS_NBIOT 1
 #define CFG_sx1276_radio 1 // HPD13A LoRa SoC
 
 // enable only if you want to store a local paxcount table on the device
@@ -34,11 +35,11 @@
 #define BAT_VOLTAGE_DIVIDER 2 // voltage divider 100k/100k on board
 
 // Pins for I2C interface of OLED Display
-#define MY_OLED_SDA (21)
-#define MY_OLED_SCL (22)
-#define MY_OLED_RST NOT_A_PIN
+#define MY_DISPLAY_SDA (21)
+#define MY_DISPLAY_SCL (22)
+#define MY_DISPLAY_RST NOT_A_PIN
 
-#define HAS_RTC MY_OLED_SDA, MY_OLED_SCL // SDA, SCL
+#define HAS_RTC MY_DISPLAY_SDA, MY_DISPLAY_SCL // SDA, SCL
 
 // Pins for LORA chip SPI interface, reset line and interrupt lines
 #define LORA_SCK  (5)

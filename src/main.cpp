@@ -200,7 +200,7 @@ void setup() {
   strcat_P(features, " OLED");
   DisplayIsOn = cfg.screenon;
   // display verbose info only after a coldstart (note: blocking call!)
-  init_display(RTC_runmode == RUNMODE_POWERCYCLE ? true : false);
+  dp_init(RTC_runmode == RUNMODE_POWERCYCLE ? true : false);
 #endif
 
   // scan i2c bus for devices
@@ -327,6 +327,11 @@ ESP_ERROR_CHECK(esp_coex_preference_set(
   // kick off join, except we come from sleep
   assert(lora_stack_init(RTC_runmode == RUNMODE_WAKEUP ? false : true) ==
          ESP_OK);
+#endif
+
+#if (HAS_NBIOT)
+  strcat_P(features, " NBIOT");
+  assert(nb_iot_init() == ESP_OK);
 #endif
 
 // initialize SPI

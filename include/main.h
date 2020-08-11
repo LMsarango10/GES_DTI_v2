@@ -17,6 +17,9 @@
 #include "ota.h"
 #include "irqhandler.h"
 #include "spislave.h"
+#if (HAS_NBIOT)
+#include "nbiot.h"
+#endif
 
 #if (HAS_LORA)
 #include "lorawan.h"

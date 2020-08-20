@@ -83,7 +83,7 @@ void nb_send(void *pvParameters) {
 
 void nb_loop() {
   MessageBuffer_t SendBuffer;
-  if (millis() - lastMessage > MIN_SEND_TIME_THRESHOLD) {
+  if (millis() - lastMessage > MIN_SEND_TIME_THRESHOLD && uxQueueMessagesWaitingFromISR(NbSendQueue) > 0) {
     // fetch next or wait for payload to send from queue
     char wifiHashSensorName[] = "S01";
     char wifiCountSensorName[] = "S02";
@@ -125,6 +125,7 @@ void nb_loop() {
     JsonArray btHashObs = btHashSensor.createNestedArray("observations");
     JsonArray btCountObs = btCountSensor.createNestedArray("observations");
 
+    initModem();
     connectModem();
     int msgCounter = 0;
     bool msgCompleted = false;

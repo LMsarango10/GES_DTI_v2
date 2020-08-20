@@ -5,6 +5,7 @@
 #include "rcommand.h"
 #include "BC95.hpp"
 #include <ArduinoJson.h>
+#include <Ticker.h>
 
 #define MIN_SEND_TIME_THRESHOLD 1000
 #define MIN_SEND_MESSAGES_THRESHOLD 5
@@ -13,6 +14,7 @@
 #define NB_QUEUE_SIZE SEND_QUEUE_SIZE
 
 extern TaskHandle_t nbIotTask;
+extern Ticker nbticker;
 
 bool nb_enqueuedata(MessageBuffer_t *message);
 void nb_queuereset(void);

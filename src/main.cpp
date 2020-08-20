@@ -457,6 +457,7 @@ ESP_ERROR_CHECK(esp_coex_preference_set(
   // cyclic function interrupts
   sendcycler.attach(cfg.sendcycle * 2, sendcycle);
   housekeeper.attach(HOMECYCLE, housekeeping);
+  nbticker.attach(30, nb_loop);
 
 #if (TIME_SYNC_INTERVAL)
 

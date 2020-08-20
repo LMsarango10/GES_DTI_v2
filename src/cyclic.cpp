@@ -137,9 +137,6 @@ if(nSent > 0)
       do_reset(true);                     // memory leak, reset device
   }
 #endif
-
-  nb_loop();
-
 } // doHousekeeping()
 
 // uptime counter 64bit to prevent millis() rollover after 49 days

@@ -8,6 +8,8 @@ TaskHandle_t nbIotTask = NULL;
 
 unsigned long lastMessage;
 
+Ticker nbticker;
+
 bool nb_enqueuedata(MessageBuffer_t *message) {
   // enqueue message in LORA send queue
   bool enqueued = false;
@@ -33,10 +35,7 @@ bool nb_enqueuedata(MessageBuffer_t *message) {
     snprintf(lmic_event_msg + 14, LMIC_EVENTMSG_LEN - 14, "<>");
     ESP_LOGW(TAG, "NBIOT sendqueue is full");
   } else {
-    enqueued = true;
-    // add Lora send queue length to display
-    snprintf(lmic_event_msg + 14, LMIC_EVENTMSG_LEN - 14, "%2u",
-             uxQueueMessagesWaiting(NbSendQueue));
+    ESP_LOGI(TAG, "NBIOT message enqueued");
   }
   return enqueued;
 }
@@ -83,7 +82,9 @@ void nb_send(void *pvParameters) {
 
 void nb_loop() {
   MessageBuffer_t SendBuffer;
+  ESP_LOGV(TAG, "Checking NB loop");
   if (millis() - lastMessage > MIN_SEND_TIME_THRESHOLD && uxQueueMessagesWaitingFromISR(NbSendQueue) > 0) {
+    ESP_LOGV(TAG, "NB messages pending, sending");
     // fetch next or wait for payload to send from queue
     char wifiHashSensorName[] = "S01";
     char wifiCountSensorName[] = "S02";

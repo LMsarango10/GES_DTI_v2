@@ -5,6 +5,7 @@
 #include "senddata.h"
 #include "rcommand.h"
 #include "spislave.h"
+#include "nbiot.h"
 
 #if(HAS_LORA)
 #include <lmic.h>

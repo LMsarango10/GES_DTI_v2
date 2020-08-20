@@ -17,5 +17,6 @@ extern TaskHandle_t nbIotTask;
 bool nb_enqueuedata(MessageBuffer_t *message);
 void nb_queuereset(void);
 esp_err_t nb_iot_init();
+void nb_loop();
 
 #endif

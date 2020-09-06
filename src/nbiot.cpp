@@ -130,11 +130,12 @@ void nb_loop() {
     connectModem();
     int msgCounter = 0;
     bool msgCompleted = false;
-    while (xQueueReceive(NbSendQueue, &SendBuffer, portMAX_DELAY) == pdTRUE ||
-           msgCounter >= MAX_NB_MESSAGES) {
+    while (msgCounter <= MAX_NB_MESSAGES &&  uxQueueMessagesWaiting(NbSendQueue) > 0 ) {
+      xQueueReceive(NbSendQueue, &SendBuffer, portMAX_DELAY);
       msgCounter++;
       switch (SendBuffer.MessagePort) {
       case COUNTERPORT: {
+        ESP_LOGI(TAG, "COUNT PORT");
         uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
         uint16_t countWifi = getCount(SendBuffer.Message + 4);
         uint16_t countBle = getCount(SendBuffer.Message + 6);
@@ -151,6 +152,7 @@ void nb_loop() {
         break;
       }
       case BTMACSPORT: {
+        ESP_LOGI(TAG, "BTMACS");
         uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
         uint16_t macCount = (SendBuffer.MessageSize - 4) / 4;
         for (int i = 0; i < macCount; i++) {
@@ -164,6 +166,7 @@ void nb_loop() {
         break;
       }
       case BLEMACSPORT: {
+        ESP_LOGI(TAG, "BLEMACS");
         uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
         uint16_t macCount = (SendBuffer.MessageSize - 4) / 4;
         for (int i = 0; i < macCount; i++) {
@@ -177,6 +180,7 @@ void nb_loop() {
         break;
       }
       case WIFIMACSPORT: {
+        ESP_LOGI(TAG, "WIFIMACS");
         uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
         uint16_t macCount = (SendBuffer.MessageSize - 4) / 4;
         for (int i = 0; i < macCount; i++) {
@@ -194,8 +198,10 @@ void nb_loop() {
       }
     }
     if (msgCompleted) {
-      char buffer[4096];
-      serializeJson(doc, Serial);
+      ESP_LOGI(TAG, "Message complete");
+      char buffer[8192];
+      serializeJsonPretty(doc, buffer);
+      ESP_LOGI(TAG, "JSON: %s", buffer);
 
       int res = 200; // postPage(serverIp, port, url, buffer);
       while (res != 200) {
@@ -220,14 +226,14 @@ esp_err_t nb_iot_init() {
   // start lorawan stack
   ESP_LOGI(TAG, "Starting NBIOT TASK...");
   lastMessage = millis();
-  /*xTaskCreatePinnedToCore(nb_send,   // task function
+  xTaskCreatePinnedToCore(nb_send,   // task function
                           "nbtask", // name of task
-                          4096,       // stack size of task
+                          12288,       // stack size of task
                           (void *)1,  // parameter of the task
                           1,          // priority of the task
                           &nbIotTask,  // task handle
                           1);         // CPU core
-*/
+
   // Start join procedure if not already joined,
   // lora_setupForNetwork(true) is called by eventhandler when joined
   // else continue current session

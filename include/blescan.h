@@ -11,11 +11,11 @@
 #define RX_BLE 35
 #define TX_BLE 14
 #define EN_BLE 12
-#define BLESerial Serial1
+#define BLESerial Serial2
 #define RX_BT 15
 #define TX_BT 13
 #define EN_BT 2
-#define BTSerial Serial1
+#define BTSerial Serial2
 
 #define BTLE_SCAN_TIME 20
 

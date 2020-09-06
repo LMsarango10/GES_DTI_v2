@@ -166,11 +166,17 @@ bool reinitBLE()
 
 void initBTSerial(long baud)
 {
+  BTSerial.flush();
+  while(BTSerial.available())
+    BTSerial.read();
   BTSerial.begin(baud, SERIAL_8N1, RX_BT, TX_BT);
 }
 
 void initBLESerial()
 {
+  BLESerial.flush();
+  while(BLESerial.available())
+    BLESerial.read();
   BLESerial.begin(9600, SERIAL_8N1, RX_BLE, TX_BLE);
 }
 
@@ -186,7 +192,6 @@ bool initBLE()
 void BLECycle(void)
 {
   if(!cfg.blescan) return;
-  initBLESerial();
   ESP_LOGV(TAG, "cycling ble scan");
   ESP_LOGV(TAG, "Set BLE inquiry mode");
   char buffer[64];
@@ -282,15 +287,17 @@ void BTCycle(long baud)
 void btHandler(void *pvParameters)
 {
   delay(1000);
-  bool btInitialized = initBT(38400);
+  //bool btInitialized = initBT(38400);
+  delay(500);
   bool bleInitialized = initBLE();
+  delay(500);
   while(true)
   {
-    BTCycle(38400);
+    /*BTCycle(38400);
     delay(5000);
     if(!btInitialized) {
       btInitialized = reinitBT();
-    }
+    }*/
     BLECycle();
     delay(5000);
     if(!bleInitialized) {

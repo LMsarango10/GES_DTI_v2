@@ -5,6 +5,7 @@ static const char TAG[] = "nbiot";
 
 QueueHandle_t NbSendQueue;
 TaskHandle_t nbIotTask = NULL;
+ConfigBuffer_t nbConfig;
 
 unsigned long lastMessage;
 

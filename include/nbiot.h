@@ -16,8 +16,7 @@
 
 extern TaskHandle_t nbIotTask;
 extern Ticker nbticker;
-
-ConfigBuffer_t nbConfig;
+extern ConfigBuffer_t nbConfig;
 
 bool nb_enqueuedata(MessageBuffer_t *message);
 void nb_queuereset(void);

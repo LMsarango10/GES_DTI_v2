@@ -17,6 +17,7 @@
 #include "ota.h"
 #include "irqhandler.h"
 #include "spislave.h"
+#include "sdcard.h"
 #if (HAS_NBIOT)
 #include "nbiot.h"
 #endif

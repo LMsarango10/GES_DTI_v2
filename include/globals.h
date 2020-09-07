@@ -95,6 +95,18 @@ typedef struct {
 } MessageBuffer_t;
 
 typedef struct {
+  char BaseUrl[46];
+  char Path[46];
+  char ComponentName[46];
+  char WifiCountSensor[7]; // max 6 chars
+  char WifiHashSensor[7]; // max 6 chars
+  char BleCountSensor[7]; // max 6 chars
+  char BleHashSensor[7]; // max 6 chars
+  char BtCountSensor[7]; // max 6 chars
+  char BtHashSensor[7]; // max 6 chars
+} ConfigBuffer_t;
+
+typedef struct {
   int32_t latitude;
   int32_t longitude;
   uint8_t satellites;

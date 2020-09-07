@@ -200,10 +200,10 @@ void nb_loop() {
     if (msgCompleted) {
       ESP_LOGI(TAG, "Message complete");
       char buffer[8192];
-      serializeJsonPretty(doc, buffer);
+      serializeJson(doc, buffer);
       ESP_LOGI(TAG, "JSON: %s", buffer);
 
-      int res = 200; // postPage(serverIp, port, url, buffer);
+      int res = postPage(serverIp, port, url, buffer);
       while (res != 200) {
         connectModem();
         postPage(serverIp, port, url, buffer);

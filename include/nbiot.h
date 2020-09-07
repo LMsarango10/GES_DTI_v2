@@ -4,6 +4,7 @@
 #include "globals.h"
 #include "rcommand.h"
 #include "BC95.hpp"
+#include "sdcard.h"
 #include <ArduinoJson.h>
 #include <Ticker.h>
 
@@ -15,6 +16,8 @@
 
 extern TaskHandle_t nbIotTask;
 extern Ticker nbticker;
+
+ConfigBuffer_t nbConfig;
 
 bool nb_enqueuedata(MessageBuffer_t *message);
 void nb_queuereset(void);

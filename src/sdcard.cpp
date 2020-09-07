@@ -234,10 +234,95 @@ void replaceCurrentFile(char* newFilename)
   // load new file
   fileSDCard = SD.open(newFilename, FILE_WRITE);
   if (fileSDCard) {
-    ESP_LOGV(TAG, "SD: name opended: <%s>", newFilename);
+    ESP_LOGV(TAG, "SD: name opened: <%s>", newFilename);
     //fileSDCard.println(SDCARD_FILE_HEADER);
     useSDCard = true;
   }
+}
+
+void sdSaveNbConfig(ConfigBuffer_t *config){
+  File f = SD.open("nb.conf", FILE_WRITE);
+  const size_t capacity = JSON_OBJECT_SIZE(9);
+  DynamicJsonDocument doc(capacity);
+
+  doc["baseUrl"] = config->BaseUrl;
+  doc["path"] = config->Path;
+  doc["componentName"] = config->ComponentName;
+  doc["wifiCountSensor"] = config->WifiCountSensor;
+  doc["wifiHashSensor"] = config->WifiHashSensor;
+  doc["bleCountSensor"] = config->BleCountSensor;
+  doc["bleHashSensor"] = config->BleHashSensor;
+  doc["btCountSensor"] = config->BtCountSensor;
+  doc["btHashSensor"] = config->BtHashSensor;
+
+  serializeJson(doc, f);
+}
+
+void saveDefaultNbConfig() {
+  ConfigBuffer_t conf;
+  sdSaveNbConfig(&conf);
+}
+
+int sdLoadNbConfig(ConfigBuffer_t *config){
+  if(!SD.exists("nb.conf")) {
+    ESP_LOGI(TAG, "nb.conf file does not exists, creating");
+    saveDefaultNbConfig();
+  }
+
+  File f = SD.open("nb.conf", FILE_READ);
+  const size_t capacity = JSON_OBJECT_SIZE(9) + 330;
+  DynamicJsonDocument doc(capacity);
+
+  deserializeJson(doc, f);
+
+  const char* baseUrl = doc["baseUrl"]; // "12345678912345678912345678912345678912345678"
+  const char* path = doc["path"]; // "12345678912345678912345678912345678912345678"
+  const char* componentName = doc["componentName"]; // "12345678912345678912345678912345678912345678"
+
+  const char* wifiCountSensor = doc["wifiCountSensor"]; // "123456"
+  const char* wifiHashSensor = doc["wifiHashSensor"]; // "123456"
+  const char* bleCountSensor = doc["bleCountSensor"]; // "123456"
+  const char* bleHashSensor = doc["bleHashSensor"]; // "123456"
+  const char* btCountSensor = doc["btCountSensor"]; // "123456"
+  const char* btHashSensor = doc["btHashSensor"]; // "123456"
+
+  int baseUrlLen = strlen(baseUrl);
+  strncpy(config->BaseUrl, baseUrl, baseUrlLen);
+  config->BaseUrl[baseUrlLen] = '\0';
+
+  int pathLen = strlen(path);
+  strncpy(config->Path, path, pathLen);
+  config->Path[pathLen] = '\0';
+
+  int componentNameLen = strlen(componentName);
+  strncpy(config->ComponentName, componentName, componentNameLen);
+  config->ComponentName[componentNameLen] = '\0';
+
+  int wifiCountSensorLen = strlen(wifiCountSensor);
+  strncpy(config->WifiCountSensor, wifiCountSensor, wifiCountSensorLen);
+  config->WifiCountSensor[wifiCountSensorLen] = '\0';
+
+  int wifiHashSensorLen = strlen(wifiHashSensor);
+  strncpy(config->WifiHashSensor, wifiHashSensor, wifiHashSensorLen);
+  config->WifiHashSensor[wifiHashSensorLen] = '\0';
+
+  int bleCountSensorLen = strlen(bleCountSensor);
+  strncpy(config->BleCountSensor, bleCountSensor, bleCountSensorLen);
+  config->BleCountSensor[bleCountSensorLen] = '\0';
+
+  int bleHashSensorLen = strlen(bleHashSensor);
+  strncpy(config->BleHashSensor, bleHashSensor, bleHashSensorLen);
+  config->BleHashSensor[bleHashSensorLen] = '\0';
+
+  int btCountSensorLen = strlen(btCountSensor);
+  strncpy(config->BtCountSensor, btCountSensor, btCountSensorLen);
+  config->BtCountSensor[btCountSensorLen] = '\0';
+
+  int btHashSensorLen = strlen(btHashSensor);
+  strncpy(config->BtHashSensor, btHashSensor, btHashSensorLen);
+  config->BtHashSensor[btHashSensorLen] = '\0';
+
+  return 0;
 }
 
 #endif // (HAS_SDCARD)

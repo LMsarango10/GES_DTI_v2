@@ -367,6 +367,133 @@ void set_flush(uint8_t val[]) {
   // used to open receive window on LoRaWAN class a nodes
 };
 
+void set_nb_server(uint8_t val[]) {
+  ESP_LOGI(TAG, "Remote command: set_nb_server");
+  ConfigBuffer_t conf;
+  sdLoadNbConfig(&conf);
+
+  for(int i = 0; i < 45; i++)
+  {
+    conf.BaseUrl[i] = val[i];
+    if (val[i] == 0) {
+      break;
+    }
+  }
+
+  ESP_LOGI(TAG, "Setting NB server to: %s", conf.BaseUrl);
+  sdSaveNbConfig(&conf);
+};
+
+void set_nb_path(uint8_t val[]) {
+  ESP_LOGI(TAG, "Remote command: set_nb_path");
+  ConfigBuffer_t conf;
+  sdLoadNbConfig(&conf);
+
+  for(int i = 0; i < 45; i++)
+  {
+    conf.Path[i] = val[i];
+    if (val[i] == 0) {
+      break;
+    }
+  }
+
+  ESP_LOGI(TAG, "Setting NB path to: %s", conf.Path);
+  sdSaveNbConfig(&conf);
+};
+
+void set_nb_component(uint8_t val[]) {
+  ESP_LOGI(TAG, "Remote command: set_nb_component");
+  ConfigBuffer_t conf;
+  sdLoadNbConfig(&conf);
+
+  for(int i = 0; i < 45; i++)
+  {
+    conf.ComponentName[i] = val[i];
+    if (val[i] == 0) {
+      break;
+    }
+  }
+
+  ESP_LOGI(TAG, "Setting NB component to: %s", conf.ComponentName);
+  sdSaveNbConfig(&conf);
+};
+
+void set_nb_sensors(uint8_t val[]) {
+  ESP_LOGI(TAG, "Remote command: set_nb_sensors");
+  ConfigBuffer_t conf;
+  sdLoadNbConfig(&conf);
+
+  for(int i = 0; i < 7; i++)
+  {
+    conf.WifiCountSensor[i] = val[i];
+    if (val[i] == 0) {
+      break;
+    }
+    if (i == 6){
+      conf.WifiHashSensor[i] = 0;
+    }
+  }
+
+  for(int i = 0; i < 7; i++)
+  {
+    conf.WifiHashSensor[i] = val[i + 7];
+    if (val[i + 7] == 0) {
+      break;
+    }
+    if (i == 6){
+      conf.WifiHashSensor[i] = 0;
+    }
+  }
+
+  for(int i = 0; i < 7; i++)
+  {
+    conf.BleCountSensor[i] = val[i + 14];
+    if (val[i + 14] == 0) {
+      break;
+    }
+    if (i == 6){
+      conf.BleCountSensor[i] = 0;
+    }
+  }
+
+  for(int i = 0; i < 7; i++)
+  {
+    conf.BleHashSensor[i] = val[i + 21];
+    if (val[i + 21] == 0) {
+      break;
+    }
+    if (i == 6){
+      conf.BleHashSensor[i] = 0;
+    }
+  }
+
+  for(int i = 0; i < 7; i++)
+  {
+    conf.BtCountSensor[i] = val[i + 28];
+    if (val[i + 28] == 0) {
+      break;
+    }
+    if (i == 6){
+      conf.BtCountSensor[i] = 0;
+    }
+  }
+
+  for(int i = 0; i < 7; i++)
+  {
+    conf.BtHashSensor[i] = val[i + 35];
+    if (val[i + 35] == 0) {
+      break;
+    }
+    if (i == 6){
+      conf.BtHashSensor[i] = 0;
+    }
+  }
+
+  ESP_LOGI(TAG, "Setting NB sensors to: WIFICOUNT: %s, WIFIHASH: %s, BLECOUNT: %s, BLEHASH: %s, BTCOUNT: %s, BTHASH: %s",
+    conf.WifiCountSensor, conf.WifiHashSensor, conf.BleCountSensor, conf.BleHashSensor, conf.BtCountSensor, conf.BtHashSensor);
+  sdSaveNbConfig(&conf);
+};
+
 // assign previously defined functions to set of numeric remote commands
 // format: opcode, function, #bytes params,
 // flag (true = do make settings persistent / false = don't)
@@ -384,7 +511,9 @@ static cmd_t table[] = {
     {0x13, set_sensor, 2, true},        {0x14, set_payloadmask, 1, true},
     {0x15, set_bme, 1, true},           {0x16, set_batt, 1, true},
     {0x17, set_wifiscan, 1, true},      {0x18, set_salt, 4, true},
-    {0x19, set_btscan, 1, true},
+    {0x19, set_btscan, 1, true},        {0x1A, set_nb_server, 45, true},
+    {0x1B, set_nb_path, 45, true},      {0x1C, set_nb_component, 45, true},
+    {0x1D, set_nb_sensors, 42, true},
     {0x80, get_config, 0, false},
     {0x81, get_status, 0, false},       {0x83, get_batt, 0, false},
     {0x84, get_gps, 0, false},          {0x85, get_bme, 0, false},

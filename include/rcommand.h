@@ -13,6 +13,7 @@
 #include "cyclic.h"
 #include "timekeeper.h"
 #include "globals.h"
+#include "sdcard.h"
 #if(TIME_SYNC_LORASERVER)
 #include "timesync.h"
 #endif

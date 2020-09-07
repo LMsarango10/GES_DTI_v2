@@ -96,6 +96,7 @@ typedef struct {
 
 typedef struct {
   char BaseUrl[46];
+  uint16_t port;
   char Path[46];
   char ComponentName[46];
   char WifiCountSensor[7]; // max 6 chars

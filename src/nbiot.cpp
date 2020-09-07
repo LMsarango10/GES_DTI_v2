@@ -82,21 +82,21 @@ void nb_send(void *pvParameters) {
 
 void nb_loop() {
   MessageBuffer_t SendBuffer;
-  ESP_LOGV(TAG, "Checking NB loop");
   if (millis() - lastMessage > MIN_SEND_TIME_THRESHOLD && uxQueueMessagesWaitingFromISR(NbSendQueue) > 0) {
+    ConfigBuffer_t conf;
+    sdLoadNbConfig(&conf);
+    if(strlen(conf.BaseUrl) < 5)
+    {
+      ESP_LOGE(TAG, "Error in NB config, cant send");
+      return;
+    }
     ESP_LOGV(TAG, "NB messages pending, sending");
     // fetch next or wait for payload to send from queue
-    char wifiHashSensorName[] = "S01";
-    char wifiCountSensorName[] = "S02";
-    char bleHashSensorName[] = "S03";
-    char bleCountSensorName[] = "S04";
-    char btHashSensorName[] = "S05";
-    char btCountSensorName[] = "S06";
 
-    char componentName[] = "0004A30B005E67EA_";
-    char url[] = "/data/gesinen_provider/";
-    char serverIp[] = "82.223.2.207";
-    long port = 8081;
+    char url[100];
+    url[0] = 0;
+    strcat(url, conf.Path);
+    strcat(url, conf.ComponentName);
 
     const size_t capacity = 4096;
     DynamicJsonDocument doc(capacity);
@@ -110,14 +110,14 @@ void nb_loop() {
     JsonObject btCountSensor = sensors.createNestedObject();
 
     wifiHashSensor["sensor"] =
-        String(componentName) + String(wifiHashSensorName);
+        String(conf.ComponentName) + String(conf.WifiHashSensor);
     wifiCountSensor["sensor"] =
-        String(componentName) + String(wifiCountSensorName);
-    bleHashSensor["sensor"] = String(componentName) + String(bleHashSensorName);
+        String(conf.ComponentName) + String(conf.WifiCountSensor);
+    bleHashSensor["sensor"] = String(conf.ComponentName) + String(conf.BleHashSensor);
     bleCountSensor["sensor"] =
-        String(componentName) + String(bleCountSensorName);
-    btHashSensor["sensor"] = String(componentName) + String(btHashSensorName);
-    btCountSensor["sensor"] = String(componentName) + String(btCountSensorName);
+        String(conf.ComponentName) + String(conf.BleCountSensor);
+    btHashSensor["sensor"] = String(conf.ComponentName) + String(conf.BtHashSensor);
+    btCountSensor["sensor"] = String(conf.ComponentName) + String(conf.BtCountSensor);
 
     JsonArray wifiHashObs = wifiHashSensor.createNestedArray("observations");
     JsonArray wifiCountObs = wifiCountSensor.createNestedArray("observations");
@@ -203,10 +203,10 @@ void nb_loop() {
       serializeJson(doc, buffer);
       ESP_LOGI(TAG, "JSON: %s", buffer);
 
-      int res = postPage(serverIp, port, url, buffer);
+      int res = postPage(conf.BaseUrl, conf.port, url, buffer);
       while (res != 200) {
         connectModem();
-        postPage(serverIp, port, url, buffer);
+        postPage(conf.BaseUrl, conf.port, url, buffer);
         delay(5000);
       }
     }

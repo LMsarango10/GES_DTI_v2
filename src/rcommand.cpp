@@ -418,6 +418,15 @@ void set_nb_component(uint8_t val[]) {
   sdSaveNbConfig(&conf);
 };
 
+void set_nb_port(uint8_t val[]) {
+  ESP_LOGI(TAG, "Remote command: set_nb_port");
+  ConfigBuffer_t conf;
+  sdLoadNbConfig(&conf);
+  conf.port = val[1] * 256 + val[0];
+  ESP_LOGI(TAG, "Setting NB port to: %d", conf.port);
+  sdSaveNbConfig(&conf);
+};
+
 void set_nb_sensors(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set_nb_sensors");
   ConfigBuffer_t conf;
@@ -513,7 +522,7 @@ static cmd_t table[] = {
     {0x17, set_wifiscan, 1, true},      {0x18, set_salt, 4, true},
     {0x19, set_btscan, 1, true},        {0x1A, set_nb_server, 45, true},
     {0x1B, set_nb_path, 45, true},      {0x1C, set_nb_component, 45, true},
-    {0x1D, set_nb_sensors, 42, true},
+    {0x1D, set_nb_sensors, 42, true},   {0x1E, set_nb_port, 2, true},
     {0x80, get_config, 0, false},
     {0x81, get_status, 0, false},       {0x83, get_batt, 0, false},
     {0x84, get_gps, 0, false},          {0x85, get_bme, 0, false},

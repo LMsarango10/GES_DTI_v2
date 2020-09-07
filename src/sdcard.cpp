@@ -256,6 +256,8 @@ void sdSaveNbConfig(ConfigBuffer_t *config){
   doc["btHashSensor"] = config->BtHashSensor;
 
   serializeJson(doc, f);
+  f.flush();
+  f.close();
 }
 
 void saveDefaultNbConfig() {
@@ -274,6 +276,8 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
   DynamicJsonDocument doc(capacity);
 
   deserializeJson(doc, f);
+
+  f.close();
 
   const char* baseUrl = doc["baseUrl"]; // "12345678912345678912345678912345678912345678"
   const char* path = doc["path"]; // "12345678912345678912345678912345678912345678"

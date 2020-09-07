@@ -10,7 +10,7 @@ https://github.com/nkolban/esp32-snippets/tree/master/BLE/scanner
 // local Tag for logging
 static const char TAG[] = "bluetooth";
 
-int readResponse(HardwareSerial* port, char* buff, int b_size, uint32_t timeout=3000)
+int readResponse(HardwareSerial* port, char* buff, int b_size, uint32_t timeout=500)
 {
   port->setTimeout(timeout);
   int bytesRead = port->readBytesUntil('\n',buff, b_size);

@@ -8,13 +8,13 @@
 #include "soc/timer_group_struct.h"
 #include "soc/timer_group_reg.h"
 
-#define RX_BLE 35
-#define TX_BLE 14
+#define RX_BLE 36
+#define TX_BLE 4
 #define EN_BLE 12
 #define BLESerial Serial2
-#define RX_BT 35
-#define TX_BT 14
-#define EN_BT 2
+#define RX_BT 39
+#define TX_BT 25
+#define EN_BT 12
 #define BTSerial Serial2
 
 #define BLEBTMUX_A 13

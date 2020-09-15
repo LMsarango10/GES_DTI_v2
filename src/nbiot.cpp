@@ -97,7 +97,7 @@ void nb_loop() {
     char url[100];
     url[0] = 0;
     strcat(url, conf.Path);
-    strcat(url, conf.ComponentName);
+    //strcat(url, conf.ComponentName);
 
     const size_t capacity = 4096;
     DynamicJsonDocument doc(capacity);
@@ -206,10 +206,11 @@ void nb_loop() {
 
       int res = postPage(conf.BaseUrl, conf.port, url, buffer);
       while (res != 200) {
-        connectModem();
-        postPage(conf.BaseUrl, conf.port, url, buffer);
         delay(5000);
+        connectModem();
+        res = postPage(conf.BaseUrl, conf.port, url, buffer);
       }
+      ESP_LOGI(TAG, "Finish sending message");
     }
   }
 }
@@ -229,7 +230,7 @@ esp_err_t nb_iot_init() {
   lastMessage = millis();
   xTaskCreatePinnedToCore(nb_send,   // task function
                           "nbtask", // name of task
-                          12288,       // stack size of task
+                          16384,       // stack size of task
                           (void *)1,  // parameter of the task
                           1,          // priority of the task
                           &nbIotTask,  // task handle

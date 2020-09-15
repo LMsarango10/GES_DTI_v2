@@ -5,7 +5,7 @@
 //#define bc95serial Serial1
 #define RESET_PIN 25
 #define RX_PIN 34
-#define TX_PIN 23
+#define TX_PIN 0
 
 #define DEBUG_MODEM
 

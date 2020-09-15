@@ -311,8 +311,9 @@ void checkQueue() {
   if (loraMessages >= MIN_SEND_MESSAGES_THRESHOLD){
     ESP_LOGI(TAG, "Lora queue threshold reached, sending %d messages through NB", loraMessages);
     // Transfer queue
-    while (xQueueReceive(loraQueueHandle, &SendBuffer, portMAX_DELAY) == pdTRUE) {
-      nb_enqueuedata(&SendBuffer);
+    while (uxQueueMessagesWaitingFromISR(loraQueueHandle) > 0) {
+      if(xQueueReceive(loraQueueHandle, &SendBuffer, portMAX_DELAY) == pdTRUE)
+        nb_enqueuedata(&SendBuffer);
     }
   }
 

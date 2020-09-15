@@ -286,7 +286,7 @@ void BTCycle(long baud)
 
 void btHandler(void *pvParameters)
 {
-  pinMode(BLEBTMUX_A, OUTPUT);
+  /*pinMode(BLEBTMUX_A, OUTPUT);
   pinMode(BLEBTMUX_B, OUTPUT);
   digitalWrite(BLEBTMUX_B, LOW);
 
@@ -294,19 +294,19 @@ void btHandler(void *pvParameters)
   bool btInitialized = initBT(38400);
   delay(500);
   bool bleInitialized = initBLE();
-  delay(500);
+  delay(500);*/
   while(true)
   {
-    digitalWrite(BLEBTMUX_A, HIGH);
+    /*digitalWrite(BLEBTMUX_A, HIGH);
     BTCycle(38400);
     delay(5000);
     if(!btInitialized) {
       btInitialized = reinitBT();
     }
-    digitalWrite(BLEBTMUX_A, LOW);
+    digitalWrite(BLEBTMUX_A, LOW);*/
     delay(5000);
-    if(!bleInitialized) {
+    /*if(!bleInitialized) {
       bleInitialized = reinitBLE();
-    }
+    }*/
   }
 }

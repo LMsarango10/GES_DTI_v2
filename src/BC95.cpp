@@ -183,7 +183,7 @@ int sendData(char *data, int datalen, char *responseBuff,
   responseBuff[buffPtr] = 0;
   sendStatus status = INIT;
   while (!timeout) {
-    timeout = (millis() - startTime > 10000);
+    timeout = (millis() - startTime > 25000);
     delay(100);
     if (sendSerial.available()) {
       char value = sendSerial.read();
@@ -338,7 +338,6 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData) {
       if (receiveData(globalBuff, bytesReceived, sizeof(globalBuff))) {
         ESP_LOGD(TAG, "Received %d bytes", bytesReceived);
         ESP_LOGD(TAG, "%s", globalBuff);
-        int responseCode;
         int bodyBytes = parseResponse(globalBuff, bytesReceived, &responseCode);
         if (bodyBytes < 0) {
           ESP_LOGE(TAG, "Error: %d while parsing response", bodyBytes);
@@ -358,8 +357,8 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData) {
     }
 
     ESP_LOGI(TAG, "disconnecting.");
-    delay(500);
     disconnectModem();
+    ESP_LOGI(TAG, "Return code %d", responseCode);
     return responseCode;
   } else {
     ESP_LOGE(TAG, "failed connecting");

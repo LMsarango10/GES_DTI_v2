@@ -241,11 +241,12 @@ void replaceCurrentFile(char* newFilename)
 }
 
 void sdSaveNbConfig(ConfigBuffer_t *config){
-  File f = SD.open("nb.conf", FILE_WRITE);
-  const size_t capacity = JSON_OBJECT_SIZE(9);
+  File f = SD.open("nb.cnf", FILE_WRITE);
+  const size_t capacity = JSON_OBJECT_SIZE(16);
   DynamicJsonDocument doc(capacity);
 
   doc["baseUrl"] = config->BaseUrl;
+  doc["port"] = config->port;
   doc["path"] = config->Path;
   doc["componentName"] = config->ComponentName;
   doc["wifiCountSensor"] = config->WifiCountSensor;
@@ -262,24 +263,66 @@ void sdSaveNbConfig(ConfigBuffer_t *config){
 
 void saveDefaultNbConfig() {
   ConfigBuffer_t conf;
+  conf.BaseUrl[0] = 0;
+  conf.ComponentName[0] = 0;
+  conf.Path[0] = 0;
+  conf.port = 0;
+  conf.WifiCountSensor[0] = 0;
+  conf.WifiHashSensor[0] = 0;
+  conf.BleCountSensor[0] = 0;
+  conf.BleHashSensor[0] = 0;
+  conf.BtCountSensor[0] = 0;
+  conf.BtHashSensor[0] = 0;
+
+  strcat(conf.BaseUrl, "82.223.2.207");
+  strcat(conf.ComponentName, "WIFIDETECTORTEST");
+  strcat(conf.Path, "/data/gesinen_provider/");
+  conf.port = 8081;
+  strcat(conf.WifiCountSensor, "S02");
+  strcat(conf.WifiHashSensor, "S01");
+  strcat(conf.BleCountSensor, "S04");
+  strcat(conf.BleHashSensor, "S03");
+  strcat(conf.BtCountSensor, "S06");
+  strcat(conf.BtHashSensor, "S05");
+
   sdSaveNbConfig(&conf);
 }
 
 int sdLoadNbConfig(ConfigBuffer_t *config){
-  if(!SD.exists("nb.conf")) {
-    ESP_LOGI(TAG, "nb.conf file does not exists, creating");
+  SD.remove("nb.cnf");
+  if(!SD.exists("nb.cnf")) {
+    ESP_LOGI(TAG, "nb.cnf file does not exists, creating");
     saveDefaultNbConfig();
   }
 
-  File f = SD.open("nb.conf", FILE_READ);
-  const size_t capacity = JSON_OBJECT_SIZE(9) + 330;
-  DynamicJsonDocument doc(capacity);
+  File f = SD.open("nb.cnf", FILE_READ);
+  const size_t capacity = JSON_OBJECT_SIZE(9) + 512;
+  StaticJsonDocument<512> doc;
 
-  deserializeJson(doc, f);
+  char buff[512];
+  int i = 0;
+  while(f.available()) {
+    buff[i++] = f.read();
+  }
+  buff[i] = 0;
+
+  ESP_LOGD(TAG, "%d Bytes read", i);
+
+  if(i == 0) {
+    ESP_LOGE(TAG, "FILE EMPTY");
+    return -1;
+  }
+  ESP_LOGD(TAG, "File content: %s", buff);
+  DeserializationError err = deserializeJson(doc, buff);
+  if(err) {
+    ESP_LOGI(TAG, "deserialization error: %s", err.c_str());
+    return -2;
+  }
 
   f.close();
 
   const char* baseUrl = doc["baseUrl"]; // "12345678912345678912345678912345678912345678"
+  config->port = doc["port"];
   const char* path = doc["path"]; // "12345678912345678912345678912345678912345678"
   const char* componentName = doc["componentName"]; // "12345678912345678912345678912345678912345678"
 

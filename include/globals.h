@@ -99,7 +99,7 @@ typedef struct {
   uint16_t port;
   char Path[46];
   char ComponentName[46];
-  char IdentityKey [46];
+  char IdentityKey [128];
   char WifiCountSensor[7]; // max 6 chars
   char WifiHashSensor[7]; // max 6 chars
   char BleCountSensor[7]; // max 6 chars

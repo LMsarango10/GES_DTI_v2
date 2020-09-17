@@ -429,12 +429,13 @@ void set_nb_port(uint8_t val[]) {
 
 void set_nb_identity(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set_nb_identity");
+  auto offset = val[0];
   ConfigBuffer_t conf;
   sdLoadNbConfig(&conf);
 
   for(int i = 0; i < 45; i++)
   {
-    conf.IdentityKey[i] = val[i];
+    conf.IdentityKey[offset + i] = val[i];
     if (val[i] == 0) {
       break;
     }

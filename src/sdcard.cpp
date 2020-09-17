@@ -242,7 +242,7 @@ void replaceCurrentFile(char* newFilename)
 
 void sdSaveNbConfig(ConfigBuffer_t *config){
   File f = SD.open("nb.cnf", FILE_WRITE);
-  const size_t capacity = JSON_OBJECT_SIZE(18);
+  const size_t capacity = JSON_OBJECT_SIZE(32);
   DynamicJsonDocument doc(capacity);
 
   doc["baseUrl"] = config->BaseUrl;

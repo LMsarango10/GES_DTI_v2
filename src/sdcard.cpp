@@ -249,6 +249,7 @@ void sdSaveNbConfig(ConfigBuffer_t *config){
   doc["port"] = config->port;
   doc["path"] = config->Path;
   doc["componentName"] = config->ComponentName;
+  doc["identityKey"] = config->IdentityKey;
   doc["wifiCountSensor"] = config->WifiCountSensor;
   doc["wifiHashSensor"] = config->WifiHashSensor;
   doc["bleCountSensor"] = config->BleCountSensor;
@@ -265,6 +266,7 @@ void saveDefaultNbConfig() {
   ConfigBuffer_t conf;
   conf.BaseUrl[0] = 0;
   conf.ComponentName[0] = 0;
+  conf.IdentityKey[0] = 0;
   conf.Path[0] = 0;
   conf.port = 0;
   conf.WifiCountSensor[0] = 0;
@@ -277,6 +279,7 @@ void saveDefaultNbConfig() {
   strcat(conf.BaseUrl, "82.223.2.207");
   strcat(conf.ComponentName, "WIFIDETECTORTEST");
   strcat(conf.Path, "/data/gesinen_provider/");
+  strcat(conf.IdentityKey, "6d5b6102973c7a65f0da890369af9d6587ef57753de5ca2b7861f65f91997ed8");
   conf.port = 8081;
   strcat(conf.WifiCountSensor, "S02");
   strcat(conf.WifiHashSensor, "S01");
@@ -325,6 +328,7 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
   config->port = doc["port"];
   const char* path = doc["path"]; // "12345678912345678912345678912345678912345678"
   const char* componentName = doc["componentName"]; // "12345678912345678912345678912345678912345678"
+  const char* identityKey = doc["identityKey"];
 
   const char* wifiCountSensor = doc["wifiCountSensor"]; // "123456"
   const char* wifiHashSensor = doc["wifiHashSensor"]; // "123456"
@@ -340,6 +344,10 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
   int pathLen = strlen(path);
   strncpy(config->Path, path, pathLen);
   config->Path[pathLen] = '\0';
+
+  int identityKeyLen = strlen(identityKey);
+  strncpy(config->IdentityKey, identityKey, identityKeyLen);
+  config->Path[identityKeyLen] = '\0';
 
   int componentNameLen = strlen(componentName);
   strncpy(config->ComponentName, componentName, componentNameLen);

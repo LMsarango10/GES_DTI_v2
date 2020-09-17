@@ -301,11 +301,8 @@ int parseResponse(char *buff, int bytesReceived, int *responseCode) {
   return bodyLen;
 }
 
-int postPage(char *domainBuffer, int thisPort, char *page, char *thisData) {
+int postPage(char *domainBuffer, int thisPort, char *page, char *thisData, char* identityKey) {
   char outBuf[256];
-
-  char key[] =
-      "6d5b6102973c7a65f0da890369af9d6587ef57753de5ca2b7861f65f91997ed8";
 
   ESP_LOGI(TAG, "connecting...");
 
@@ -319,7 +316,7 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData) {
     strcat(globalBuff, outBuf);
     sprintf(outBuf, "Connection: close\r\nContent-Type: application/json\r\n");
     strcat(globalBuff, outBuf);
-    sprintf(outBuf, "IDENTITY_KEY: %s\r\n", key);
+    sprintf(outBuf, "IDENTITY_KEY: %s\r\n", identityKey);
     strcat(globalBuff, outBuf);
     sprintf(outBuf, "Content-Length: %u\r\n", strlen(thisData));
     strcat(globalBuff, outBuf);

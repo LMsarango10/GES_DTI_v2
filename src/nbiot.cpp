@@ -204,11 +204,11 @@ void nb_loop() {
       serializeJson(doc, buffer);
       ESP_LOGI(TAG, "JSON: %s", buffer);
 
-      int res = postPage(conf.BaseUrl, conf.port, url, buffer);
+      int res = postPage(conf.BaseUrl, conf.port, url, buffer, conf.IdentityKey);
       while (res != 200) {
         delay(5000);
         connectModem();
-        res = postPage(conf.BaseUrl, conf.port, url, buffer);
+        res = postPage(conf.BaseUrl, conf.port, url, buffer, conf.IdentityKey);
       }
       ESP_LOGI(TAG, "Finish sending message");
     }

@@ -20,6 +20,6 @@ bool attachNetwork();
 bool networkAttached();
 bool connectModem(char *ip, int port);
 void disconnectModem();
-int postPage(char *domainBuffer, int thisPort, char *page, char *thisData);
+int postPage(char *domainBuffer, int thisPort, char *page, char *thisData, char* identityKey);
 
 #endif

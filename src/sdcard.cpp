@@ -347,7 +347,7 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
 
   int identityKeyLen = strlen(identityKey);
   strncpy(config->IdentityKey, identityKey, identityKeyLen);
-  config->Path[identityKeyLen] = '\0';
+  config->IdentityKey[identityKeyLen] = '\0';
 
   int componentNameLen = strlen(componentName);
   strncpy(config->ComponentName, componentName, componentNameLen);

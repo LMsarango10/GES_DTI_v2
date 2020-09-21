@@ -74,7 +74,7 @@ uint16_t getCount(uint8_t *buffer) {
 
 void nb_send(void *pvParameters) {
   configASSERT(((uint32_t)pvParameters) == 1); // FreeRTOS check
-
+  initModem();
   while (1) {
     nb_loop();
     delay(1000);
@@ -127,7 +127,6 @@ void nb_loop() {
     JsonArray btHashObs = btHashSensor.createNestedArray("observations");
     JsonArray btCountObs = btCountSensor.createNestedArray("observations");
 
-    initModem();
     connectModem();
     int msgCounter = 0;
     bool msgCompleted = false;

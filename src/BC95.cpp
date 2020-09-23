@@ -185,7 +185,7 @@ int sendData(char *data, int datalen, char *responseBuff,
   while (!timeout) {
     timeout = (millis() - startTime > 25000);
     delay(100);
-    if (sendSerial.available()) {
+    while (sendSerial.available()) {
       char value = sendSerial.read();
       if (value != '\r' && value != '\n') {
         responseBuff[buffPtr++] = value;

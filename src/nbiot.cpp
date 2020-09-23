@@ -81,6 +81,11 @@ void nb_send(void *pvParameters) {
   }
 }
 
+void getSentiloTimestamp(char* buffer, uint32_t timestamp)
+{
+  sprintf(buffer, "%02d/%02d/%4d'T'%02d:%02d:%02d", day(timestamp), month(timestamp), year(timestamp), hour(timestamp), minute(timestamp), second(timestamp));
+}
+
 void nb_loop() {
   MessageBuffer_t SendBuffer;
   if (millis() - lastMessage > MIN_SEND_TIME_THRESHOLD && uxQueueMessagesWaitingFromISR(NbSendQueue) > 0) {
@@ -140,20 +145,30 @@ void nb_loop() {
         uint16_t countWifi = getCount(SendBuffer.Message + 4);
         uint16_t countBle = getCount(SendBuffer.Message + 6);
         uint16_t countBt = getCount(SendBuffer.Message + 8);
-        // inicialmente sin timestamp
+
+        char sentiloTimestamp[36];
+        getSentiloTimestamp(sentiloTimestamp, timestamp);
+
         JsonObject wifiCountObsValues = wifiCountObs.createNestedObject();
         JsonObject bleCountObsValues = bleCountObs.createNestedObject();
         JsonObject btCountObsValues = btCountObs.createNestedObject();
 
         wifiCountObsValues["value"] = countWifi;
+        wifiCountObsValues["timestamp"] = sentiloTimestamp;
         bleCountObsValues["value"] = countBle;
+        bleCountObsValues["timestamp"] = sentiloTimestamp;
         btCountObsValues["value"] = countBt;
+        btCountObsValues["timestamp"] = sentiloTimestamp;
         msgCompleted = true;
         break;
       }
       case BTMACSPORT: {
         ESP_LOGI(TAG, "BTMACS");
         uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
+
+        char sentiloTimestamp[36];
+        getSentiloTimestamp(sentiloTimestamp, timestamp);
+
         uint16_t macCount = (SendBuffer.MessageSize - 4) / 4;
         for (int i = 0; i < macCount; i++) {
           uint32_t mac = getUint32FromBuffer(SendBuffer.Message + 4 + 4 * i);
@@ -161,6 +176,7 @@ void nb_loop() {
           char buff[10];
           sprintf(buff, "%08X", mac);
           btHashObsValues["value"] = buff;
+          btHashObsValues["timestamp"] = sentiloTimestamp;
         }
         msgCompleted = true;
         break;
@@ -168,6 +184,10 @@ void nb_loop() {
       case BLEMACSPORT: {
         ESP_LOGI(TAG, "BLEMACS");
         uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
+
+        char sentiloTimestamp[36];
+        getSentiloTimestamp(sentiloTimestamp, timestamp);
+
         uint16_t macCount = (SendBuffer.MessageSize - 4) / 4;
         for (int i = 0; i < macCount; i++) {
           uint32_t mac = getUint32FromBuffer(SendBuffer.Message + 4 + 4 * i);
@@ -175,6 +195,7 @@ void nb_loop() {
           char buff[10];
           sprintf(buff, "%08X", mac);
           bleHashObsValues["value"] = buff;
+          bleHashObsValues["timestamp"] = sentiloTimestamp;
         }
         msgCompleted = true;
         break;
@@ -182,6 +203,10 @@ void nb_loop() {
       case WIFIMACSPORT: {
         ESP_LOGI(TAG, "WIFIMACS");
         uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
+
+        char sentiloTimestamp[36];
+        getSentiloTimestamp(sentiloTimestamp, timestamp);
+
         uint16_t macCount = (SendBuffer.MessageSize - 4) / 4;
         for (int i = 0; i < macCount; i++) {
           uint32_t mac = getUint32FromBuffer(SendBuffer.Message + 4 + 4 * i);
@@ -189,6 +214,7 @@ void nb_loop() {
           char buff[10];
           sprintf(buff, "%08X", mac);
           wifiHashObsValues["value"] = buff;
+          wifiHashObsValues["timestamp"] = sentiloTimestamp;
         }
         msgCompleted = true;
         break;

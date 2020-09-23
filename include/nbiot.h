@@ -7,6 +7,7 @@
 #include "sdcard.h"
 #include <ArduinoJson.h>
 #include <Ticker.h>
+#include <TimeLib.h>
 
 #define MIN_SEND_TIME_THRESHOLD 1000
 #define MIN_SEND_MESSAGES_THRESHOLD 5

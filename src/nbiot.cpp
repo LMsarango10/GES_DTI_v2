@@ -83,7 +83,7 @@ void nb_send(void *pvParameters) {
 
 void getSentiloTimestamp(char* buffer, uint32_t timestamp)
 {
-  sprintf(buffer, "%02d/%02d/%4d'T'%02d:%02d:%02d", day(timestamp), month(timestamp), year(timestamp), hour(timestamp), minute(timestamp), second(timestamp));
+  sprintf(buffer, "%02d/%02d/%4dT%02d:%02d:%02d", day(timestamp), month(timestamp), year(timestamp), hour(timestamp), minute(timestamp), second(timestamp));
 }
 
 void nb_loop() {

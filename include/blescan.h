@@ -12,13 +12,13 @@
 #define TX_BLE 4
 #define EN_BLE 12
 #define BLESerial Serial2
-#define RX_BT 39
-#define TX_BT 25
+#define RX_BT 36
+#define TX_BT 4
 #define EN_BT 12
 #define BTSerial Serial2
 
-#define BLEBTMUX_A 13
-#define BLEBTMUX_B 15
+#define BLEBTMUX_A 25
+#define BLEBTMUX_B 2
 
 #define BTLE_SCAN_TIME 20
 

@@ -71,7 +71,7 @@ int getMacsFromBT(char* buff, int bytesRead)
   unsigned long btClass = strtoul(endPtr+1, &endPtr, 16) ;
   int16_t rssi = strtol(endPtr+1, NULL, 16) &0xFFFF;
 
-  ESP_LOGV(TAG, "Parse input: MAC: %04X%02X%06X, BT Class: %06X, RSSI: %d", p1, p2, p3, btClass, rssi);
+  //ESP_LOGV(TAG, "Parse input: MAC: %04X%02X%06X, BT Class: %06X, RSSI: %d", p1, p2, p3, btClass, rssi);
 
   uint8_t mac[6];
   mac[0] = (p1 >> 8) & 0xFF;
@@ -81,13 +81,13 @@ int getMacsFromBT(char* buff, int bytesRead)
   mac[4] = (p3 >> 8) & 0xFF;
   mac[5] = (p3) & 0xFF;
 
-  char tempBuffer[64];
+  /*char tempBuffer[64];
   sprintf(tempBuffer, "Device MAC: ");
   for (int n = 0; n < 6; n++)
   {
     sprintf(tempBuffer + 2*n, "%02X",mac[n]);
   }
-  ESP_LOGV(TAG, "MAC parsed: %s", tempBuffer);
+  ESP_LOGV(TAG, "MAC parsed: %s", tempBuffer);*/
   mac_add((uint8_t *)mac, rssi, MAC_SNIFF_BT);
   return 0;
 }
@@ -166,25 +166,40 @@ bool reinitBLE()
 
 void initBTSerial(long baud)
 {
-  BTSerial.flush();
-  while(BTSerial.available())
-    BTSerial.read();
   BTSerial.begin(baud, SERIAL_8N1, RX_BT, TX_BT);
+  delay(1000);
 }
 
 void initBLESerial()
 {
-  BLESerial.flush();
-  while(BLESerial.available())
-    BLESerial.read();
   BLESerial.begin(9600, SERIAL_8N1, RX_BLE, TX_BLE);
+  delay(1000);
+}
+
+void setSerialToBT() {
+  BTSerial.flush();
+  delay(100) ;
+  BTSerial.updateBaudRate(38400);
+  //initBTSerial(38400);
+  digitalWrite(BLEBTMUX_A, LOW);
+  delay(100);
+}
+
+void setSerialToBLE() {
+  BLESerial.flush();
+  delay(100);
+  BLESerial.updateBaudRate(9600);
+  //initBLESerial();
+  digitalWrite(BLEBTMUX_A, HIGH);
+  delay(100);
 }
 
 bool initBLE()
 {
   pinMode(EN_BLE, OUTPUT);
   digitalWrite(EN_BLE, HIGH);
-  initBLESerial();
+  //initBLESerial();
+  setSerialToBLE();
   return reinitBLE();
 }
 
@@ -248,7 +263,8 @@ bool initBT(long baud)
 {
   pinMode(EN_BT, OUTPUT);  // this pin will pull the HC-05 pin 34 (key pin) HIGH to switch module to AT mode
   digitalWrite(EN_BT, HIGH);
-  initBTSerial(baud);  // HC-05 default speed in AT command more
+  //initBTSerial(baud);  // HC-05 default speed in AT command more
+  setSerialToBT();
   ESP_LOGD(TAG, "Initialize BT inquiry mode at %d", baud);
   return reinitBT();
 }
@@ -256,7 +272,7 @@ bool initBT(long baud)
 void BTCycle(long baud)
 {
   if(!cfg.btscan) return;
-  initBTSerial(baud);
+  //initBTSerial(baud);
   ESP_LOGV(TAG, "cycling bt scan");
 
   long startTime = millis();
@@ -275,7 +291,7 @@ void BTCycle(long baud)
     }
     if(assertResponse("+INQ:", buffer, bytesRead))
     {
-      ESP_LOGV(TAG, "Got message %s", buffer);
+      //ESP_LOGV(TAG, "Got message %s", buffer);
       getMacsFromBT(buffer, bytesRead);
     }
     delay(10);
@@ -286,20 +302,33 @@ void BTCycle(long baud)
 
 void btHandler(void *pvParameters)
 {
-  /*pinMode(BLEBTMUX_A, OUTPUT);
-  pinMode(BLEBTMUX_B, OUTPUT);
-  digitalWrite(BLEBTMUX_B, LOW);
-  */
-  delay(1000);
+  pinMode(BLEBTMUX_A, OUTPUT);
+  /*pinMode(BLEBTMUX_B, OUTPUT);
+  digitalWrite(BLEBTMUX_B, LOW);*/
+  delay(100);
+  initBTSerial(38400);
   bool btInitialized = initBT(38400);
-  delay(500);
+  delay(100);
+
   bool bleInitialized = initBLE();
-  delay(500);
+  delay(100);
+
+  ESP_LOGV(TAG,"start loop");
   while(true)
   {
-    BTCycle(38400);
+    setSerialToBT();
+    if(btInitialized)
+      BTCycle(38400);
+    else
+      btInitialized = reinitBT();
+
     delay(5000);
-    BLECycle();
+
+    setSerialToBLE();
+    if(bleInitialized)
+      BLECycle();
+    else
+      bleInitialized = reinitBLE();
     delay(5000);
   }
 }

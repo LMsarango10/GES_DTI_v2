@@ -17,7 +17,7 @@
 #define EN_BT 12
 #define BTSerial Serial2
 
-#define BLEBTMUX_A 2
+#define BLEBTMUX_A 25
 //#define BLEBTMUX_B 2
 
 #define BTLE_SCAN_TIME 20

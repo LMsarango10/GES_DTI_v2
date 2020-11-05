@@ -261,7 +261,7 @@ void lora_send(void *pvParameters) {
 
     else if (LMIC.opmode & OP_TXRXPEND)
     {
-      Serial.println("LMIC busy, waiting...");
+      ESP_LOGD(TAG, "LMIC busy, waiting...");
       lora_enqueuedata(&SendBuffer, prio_high);
       vTaskDelay(pdMS_TO_TICKS(500));
       continue;

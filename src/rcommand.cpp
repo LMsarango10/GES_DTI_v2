@@ -435,7 +435,7 @@ void set_nb_identity(uint8_t val[]) {
 
   for(int i = 1; i < 45; i++)
   {
-    conf.IdentityKey[offset + i] = val[i];
+    conf.IdentityKey[offset + i - 1] = val[i];
     if (val[i] == 0) {
       break;
     }

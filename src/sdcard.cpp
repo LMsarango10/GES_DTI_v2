@@ -299,10 +299,10 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
   }
 
   File f = SD.open("nb.cnf", FILE_READ);
-  const size_t capacity = JSON_OBJECT_SIZE(12) + 512;
-  StaticJsonDocument<512> doc;
+  const size_t capacity = JSON_OBJECT_SIZE(12) + 1024;
+  StaticJsonDocument<1024> doc;
 
-  char buff[512];
+  char buff[1024];
   int i = 0;
   while(f.available()) {
     buff[i++] = f.read();

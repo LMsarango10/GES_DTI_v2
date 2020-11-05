@@ -69,10 +69,10 @@ if (!enqueued)
 // interrupt triggered function to prepare payload to send
 void sendData() {
   time_t tstamp;
-  tstamp = get_rtctime();
-  float temp = get_rtctemp();
+  tstamp = now();
+  //float temp = get_rtctemp();
   ESP_LOGD(TAG, "timestamp is %lu", tstamp);
-  ESP_LOGD(TAG, "rtc temp is: %f", temp);
+  //ESP_LOGD(TAG, "rtc temp is: %f", temp);
   uint8_t bitmask = cfg.payloadmask;
   uint8_t mask = 1;
   uint8_t* bfs;

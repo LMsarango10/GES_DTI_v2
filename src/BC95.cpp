@@ -45,13 +45,13 @@ bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command,
 
 void initModem() {
   bc95serial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
-  pinMode(RESET_PIN, OUTPUT);
+  //pinMode(RESET_PIN, OUTPUT);
   // digitalWrite(RESET_PIN, HIGH);
 
-  digitalWrite(RESET_PIN, HIGH);
+  /*digitalWrite(RESET_PIN, HIGH);
   delay(1000);
   digitalWrite(RESET_PIN, LOW);
-  delay(5000);
+  delay(5000);*/
 #ifdef DEBUG_MODEM
   // ESP_LOGD(TAG, bc95serial.readString().c_str());
 #endif
@@ -64,6 +64,11 @@ bool networkReady() {
     return true;
   else
     return false;
+}
+
+void getCsq() {
+  bc95serial.println("AT+CSQ");
+  int bytesRead = readResponseBC(&bc95serial, globalBuff, sizeof(globalBuff));
 }
 
 void resetModem() {
@@ -183,7 +188,7 @@ int sendData(char *data, int datalen, char *responseBuff,
   responseBuff[buffPtr] = 0;
   sendStatus status = INIT;
   while (!timeout) {
-    timeout = (millis() - startTime > 25000);
+    timeout = (millis() - startTime > NBSENDTIMEOUT);
     delay(100);
     while (sendSerial.available()) {
       char value = sendSerial.read();

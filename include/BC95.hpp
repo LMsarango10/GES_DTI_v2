@@ -3,9 +3,11 @@
 #include <Arduino.h>
 
 //#define bc95serial Serial1
-#define RESET_PIN 25
+//#define RESET_PIN 25
 #define RX_PIN 34
 #define TX_PIN 0
+
+#define NBSENDTIMEOUT 25000
 
 #define DEBUG_MODEM
 
@@ -16,6 +18,7 @@ void initModem();
 void resetModem();
 bool configModem();
 bool networkReady();
+void getCsq();
 bool attachNetwork();
 bool networkAttached();
 bool connectModem(char *ip, int port);

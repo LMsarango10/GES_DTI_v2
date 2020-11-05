@@ -88,7 +88,7 @@ void getSentiloTimestamp(char* buffer, uint32_t timestamp)
 
 void nb_loop() {
   MessageBuffer_t SendBuffer;
-  if (millis() - lastMessage > MIN_SEND_TIME_THRESHOLD && uxQueueMessagesWaitingFromISR(NbSendQueue) > 0) {
+  if (millis() - lastMessage > MIN_SEND_TIME_THRESHOLD && uxQueueMessagesWaiting(NbSendQueue) > 0) {
     ConfigBuffer_t conf;
     sdLoadNbConfig(&conf);
     if(strlen(conf.BaseUrl) < 5)
@@ -96,9 +96,9 @@ void nb_loop() {
       ESP_LOGE(TAG, "Error in NB config, cant send");
       return;
     }
-    ESP_LOGV(TAG, "NB messages pending, sending");
+    ESP_LOGI(TAG, "NB messages pending, sending");
     // fetch next or wait for payload to send from queue
-
+    delay(100);
     char url[100];
     url[0] = 0;
     strcat(url, conf.Path);

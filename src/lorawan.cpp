@@ -262,7 +262,8 @@ void lora_send(void *pvParameters) {
     else if (LMIC.opmode & OP_TXRXPEND)
     {
       ESP_LOGD(TAG, "LMIC busy, waiting...");
-      lora_enqueuedata(&SendBuffer, prio_high);
+      SendBuffer.MessagePrio = prio_high;
+      lora_enqueuedata(&SendBuffer);
       vTaskDelay(pdMS_TO_TICKS(500));
       continue;
     }

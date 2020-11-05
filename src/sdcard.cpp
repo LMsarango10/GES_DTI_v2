@@ -292,7 +292,7 @@ void saveDefaultNbConfig() {
 }
 
 int sdLoadNbConfig(ConfigBuffer_t *config){
-  SD.remove("nb.cnf");
+  // Use this to return to default SD.remove("nb.cnf");
   if(!SD.exists("nb.cnf")) {
     ESP_LOGI(TAG, "nb.cnf file does not exists, creating");
     saveDefaultNbConfig();

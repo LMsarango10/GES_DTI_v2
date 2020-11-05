@@ -361,6 +361,12 @@ void set_time(uint8_t val[]) {
   timeSync();
 };
 
+void set_rtc_timestamp(uint8_t val[]) {
+  uint32_t epoch = (uint32_t)val[0] * 256 * 256 * 256 + (uint32_t)val[1] * 256 * 256 + (uint32_t)val[2] * 256 + (uint32_t)val[0];
+  ESP_LOGI(TAG, "Force RTC timestamp to: %l", epoch);
+  setMyTime(epoch, 0, _rtc);
+};
+
 void set_flush(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: flush");
   // does nothing
@@ -541,7 +547,7 @@ static cmd_t table[] = {
     {0x19, set_btscan, 1, true},        {0x1A, set_nb_server, 45, true},
     {0x1B, set_nb_path, 45, true},      {0x1C, set_nb_component, 45, true},
     {0x1D, set_nb_sensors, 42, true},   {0x1E, set_nb_port, 2, true},
-    {0x1F, set_nb_identity, 45, true},
+    {0x1F, set_nb_identity, 45, true},  {0x20, set_rtc_timestamp, 4, true},
     {0x80, get_config, 0, false},
     {0x81, get_status, 0, false},       {0x83, get_batt, 0, false},
     {0x84, get_gps, 0, false},          {0x85, get_bme, 0, false},

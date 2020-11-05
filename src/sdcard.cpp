@@ -241,6 +241,9 @@ void replaceCurrentFile(char* newFilename)
 }
 
 void sdSaveNbConfig(ConfigBuffer_t *config){
+  if(SD.exists("nb.cnf")) {
+    SD.remove("nb.cnf");
+  }
   File f = SD.open("nb.cnf", FILE_WRITE);
   const size_t capacity = JSON_OBJECT_SIZE(32);
   DynamicJsonDocument doc(capacity);

@@ -259,6 +259,14 @@ void lora_send(void *pvParameters) {
       continue;
     }
 
+    else if (LMIC.opmode & OP_TXRXPEND)
+    {
+      Serial.println("LMIC busy, waiting...");
+      lora_enqueuedata(&SendBuffer, prio_high);
+      vTaskDelay(pdMS_TO_TICKS(500));
+      continue;
+    }
+
     // attempt to transmit payload
     else {
 

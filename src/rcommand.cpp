@@ -433,7 +433,7 @@ void set_nb_identity(uint8_t val[]) {
   ConfigBuffer_t conf;
   sdLoadNbConfig(&conf);
 
-  for(int i = 0; i < 45; i++)
+  for(int i = 1; i < 45; i++)
   {
     conf.IdentityKey[offset + i] = val[i];
     if (val[i] == 0) {

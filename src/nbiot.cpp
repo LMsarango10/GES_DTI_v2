@@ -228,8 +228,8 @@ void nb_loop() {
       char buffer[8192];
       serializeJson(doc, buffer);
       ESP_LOGI(TAG, "JSON: %s", buffer);
-
-      int res = postPage(conf.BaseUrl, conf.port, url, buffer, conf.IdentityKey);
+      int res = 200;
+      postPage(conf.BaseUrl, conf.port, url, buffer, conf.IdentityKey);
       while (res != 200) {
         delay(5000);
         connectModem();

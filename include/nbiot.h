@@ -19,6 +19,7 @@ extern "C" {
 #define MAX_NB_MESSAGES 10
 #define MQTT_RETRIES 10
 #define MQTT_RETRY_TIME 1000
+#define MQTT_CONN_RETRIES 5
 
 #define NB_QUEUE_SIZE SEND_QUEUE_SIZE
 

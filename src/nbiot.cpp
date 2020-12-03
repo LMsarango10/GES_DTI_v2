@@ -127,7 +127,22 @@ void nb_loop() {
     sprintf(devEui, "%02x%02x%02x%02x%02x%02x%02x%02x", DEVEUI[0], DEVEUI[1], DEVEUI[2], DEVEUI[3], DEVEUI[4], DEVEUI[5], DEVEUI[6], DEVEUI[7]);
 
     connectModem();
-    connectMqtt(conf.ServerAddress, conf.port, conf.ServerPassword, devEui);
+    int connection_retries = 0;
+    while(connection_retries < MQTT_CONN_RETRIES) {
+      int conn_result = connectMqtt(conf.ServerAddress, conf.port, conf.ServerPassword, devEui);
+      if(conn_result == 0){
+        ESP_LOGI(TAG, "MQTT CONNECTED");
+        break;
+      }
+      ESP_LOGI(TAG, "Could not connect to MQTT, retrying");
+      delay(MQTT_RETRY_TIME);
+      connection_retries++;
+    }
+    if (connection_retries == MQTT_CONN_RETRIES) {
+      ESP_LOGI(TAG, "Could not connect to MQTT");
+      return;
+    }
+
     int msgCounter = 0;
     while (msgCounter <= MAX_NB_MESSAGES &&  uxQueueMessagesWaiting(NbSendQueue) > 0 ) {
       xQueueReceive(NbSendQueue, &SendBuffer, portMAX_DELAY);

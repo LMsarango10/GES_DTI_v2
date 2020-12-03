@@ -370,6 +370,8 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData, char*
 
 int connectMqtt(char *url, int port, char *password, char *clientId)
 {
+  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTOPEN=0,\"%s\",%d",url, port);
+
   bc95serial.print("AT+QMTOPEN=0,\"");
   bc95serial.print(url);
   bc95serial.print("\",");
@@ -379,6 +381,8 @@ int connectMqtt(char *url, int port, char *password, char *clientId)
   if (!assertResponseBC("OK", data, responseBytes)) {
     return -1;
   }
+
+  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCONN=0,\"%s\",\"gesinen\",\"%s\"",clientId, password);
 
   bc95serial.print("AT+QMTCONN=0,\"");
   bc95serial.print(clientId);
@@ -407,6 +411,8 @@ int checkSubscriptionMqtt(char *message)
 }
 int publishMqtt(char *topic, char *message, int qos)
 {
+  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTPUB=0,0,0,0,\"%s\"",topic);
+
   bc95serial.print("AT+QMTPUB=0,0,0,0,\"");
   bc95serial.print(topic);
   bc95serial.println("\"");
@@ -429,6 +435,7 @@ int publishMqtt(char *topic, char *message, int qos)
 }
 int disconnectMqtt()
 {
+  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTDISC=0");
   bc95serial.println("AT+QMTDISC=0");
   char data[64];
   int responseBytes = readResponseBC(&bc95serial, data, 64);

@@ -95,17 +95,12 @@ typedef struct {
 } MessageBuffer_t;
 
 typedef struct {
-  char BaseUrl[46];
+  char ServerAddress[46];
   uint16_t port;
-  char Path[46];
-  char ComponentName[46];
-  char IdentityKey [128];
-  char WifiCountSensor[7]; // max 6 chars
-  char WifiHashSensor[7]; // max 6 chars
-  char BleCountSensor[7]; // max 6 chars
-  char BleHashSensor[7]; // max 6 chars
-  char BtCountSensor[7]; // max 6 chars
-  char BtHashSensor[7]; // max 6 chars
+  char ServerPassword [46];
+  char ApplicationId[6];
+  char ApplicationName[32];
+  char GatewayId[46];
 } ConfigBuffer_t;
 
 typedef struct {

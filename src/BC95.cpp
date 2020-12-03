@@ -367,3 +367,73 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData, char*
     return -1;
   }
 }
+
+int connectMqtt(char *url, int port, char *password, char *clientId)
+{
+  bc95serial.print("AT+QMTOPEN=0,\"");
+  bc95serial.print(url);
+  bc95serial.print("\",");
+  bc95serial.println(port);
+  char data[64];
+  int responseBytes = readResponseBC(&bc95serial, data, 64);
+  if (!assertResponseBC("OK", data, responseBytes)) {
+    return -1;
+  }
+
+  bc95serial.print("AT+QMTCONN=0,\"");
+  bc95serial.print(clientId);
+  bc95serial.print("\",\"gesinen\",\"");
+  bc95serial.print(password);
+  bc95serial.println("\"");
+
+  responseBytes = readResponseBC(&bc95serial, data, 64);
+  if (!assertResponseBC("OK", data, responseBytes)) {
+    return -2;
+  }
+  return 0;
+}
+
+int subscribeMqtt(char *topic, int qos)
+{
+
+}
+int unsubscribeMqtt(char *topic, int qos)
+{
+
+}
+int checkSubscriptionMqtt(char *message)
+{
+
+}
+int publishMqtt(char *topic, char *message, int qos)
+{
+  bc95serial.print("AT+QMTPUB=0,0,0,0,\"");
+  bc95serial.print(topic);
+  bc95serial.println("\"");
+
+  char data[64];
+  int responseBytes = readResponseBC(&bc95serial, data, 64);
+
+  if (!assertResponseBC(">", data, responseBytes)) {
+    return -1;
+  }
+
+  bc95serial.println(message);
+
+  responseBytes = readResponseBC(&bc95serial, data, 64);
+
+  if (!assertResponseBC("+QMTPUB: 0,0,0", data, responseBytes)) {
+    return -2;
+  }
+  return 0;
+}
+int disconnectMqtt()
+{
+  bc95serial.println("AT+QMTDISC=0");
+  char data[64];
+  int responseBytes = readResponseBC(&bc95serial, data, 64);
+  if (!assertResponseBC("OK", data, responseBytes)) {
+    return -1;
+  }
+  return 0;
+}

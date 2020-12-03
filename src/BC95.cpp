@@ -377,8 +377,8 @@ int connectMqtt(char *url, int port, char *password, char *clientId)
   bc95serial.print("\",");
   bc95serial.println(port);
   char data[64];
-  int responseBytes = readResponseBC(&bc95serial, data, 64);
-  if (!assertResponseBC("OK", data, responseBytes)) {
+  int responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
+  if (!assertResponseBC("+QMTOPEN: 0,0", data, responseBytes)) {
     return -1;
   }
 
@@ -390,8 +390,8 @@ int connectMqtt(char *url, int port, char *password, char *clientId)
   bc95serial.print(password);
   bc95serial.println("\"");
 
-  responseBytes = readResponseBC(&bc95serial, data, 64);
-  if (!assertResponseBC("OK", data, responseBytes)) {
+  responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
+  if (!assertResponseBC("+QMTCONN: 0,0,0", data, responseBytes)) {
     return -2;
   }
   return 0;
@@ -424,9 +424,10 @@ int publishMqtt(char *topic, char *message, int qos)
     return -1;
   }
 
-  bc95serial.println(message);
+  bc95serial.print(message);
+  bc95serial.write(26);
 
-  responseBytes = readResponseBC(&bc95serial, data, 64);
+  responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
 
   if (!assertResponseBC("+QMTPUB: 0,0,0", data, responseBytes)) {
     return -2;

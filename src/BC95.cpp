@@ -417,8 +417,8 @@ int publishMqtt(char *topic, char *message, int qos)
   bc95serial.print(topic);
   bc95serial.println("\"");
 
-  char data[64];
-  int responseBytes = readResponseBC(&bc95serial, data, 64);
+  char data[512];
+  int responseBytes = readResponseBC(&bc95serial, data, 512);
 
   if (!assertResponseBC(">", data, responseBytes)) {
     return -1;
@@ -427,7 +427,7 @@ int publishMqtt(char *topic, char *message, int qos)
   bc95serial.print(message);
   bc95serial.write(26);
 
-  responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
+  responseBytes = readResponseBC(&bc95serial, data, 511, 5000);
 
   if (!assertResponseBC("+QMTPUB: 0,0,0", data, responseBytes)) {
     return -2;
@@ -438,8 +438,8 @@ int disconnectMqtt()
 {
   ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTDISC=0");
   bc95serial.println("AT+QMTDISC=0");
-  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCLOSE=0");
-  bc95serial.println("AT+QMTCLOSE=0");
+  //ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCLOSE=0");
+  //bc95serial.println("AT+QMTCLOSE=0");
   char data[64];
   int responseBytes = readResponseBC(&bc95serial, data, 64);
   if (!assertResponseBC("OK", data, responseBytes)) {

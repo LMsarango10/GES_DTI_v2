@@ -107,7 +107,7 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
 
   serializeJson(doc, messageBuffer);
   free(base64);
-  publishMqtt(topic, messageBuffer, 0);
+  return publishMqtt(topic, messageBuffer, 0);
 }
 
 void nb_loop() {

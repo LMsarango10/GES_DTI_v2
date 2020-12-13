@@ -91,7 +91,7 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
 
   char messageBuffer[512];
 
-  sprintf(topic, "%s/application/%d/device/%s", config->GatewayId, config->ApplicationId, devEui);
+  sprintf(topic, "%s/application/%s/device/%s", config->GatewayId, config->ApplicationId, devEui);
 
   StaticJsonDocument<512> doc;
 
@@ -153,6 +153,7 @@ void nb_loop() {
         if (result == 0) {
           break;
         }
+
         ESP_LOGE(TAG, "Could not send MQTT message, retry.");
         delay(MQTT_RETRY_TIME);
       }

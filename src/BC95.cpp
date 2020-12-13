@@ -26,6 +26,31 @@ int readResponseBC(HardwareSerial *port, char *buff, int b_size,
   return 0;
 }
 
+int readResponseWithStop(HardwareSerial *port, char *buff, int b_size, char* stopWord, unsigned long timeout) {
+  buff[0] = 0;
+  int p = 0;
+
+  unsigned long startTime = millis();
+
+  while(millis() - startTime < timeout) {
+    if(port->available()) {
+      buff[p++] = port->read();
+      if(p >= b_size) {
+        ESP_LOGE(TAG, "Buffer too small to receive message");
+        return -1;
+      }
+    }
+    if (strstr(buff, stopWord)) {
+      ESP_LOGI(TAG, "Stopword %s found", stopWord);
+      ESP_LOGI(TAG, "%d bytes read", p);
+      ESP_LOGI(TAG, "Message: %s", buff);
+      return p;
+    }
+  }
+  ESP_LOGE(TAG, "Timeout waiting for stopword");
+  return -2;
+}
+
 bool assertResponseBC(const char *expected, char *received, int bytesRead) {
   if (bytesRead <= 0)
     return false;
@@ -421,17 +446,19 @@ int publishMqtt(char *topic, char *message, int qos)
   int responseBytes = readResponseBC(&bc95serial, data, 512);
 
   if (!assertResponseBC(">", data, responseBytes)) {
+    bc95serial.write(26);
     return -1;
   }
 
   bc95serial.print(message);
   bc95serial.write(26);
 
-  responseBytes = readResponseBC(&bc95serial, data, 511, 5000);
-
-  if (!assertResponseBC("+QMTPUB: 0,0,0", data, responseBytes)) {
-    return -2;
+  responseBytes = readResponseWithStop(&bc95serial, data, 512, "+QMTPUB: 0,0,0", 5000);
+  while(bc95serial.available()) {
+    bc95serial.read();
   }
+  if(responseBytes < 0)
+    return responseBytes;
   return 0;
 }
 int disconnectMqtt()

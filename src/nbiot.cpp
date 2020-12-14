@@ -143,12 +143,10 @@ void nb_loop() {
       return;
     }
 
-    int msgCounter = 0;
-    while (msgCounter <= MAX_NB_MESSAGES &&  uxQueueMessagesWaiting(NbSendQueue) > 0 ) {
+    while (uxQueueMessagesWaiting(NbSendQueue) > 0) {
       xQueueReceive(NbSendQueue, &SendBuffer, portMAX_DELAY);
       int retries = true;
-      msgCounter++;
-      while(retries < MQTT_RETRIES) {
+      while(retries < MQTT_PUB_RETRIES) {
         int result = sendNbMqtt(&SendBuffer, &conf, devEui);
         if (result == 0) {
           break;
@@ -156,6 +154,13 @@ void nb_loop() {
 
         ESP_LOGE(TAG, "Could not send MQTT message, retry.");
         delay(MQTT_RETRY_TIME);
+      }
+      if(retries >= MQTT_PUB_RETRIES)
+      {
+        ESP_LOGE(TAG, "Max MQTT retries exceeded");
+        SendBuffer.MessagePrio = prio_high;
+        nb_enqueuedata(&SendBuffer);
+        break;
       }
     }
     disconnectMqtt();

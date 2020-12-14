@@ -91,7 +91,7 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
 
   char messageBuffer[512];
 
-  sprintf(topic, "%s/application/%s/device/%s", config->GatewayId, config->ApplicationId, devEui);
+  sprintf(topic, "%s/application/%s/device/%s/rx", config->GatewayId, config->ApplicationId, devEui);
 
   StaticJsonDocument<512> doc;
 

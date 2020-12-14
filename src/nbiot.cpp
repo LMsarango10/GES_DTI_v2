@@ -101,7 +101,7 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
 
   unsigned int base64_length;
   unsigned char * base64 = base64_encode((const unsigned char *)message->Message, message->MessageSize, &base64_length);
-  if(base64[base64_length] == '/n') {
+  if(base64[base64_length - 1] == '/n') {
     base64[base64_length - 1] = 0;
   }
   doc["data"] = base64;

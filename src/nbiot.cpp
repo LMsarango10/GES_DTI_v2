@@ -45,7 +45,9 @@ void connectModem() {
   bool done = false;
   while (!done) {
     resetModem();
-    configModem();
+    if(!configModem()) {
+      ESP_LOGE(TAG, "Could not config modem");
+    }
     unsigned long t0 = millis();
     ESP_LOGI(TAG, "Try connecting");
     while (millis() < t0 + 60000) {

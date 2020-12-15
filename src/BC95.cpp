@@ -97,6 +97,7 @@ void getCsq() {
 }
 
 void resetModem() {
+  ESP_LOGI(TAG, "Reset NBIOT modem");
   bc95serial.println("AT+NRB");
   delay(2000);
   int bytesRead = readResponseBC(&bc95serial, globalBuff, sizeof(globalBuff));
@@ -109,6 +110,7 @@ void resetModem() {
 }
 
 bool configModem() {
+  ESP_LOGI(TAG, "Config NBIOT modem");
   return sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=2", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial,

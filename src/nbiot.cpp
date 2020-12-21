@@ -150,13 +150,13 @@ void nb_loop() {
 
     while (uxQueueMessagesWaiting(NbSendQueue) > 0) {
       xQueueReceive(NbSendQueue, &SendBuffer, portMAX_DELAY);
-      int retries = true;
+      int retries = 0;
       while(retries < MQTT_PUB_RETRIES) {
         int result = sendNbMqtt(&SendBuffer, &conf, devEui);
         if (result == 0) {
           break;
         }
-
+        retries++;
         ESP_LOGE(TAG, "Could not send MQTT message, retry.");
         delay(MQTT_RETRY_TIME);
       }

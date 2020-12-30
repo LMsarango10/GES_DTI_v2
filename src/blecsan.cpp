@@ -310,6 +310,9 @@ void btHandler(void *pvParameters)
   bool btInitialized = initBT(38400);
   delay(100);
 
+#ifdef LEGACY_MODULE
+  initBLESerial();
+#endif
   bool bleInitialized = initBLE();
   delay(100);
 

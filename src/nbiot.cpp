@@ -45,7 +45,9 @@ void connectModem() {
   bool done = false;
   while (!done) {
     resetModem();
-    configModem();
+    if(!configModem()) {
+      ESP_LOGE(TAG, "Could not config modem");
+    }
     unsigned long t0 = millis();
     ESP_LOGI(TAG, "Try connecting");
     while (millis() < t0 + 60000) {
@@ -86,156 +88,87 @@ void getSentiloTimestamp(char* buffer, uint32_t timestamp)
   sprintf(buffer, "%02d/%02d/%4dT%02d:%02d:%02d", day(timestamp), month(timestamp), year(timestamp), hour(timestamp), minute(timestamp), second(timestamp));
 }
 
+int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
+  char topic[64];
+
+  char messageBuffer[512];
+
+  sprintf(topic, "%s/application/%s/device/%s/rx", config->GatewayId, config->ApplicationId, devEui);
+
+  StaticJsonDocument<512> doc;
+
+  doc["applicationID"] = config->ApplicationId;
+  doc["applicationName"] = config->ApplicationName;
+  doc["fPort"] = message->MessagePort;
+
+  unsigned int base64_length;
+  unsigned char * base64 = base64_encode((const unsigned char *)message->Message, message->MessageSize, &base64_length);
+  if(base64[base64_length - 1] == 10) {
+    base64[base64_length - 1] = 0;
+  }
+  doc["data"] = base64;
+  doc["deviceName"] = devEui;
+  doc["devEUI"] = devEui;
+
+  serializeJson(doc, messageBuffer);
+  free(base64);
+  return publishMqtt(topic, messageBuffer, 0);
+}
+
 void nb_loop() {
   MessageBuffer_t SendBuffer;
   if (millis() - lastMessage > MIN_SEND_TIME_THRESHOLD && uxQueueMessagesWaiting(NbSendQueue) > 0) {
     ConfigBuffer_t conf;
     sdLoadNbConfig(&conf);
-    if(strlen(conf.BaseUrl) < 5)
+    if(strlen(conf.ServerAddress) < 5)
     {
       ESP_LOGE(TAG, "Error in NB config, cant send");
       return;
     }
     ESP_LOGI(TAG, "NB messages pending, sending");
     // fetch next or wait for payload to send from queue
-    delay(100);
-    char url[100];
-    url[0] = 0;
-    strcat(url, conf.Path);
-    //strcat(url, conf.ComponentName);
 
-    const size_t capacity = 4096;
-    DynamicJsonDocument doc(capacity);
-
-    JsonArray sensors = doc.createNestedArray("sensors");
-    JsonObject wifiHashSensor = sensors.createNestedObject();
-    JsonObject wifiCountSensor = sensors.createNestedObject();
-    JsonObject bleHashSensor = sensors.createNestedObject();
-    JsonObject bleCountSensor = sensors.createNestedObject();
-    JsonObject btHashSensor = sensors.createNestedObject();
-    JsonObject btCountSensor = sensors.createNestedObject();
-
-    wifiHashSensor["sensor"] =
-        String(conf.ComponentName) + String(conf.WifiHashSensor);
-    wifiCountSensor["sensor"] =
-        String(conf.ComponentName) + String(conf.WifiCountSensor);
-    bleHashSensor["sensor"] = String(conf.ComponentName) + String(conf.BleHashSensor);
-    bleCountSensor["sensor"] =
-        String(conf.ComponentName) + String(conf.BleCountSensor);
-    btHashSensor["sensor"] = String(conf.ComponentName) + String(conf.BtHashSensor);
-    btCountSensor["sensor"] = String(conf.ComponentName) + String(conf.BtCountSensor);
-
-    JsonArray wifiHashObs = wifiHashSensor.createNestedArray("observations");
-    JsonArray wifiCountObs = wifiCountSensor.createNestedArray("observations");
-    JsonArray bleHashObs = bleHashSensor.createNestedArray("observations");
-    JsonArray bleCountObs = bleCountSensor.createNestedArray("observations");
-    JsonArray btHashObs = btHashSensor.createNestedArray("observations");
-    JsonArray btCountObs = btCountSensor.createNestedArray("observations");
+    char devEui[17];
+    sprintf(devEui, "%02x%02x%02x%02x%02x%02x%02x%02x", DEVEUI[0], DEVEUI[1], DEVEUI[2], DEVEUI[3], DEVEUI[4], DEVEUI[5], DEVEUI[6], DEVEUI[7]);
 
     connectModem();
-    int msgCounter = 0;
-    bool msgCompleted = false;
-    while (msgCounter <= MAX_NB_MESSAGES &&  uxQueueMessagesWaiting(NbSendQueue) > 0 ) {
+    int connection_retries = 0;
+    while(connection_retries < MQTT_CONN_RETRIES) {
+      int conn_result = connectMqtt(conf.ServerAddress, conf.port, conf.ServerPassword, devEui);
+      if(conn_result == 0){
+        ESP_LOGI(TAG, "MQTT CONNECTED");
+        break;
+      }
+      ESP_LOGI(TAG, "Could not connect to MQTT, retrying");
+      delay(MQTT_RETRY_TIME);
+      connection_retries++;
+    }
+    if (connection_retries == MQTT_CONN_RETRIES) {
+      ESP_LOGI(TAG, "Could not connect to MQTT");
+      return;
+    }
+
+    while (uxQueueMessagesWaiting(NbSendQueue) > 0) {
       xQueueReceive(NbSendQueue, &SendBuffer, portMAX_DELAY);
-      msgCounter++;
-      switch (SendBuffer.MessagePort) {
-      case COUNTERPORT: {
-        ESP_LOGI(TAG, "COUNT PORT");
-        uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
-        uint16_t countWifi = getCount(SendBuffer.Message + 4);
-        uint16_t countBle = getCount(SendBuffer.Message + 6);
-        uint16_t countBt = getCount(SendBuffer.Message + 8);
-
-        char sentiloTimestamp[36];
-        getSentiloTimestamp(sentiloTimestamp, timestamp);
-
-        JsonObject wifiCountObsValues = wifiCountObs.createNestedObject();
-        JsonObject bleCountObsValues = bleCountObs.createNestedObject();
-        JsonObject btCountObsValues = btCountObs.createNestedObject();
-
-        wifiCountObsValues["value"] = countWifi;
-        wifiCountObsValues["timestamp"] = sentiloTimestamp;
-        bleCountObsValues["value"] = countBle;
-        bleCountObsValues["timestamp"] = sentiloTimestamp;
-        btCountObsValues["value"] = countBt;
-        btCountObsValues["timestamp"] = sentiloTimestamp;
-        msgCompleted = true;
-        break;
-      }
-      case BTMACSPORT: {
-        ESP_LOGI(TAG, "BTMACS");
-        uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
-
-        char sentiloTimestamp[36];
-        getSentiloTimestamp(sentiloTimestamp, timestamp);
-
-        uint16_t macCount = (SendBuffer.MessageSize - 4) / 4;
-        for (int i = 0; i < macCount; i++) {
-          uint32_t mac = getUint32FromBuffer(SendBuffer.Message + 4 + 4 * i);
-          JsonObject btHashObsValues = btHashObs.createNestedObject();
-          char buff[10];
-          sprintf(buff, "%08X", mac);
-          btHashObsValues["value"] = buff;
-          btHashObsValues["timestamp"] = sentiloTimestamp;
+      int retries = 0;
+      while(retries < MQTT_PUB_RETRIES) {
+        int result = sendNbMqtt(&SendBuffer, &conf, devEui);
+        if (result == 0) {
+          break;
         }
-        msgCompleted = true;
-        break;
+        retries++;
+        ESP_LOGE(TAG, "Could not send MQTT message, retry.");
+        delay(MQTT_RETRY_TIME);
       }
-      case BLEMACSPORT: {
-        ESP_LOGI(TAG, "BLEMACS");
-        uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
-
-        char sentiloTimestamp[36];
-        getSentiloTimestamp(sentiloTimestamp, timestamp);
-
-        uint16_t macCount = (SendBuffer.MessageSize - 4) / 4;
-        for (int i = 0; i < macCount; i++) {
-          uint32_t mac = getUint32FromBuffer(SendBuffer.Message + 4 + 4 * i);
-          JsonObject bleHashObsValues = bleHashObs.createNestedObject();
-          char buff[10];
-          sprintf(buff, "%08X", mac);
-          bleHashObsValues["value"] = buff;
-          bleHashObsValues["timestamp"] = sentiloTimestamp;
-        }
-        msgCompleted = true;
-        break;
-      }
-      case WIFIMACSPORT: {
-        ESP_LOGI(TAG, "WIFIMACS");
-        uint32_t timestamp = getUint32FromBuffer(SendBuffer.Message);
-
-        char sentiloTimestamp[36];
-        getSentiloTimestamp(sentiloTimestamp, timestamp);
-
-        uint16_t macCount = (SendBuffer.MessageSize - 4) / 4;
-        for (int i = 0; i < macCount; i++) {
-          uint32_t mac = getUint32FromBuffer(SendBuffer.Message + 4 + 4 * i);
-          JsonObject wifiHashObsValues = wifiHashObs.createNestedObject();
-          char buff[10];
-          sprintf(buff, "%08X", mac);
-          wifiHashObsValues["value"] = buff;
-          wifiHashObsValues["timestamp"] = sentiloTimestamp;
-        }
-        msgCompleted = true;
-        break;
-      }
-      default:
+      if(retries >= MQTT_PUB_RETRIES)
+      {
+        ESP_LOGE(TAG, "Max MQTT retries exceeded");
+        SendBuffer.MessagePrio = prio_high;
+        nb_enqueuedata(&SendBuffer);
         break;
       }
     }
-    if (msgCompleted) {
-      ESP_LOGI(TAG, "Message complete");
-      char buffer[8192];
-      serializeJson(doc, buffer);
-      ESP_LOGI(TAG, "JSON: %s", buffer);
-      int res = postPage(conf.BaseUrl, conf.port, url, buffer, conf.IdentityKey);
-      while (res < 0) {
-        delay(5000);
-        connectModem();
-        res = postPage(conf.BaseUrl, conf.port, url, buffer, conf.IdentityKey);
-      }
-      ESP_LOGI(TAG, "Finish sending message");
-    }
+    disconnectMqtt();
   }
 }
 

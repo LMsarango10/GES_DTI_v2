@@ -248,17 +248,12 @@ void sdSaveNbConfig(ConfigBuffer_t *config){
   const size_t capacity = JSON_OBJECT_SIZE(32);
   DynamicJsonDocument doc(capacity);
 
-  doc["baseUrl"] = config->BaseUrl;
+  doc["serverAddress"] = config->ServerAddress;
+  doc["serverPassword"] = config->ServerPassword;
+  doc["applicationId"] = config->ApplicationId;
+  doc["applicationName"] = config->ApplicationName;
+  doc["gatewayId"] = config->GatewayId;
   doc["port"] = config->port;
-  doc["path"] = config->Path;
-  doc["componentName"] = config->ComponentName;
-  doc["identityKey"] = config->IdentityKey;
-  doc["wifiCountSensor"] = config->WifiCountSensor;
-  doc["wifiHashSensor"] = config->WifiHashSensor;
-  doc["bleCountSensor"] = config->BleCountSensor;
-  doc["bleHashSensor"] = config->BleHashSensor;
-  doc["btCountSensor"] = config->BtCountSensor;
-  doc["btHashSensor"] = config->BtHashSensor;
 
   serializeJson(doc, f);
   f.flush();
@@ -267,30 +262,19 @@ void sdSaveNbConfig(ConfigBuffer_t *config){
 
 void saveDefaultNbConfig() {
   ConfigBuffer_t conf;
-  conf.BaseUrl[0] = 0;
-  conf.ComponentName[0] = 0;
-  conf.IdentityKey[0] = 0;
-  conf.Path[0] = 0;
+  conf.ServerAddress[0] = 0;
+  conf.ServerPassword[0] = 0;
+  conf.ApplicationId[0] = 0;
+  conf.ApplicationName[0] = 0;
   conf.port = 0;
-  conf.WifiCountSensor[0] = 0;
-  conf.WifiHashSensor[0] = 0;
-  conf.BleCountSensor[0] = 0;
-  conf.BleHashSensor[0] = 0;
-  conf.BtCountSensor[0] = 0;
-  conf.BtHashSensor[0] = 0;
+  conf.GatewayId[0] = 0;
 
-  strcat(conf.BaseUrl, "82.223.2.207");
-  strcat(conf.ComponentName, "WIFIDETECTORTEST");
-  strcat(conf.Path, "/data/gesinen_provider/");
-  strcat(conf.IdentityKey, "6d5b6102973c7a65f0da890369af9d6587ef57753de5ca2b7861f65f91997ed8");
-  conf.port = 8081;
-  strcat(conf.WifiCountSensor, "S02");
-  strcat(conf.WifiHashSensor, "S01");
-  strcat(conf.BleCountSensor, "S04");
-  strcat(conf.BleHashSensor, "S03");
-  strcat(conf.BtCountSensor, "S06");
-  strcat(conf.BtHashSensor, "S05");
-
+  strcat(conf.ServerAddress, "gesinen.es");
+  strcat(conf.ServerPassword, "gesinen2110");
+  strcat(conf.ApplicationId, "1");
+  strcat(conf.ApplicationName, "app");
+  conf.port = 1882;
+  strcat(conf.GatewayId, "TESTGATE");
   sdSaveNbConfig(&conf);
 }
 
@@ -327,58 +311,33 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
 
   f.close();
 
-  const char* baseUrl = doc["baseUrl"]; // "12345678912345678912345678912345678912345678"
+  const char* serverAddress = doc["serverAddress"]; // "12345678912345678912345678912345678912345678"
+  const char* serverPassword = doc["serverPassword"];
   config->port = doc["port"];
-  const char* path = doc["path"]; // "12345678912345678912345678912345678912345678"
-  const char* componentName = doc["componentName"]; // "12345678912345678912345678912345678912345678"
-  const char* identityKey = doc["identityKey"];
 
-  const char* wifiCountSensor = doc["wifiCountSensor"]; // "123456"
-  const char* wifiHashSensor = doc["wifiHashSensor"]; // "123456"
-  const char* bleCountSensor = doc["bleCountSensor"]; // "123456"
-  const char* bleHashSensor = doc["bleHashSensor"]; // "123456"
-  const char* btCountSensor = doc["btCountSensor"]; // "123456"
-  const char* btHashSensor = doc["btHashSensor"]; // "123456"
+  const char* applicationId = doc["applicationId"];
+  const char* applicationName = doc["applicationName"];
+  const char* gatewayId = doc["gatewayId"];
 
-  int baseUrlLen = strlen(baseUrl);
-  strncpy(config->BaseUrl, baseUrl, baseUrlLen);
-  config->BaseUrl[baseUrlLen] = '\0';
+  int serverAddressLen = strlen(serverAddress);
+  strncpy(config->ServerAddress, serverAddress, serverAddressLen);
+  config->ServerAddress[serverAddressLen] = '\0';
 
-  int pathLen = strlen(path);
-  strncpy(config->Path, path, pathLen);
-  config->Path[pathLen] = '\0';
+  int serverPasswordLen = strlen(serverPassword);
+  strncpy(config->ServerPassword, serverPassword, serverPasswordLen);
+  config->ServerPassword[serverPasswordLen] = '\0';
 
-  int identityKeyLen = strlen(identityKey);
-  strncpy(config->IdentityKey, identityKey, identityKeyLen);
-  config->IdentityKey[identityKeyLen] = '\0';
+  int applicationIdLen = strlen(applicationId);
+  strncpy(config->ApplicationId, applicationId, applicationIdLen);
+  config->ApplicationId[applicationIdLen] = '\0';
 
-  int componentNameLen = strlen(componentName);
-  strncpy(config->ComponentName, componentName, componentNameLen);
-  config->ComponentName[componentNameLen] = '\0';
+  int applicationNameLen = strlen(applicationName);
+  strncpy(config->ApplicationName, applicationName, applicationNameLen);
+  config->ApplicationName[applicationNameLen] = '\0';
 
-  int wifiCountSensorLen = strlen(wifiCountSensor);
-  strncpy(config->WifiCountSensor, wifiCountSensor, wifiCountSensorLen);
-  config->WifiCountSensor[wifiCountSensorLen] = '\0';
-
-  int wifiHashSensorLen = strlen(wifiHashSensor);
-  strncpy(config->WifiHashSensor, wifiHashSensor, wifiHashSensorLen);
-  config->WifiHashSensor[wifiHashSensorLen] = '\0';
-
-  int bleCountSensorLen = strlen(bleCountSensor);
-  strncpy(config->BleCountSensor, bleCountSensor, bleCountSensorLen);
-  config->BleCountSensor[bleCountSensorLen] = '\0';
-
-  int bleHashSensorLen = strlen(bleHashSensor);
-  strncpy(config->BleHashSensor, bleHashSensor, bleHashSensorLen);
-  config->BleHashSensor[bleHashSensorLen] = '\0';
-
-  int btCountSensorLen = strlen(btCountSensor);
-  strncpy(config->BtCountSensor, btCountSensor, btCountSensorLen);
-  config->BtCountSensor[btCountSensorLen] = '\0';
-
-  int btHashSensorLen = strlen(btHashSensor);
-  strncpy(config->BtHashSensor, btHashSensor, btHashSensorLen);
-  config->BtHashSensor[btHashSensorLen] = '\0';
+  int gatewayIdLen = strlen(gatewayId);
+  strncpy(config->GatewayId, gatewayId, gatewayIdLen);
+  config->GatewayId[gatewayIdLen] = '\0';
 
   return 0;
 }

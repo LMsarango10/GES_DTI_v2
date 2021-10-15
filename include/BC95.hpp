@@ -23,6 +23,12 @@ bool attachNetwork();
 bool networkAttached();
 bool connectModem(char *ip, int port);
 void disconnectModem();
+int connectMqtt(char *url, int port, char *password, char *clientId);
+int subscribeMqtt(char *topic, int qos);
+int unsubscribeMqtt(char *topic, int qos);
+int checkSubscriptionMqtt(char *message);
+int publishMqtt(char *topic, char *message, int qos);
+int disconnectMqtt();
 int postPage(char *domainBuffer, int thisPort, char *page, char *thisData, char* identityKey);
 
 #endif

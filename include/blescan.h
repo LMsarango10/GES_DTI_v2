@@ -8,14 +8,31 @@
 #include "soc/timer_group_struct.h"
 #include "soc/timer_group_reg.h"
 
+// #define LEGACY_MODULE Descomentar para usar placas viejas
+
+#ifndef LEGACY_MODULE
+
 #define RX_BLE 36
 #define TX_BLE 4
 #define EN_BLE 12
 #define BLESerial Serial2
-#define RX_BT 36
-#define TX_BT 4
-#define EN_BT 12
+#define RX_BT 36 //
+#define TX_BT 4 //
+#define EN_BT 12 //
 #define BTSerial Serial2
+
+#else
+
+#define RX_BLE 35  // para modulo viejo usar 35 nuevo 36
+#define TX_BLE 14  // para modulo viejo usar 14 nuevo 4
+#define EN_BLE 12 // para modulo viejo usar 12 nuevo 12
+#define BLESerial Serial1 // para modelo viejo usar Serial1 nuevo Serial2
+#define RX_BT 36 // para modulo viejo usar 15
+#define TX_BT 4 // para modulo viejo usar 13
+#define EN_BT 12 // para modulo viejo usar 02
+#define BTSerial Serial2
+
+#endif
 
 #define BLEBTMUX_A 25
 //#define BLEBTMUX_B 2

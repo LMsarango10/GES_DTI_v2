@@ -87,6 +87,9 @@ bool networkReady() {
   int bytesRead = readResponseBC(&bc95serial, globalBuff, sizeof(globalBuff));
   if (assertResponseBC("CEREG:0,1", globalBuff, bytesRead))
     return true;
+  // next conditional allows for network roaming
+  else if (assertResponseBC("CEREG:0,5", globalBuff, bytesRead))
+    return true;
   else
     return false;
 }

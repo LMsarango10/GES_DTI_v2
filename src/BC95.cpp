@@ -114,7 +114,7 @@ void resetModem() {
 
 bool configModem() {
   ESP_LOGI(TAG, "Config NBIOT modem");
-  return sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=2", globalBuff,
+  return sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial,
                                  "AT+CGDCONT=1,\"IP\",\"m2m.movistar.es\"",
@@ -407,7 +407,7 @@ int connectMqtt(char *url, int port, char *password, char *clientId)
   bc95serial.print("\",");
   bc95serial.println(port);
   char data[64];
-  int responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
+  int responseBytes = readResponseBC(&bc95serial, data, 64, 60000);
   if (!assertResponseBC("+QMTOPEN: 0,0", data, responseBytes)) {
     return -1;
   }

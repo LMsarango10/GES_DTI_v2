@@ -407,7 +407,14 @@ int connectMqtt(char *url, int port, char *password, char *clientId)
   bc95serial.print("\",");
   bc95serial.println(port);
   char data[64];
-  int responseBytes = readResponseBC(&bc95serial, data, 64, 60000);
+  int responseBytes = 0;
+  for (int i = 0; i < 60; i++) {
+    responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
+    if(responseBytes != 0) {
+      break;
+    }
+  }
+
   if (!assertResponseBC("+QMTOPEN: 0,0", data, responseBytes)) {
     return -1;
   }

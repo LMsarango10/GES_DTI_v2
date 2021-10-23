@@ -114,7 +114,7 @@ void resetModem() {
 
 bool configModem() {
   ESP_LOGI(TAG, "Config NBIOT modem");
-  return sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
+  return /* sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial,
                                  "AT+CGDCONT=1,\"IP\",\"m2m.movistar.es\"",
@@ -122,8 +122,8 @@ bool configModem() {
          sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+COPS=0", globalBuff,
-                                 sizeof(globalBuff));
-  // sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE");
+                                 sizeof(globalBuff));*/
+  sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE");
 }
 
 bool attachNetwork()
@@ -413,10 +413,13 @@ int connectMqtt(char *url, int port, char *password, char *clientId)
     return -1;
   }
   int responseBytes = 0;
-  for (int i = 0; i < 24; i++) {
-    responseBytes = readResponseBC(&bc95serial, data, 64, 5000);
+  for (int i = 0; i < 60; i++) {
+    responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
     if(responseBytes != 0) {
       break;
+    }
+    if(!sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff))) {
+      return -1;
     }
   }
 

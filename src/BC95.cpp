@@ -123,7 +123,8 @@ bool configModem() {
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+COPS=0", globalBuff,
                                  sizeof(globalBuff));*/
-  sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE");
+  sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE", globalBuff,
+                                 sizeof(globalBuff));
 }
 
 bool attachNetwork()
@@ -413,14 +414,12 @@ int connectMqtt(char *url, int port, char *password, char *clientId)
     return -1;
   }
   int responseBytes = 0;
-  for (int i = 0; i < 60; i++) {
+  for (int i = 0; i < 150; i++) {
     responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
     if(responseBytes != 0) {
       break;
     }
-    if(!sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff))) {
-      return -1;
-    }
+    ESP_LOGI(TAG, "Wait for conn");
   }
 
   if (!assertResponseBC("+QMTOPEN: 0,0", data, responseBytes)) {

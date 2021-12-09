@@ -8,6 +8,14 @@
 #include "soc/timer_group_struct.h"
 #include "soc/timer_group_reg.h"
 
+// #define BT_OLD_MODULE 1 para usar el viejo modulo
+
+#ifdef BT_OLD_MODULE
+#define BT_BAUD 38400
+#else
+#define BT_BAUD 9600
+#endif
+
 // #define LEGACY_MODULE Descomentar para usar placas viejas
 
 #ifndef LEGACY_MODULE

@@ -250,7 +250,9 @@ bool reinitBT()
   delay(2000);
   if (!(
     sendAndReadOkResponse(&BTSerial,"AT+CMODE=1") &&
+#ifdef BT_OLD_MODULE
     sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
+#endif
     sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7")))
     {
       ESP_LOGE(TAG, "Error initializing BT");
@@ -306,8 +308,8 @@ void btHandler(void *pvParameters)
   /*pinMode(BLEBTMUX_B, OUTPUT);
   digitalWrite(BLEBTMUX_B, LOW);*/
   delay(100);
-  initBTSerial(38400);
-  bool btInitialized = initBT(38400);
+  initBTSerial(BT_BAUD);
+  bool btInitialized = initBT(BT_BAUD);
   delay(100);
 
 #ifdef LEGACY_MODULE
@@ -321,7 +323,7 @@ void btHandler(void *pvParameters)
   {
     setSerialToBT();
     if(btInitialized)
-      BTCycle(38400);
+      BTCycle(BT_BAUD);
     else
       btInitialized = reinitBT();
 

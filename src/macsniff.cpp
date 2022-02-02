@@ -77,7 +77,9 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     for(int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++) in[n] = 0;
     for(int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++) out[n] = 0;
     memcpy(in, paddr, 6);
-    metis_digest_mac_salt(in, salt, out);
+    metis_digest_mac_from_str_salt((char*) in, (char*)salt, out);
+
+    //metis_digest_mac_salt(in, salt, out);
     memcpy(&hashedmac, out, METIS_OUTPUT_HASH_LENGTH);
 
     uint32_t hashedmacH = (hashedmac >> 32) & 0xFFFFFFFF;

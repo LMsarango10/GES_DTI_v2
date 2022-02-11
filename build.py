@@ -20,7 +20,7 @@ config = configparser.ConfigParser()
 config.read("platformio.ini")
 
 # get platformio source path
-srcdir = env.get("PROJECTSRC_DIR")
+srcdir = env.get("PROJECT_SRC_DIR")
 
 # get hal path
 haldir = os.path.join (srcdir, "hal")
@@ -98,10 +98,10 @@ env.Replace(BINTRAY_API_TOKEN=apitoken)
 
 # get runtime credentials and put them to compiler directive
 env.Append(BUILD_FLAGS=[
-    u'-DWIFI_SSID=\\"' + mykeys["OTA_WIFI_SSID"] + '\\"', 
-    u'-DWIFI_PASS=\\"' + mykeys["OTA_WIFI_PASS"] + '\\"', 
-    u'-DBINTRAY_USER=\\"' + mykeys["BINTRAY_USER"] + '\\"', 
-    u'-DBINTRAY_REPO=\\"' + mykeys["BINTRAY_REPO"] + '\\"', 
+    u'-DWIFI_SSID=\\"' + mykeys["OTA_WIFI_SSID"] + '\\"',
+    u'-DWIFI_PASS=\\"' + mykeys["OTA_WIFI_PASS"] + '\\"',
+    u'-DBINTRAY_USER=\\"' + mykeys["BINTRAY_USER"] + '\\"',
+    u'-DBINTRAY_REPO=\\"' + mykeys["BINTRAY_REPO"] + '\\"',
     u'-DBINTRAY_PACKAGE=\\"' + package + '\\"',
     u'-DARDUINO_LMIC_PROJECT_CONFIG_H=' + lmicconfig,
     u'-I \"' + srcdir + '\"'
@@ -127,7 +127,7 @@ def publish_bintray(source, target, env):
     }
 
     r = None
-    
+
     try:
         r = requests.put(url,
                          data=open(firmware_path, "rb"),

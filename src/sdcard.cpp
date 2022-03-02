@@ -273,9 +273,17 @@ void saveDefaultNbConfig() {
   strcat(conf.ServerPassword, "gesinen2110");
   strcat(conf.ApplicationId, "1");
   strcat(conf.ApplicationName, "app");
-  conf.port = 1882;
+  conf.port = 8882;
   strcat(conf.GatewayId, "TESTGATE");
   sdSaveNbConfig(&conf);
+/*
+  strcat(conf.ServerAddress, "connecta.dival.es");
+  strcat(conf.ServerPassword, "gesinen2110_app");
+  strcat(conf.ApplicationId, "1");
+  strcat(conf.ApplicationName, "app");
+  conf.port = 1882;
+  strcat(conf.GatewayId, "TESTGATE");
+  sdSaveNbConfig(&conf);*/
 }
 
 int sdLoadNbConfig(ConfigBuffer_t *config){

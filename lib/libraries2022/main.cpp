@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "./metislib_v1.1/metis_algolib.h"
+#include "libmetis_algolib.h"
 
 void setup()
 {

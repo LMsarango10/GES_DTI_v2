@@ -221,6 +221,7 @@ void get_hard_deveui(uint8_t *pdeveui) {
   Wire.setClock(400000);
 #endif // MCP 24AA02E64
 }
+#define VERBOSE 1
 
 #if (VERBOSE)
 

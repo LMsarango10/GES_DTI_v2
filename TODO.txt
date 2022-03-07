@@ -1,0 +1,34 @@
+Cambiar macsiniff-cpp 
+
+    * DONE beaconId fix
+        macsiniff.cpp:184
+    * DONE Alfinal comentario debug fix
+        macsiniff.cpp:200
+    * Salt variable:
+        ** ConfigManager:  Check
+            """ 
+            if (nvs_get_str(my_handle, "salt", &string) != ESP_OK ||  //TODO check
+                string != cfg.salt)
+            nvs_set_i32(my_handle, "salt", cfg.salt);
+            """
+        ** payload.cpp:  
+            """
+            void PayloadConvert::addSalt(char * value) {
+            buffer[cursor++] = (value >> 24) & 0xFF;
+            buffer[cursor++] = (value >> 16) & 0xFF;
+            buffer[cursor++] = (value >> 8) & 0xFF;
+            buffer[cursor++] = (value ) & 0xFF;
+            }
+            """
+        ** rcommand.cpp:506
+            """
+              // {0x18, set_salt, 4, true}, eso no debe estar comentado
+            """
+    * Al cambiar el BT ahora recivimos este tipo de mac BT: 
+        """
+        [E][blecsan.cpp:28] assertResponse(): received: +INQ:6E70:46:0ACC3F,5A020C,FFAA,Umidigi S5 Pro 
+        """
+    * Al cambiar la libreria ahora hay un byte mas de la macDigest
+        """
+        [D][macsniff.cpp:116] mac_add(): Digest Mac: 72f5a
+        """

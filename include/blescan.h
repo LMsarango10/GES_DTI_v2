@@ -9,12 +9,12 @@
 #include "soc/timer_group_reg.h"
 
 // #define BT_OLD_MODULE 1 para usar el viejo modulo
-
 #ifdef BT_OLD_MODULE
 #define BT_BAUD 38400
 #else
-#define BT_BAUD 9600
+#define BT_BAUD 38400
 #endif
+#define BLE_BAUD 9600
 
 // #define LEGACY_MODULE Descomentar para usar placas viejas
 
@@ -22,11 +22,11 @@
 
 #define RX_BLE 36
 #define TX_BLE 4
-#define EN_BLE 12
+#define EN_BLE 25
 #define BLESerial Serial2
 #define RX_BT 36 //
 #define TX_BT 4 //
-#define EN_BT 12 //
+#define EN_BT 25 //
 #define BTSerial Serial2
 
 #else
@@ -50,9 +50,9 @@
 void start_BLEscan(void);
 void stop_BLEscan(void);
 bool initBLE(void);
-bool initBT(long baud);
+bool initBT();
 void btHandler(void *pvParameters);
-void BLECycle(void);
-void BTCycle(void);
+bool BLECycle(void);
+bool BTCycle(void);
 
 #endif

@@ -9,9 +9,9 @@
 // Local logging tag
 static const char TAG[] = __FILE__;
 
-uint32_t salt;
+char * salt;
 
-uint32_t get_salt(void) {
+  char * get_salt(void) {
   salt = cfg.salt;
   return cfg.salt;
 }
@@ -41,16 +41,6 @@ uint64_t macConvert(uint8_t *paddr) {
   mac = (uint64_t *)paddr;
   return (__builtin_bswap64(*mac) >> 16);
 }
-// converts character array
-// to string and returns it
-String convertToString(char *a, int size) {
-  int i;
-  String s = "";
-  for (i = 0; i < size; i++) {
-    s = s + a[i];
-  }
-  return s;
-}
 bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
   if (!salt) // ensure we have salt (appears after radio is turned on)
     return false;
@@ -76,8 +66,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
 
     /*  ESP_LOGI(TAG, "MAC is: %02X%02X%02X%02X%02X%02X",
       paddr[0],paddr[1],paddr[2],paddr[3],paddr[4],paddr[5]);*/
-   String cadena = buff;
-    
+
     snprintf(buff, sizeof(buff), "%02X:%02X:%02X:%02X:%02X:%02X", paddr[0],
              paddr[1], paddr[2], paddr[3], paddr[4], paddr[5]);
     ESP_LOGI(TAG, "Content of buff is: %s", buff);
@@ -86,9 +75,9 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     // hashedmac = rokkit(&buff[0], 5);      // hash MAC 8 digit -> 5 digit
     char out[METIS_OUTPUT_HASH_LENGTH];
     char in[METIS_OUTPUT_HASH_LENGTH];
-    // ESP_LOGI(TAG, "salted MAC %d", in);
+    //ESP_LOGV(TAG, "salted MAC %d", in);
 
-    // memcpy(in, paddr, 6);
+    memcpy(in, paddr, METIS_OUTPUT_HASH_LENGTH);
     metis_enable_printing(true);
 
     /**
@@ -102,20 +91,15 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
 
     bool *isDev = false;
     // metis_is_device((char *)in, isDev);
-    //buff  = "";
-    // char *exampleMac = str_;
     strcpy(in, buff);
     // metis_digest_mac_salt(in, salt, out); // Last version
 
-    // const char aaa = in;
-    // memcpy(&aaa, in, METIS_OUTPUT_HASH_LENGTH);
-
-    if (metis_digest_mac_from_str_salt(in, "FFFFFFFF", out) ==
+    if (metis_digest_mac_from_str_salt(in,  salt, out) ==
         metis_failure_reason_none) {
-      ESP_LOGD(TAG, "OK!\n");
-      ESP_LOGD(TAG, "Digest Mac: %s\n", out);
+      ESP_LOGD(TAG, "(METIS) OK!\n");
+      ESP_LOGD(TAG, "(METIS) Digest Mac: %s\n", out);
     } else {
-      ESP_LOGD(TAG, "FAILED\n");
+      ESP_LOGD(TAG, "(METIS) FAILED\n");
     }
 
     memcpy(&hashedmac, out, METIS_OUTPUT_HASH_LENGTH);
@@ -143,6 +127,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
         blink_LED(COLOR_GREEN, 50);
 #endif
       }
+
       break;
     }
     case MAC_SNIFF_BLE: {
@@ -174,10 +159,14 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
       break;
     }
     }
+
     // in beacon monitor mode check if seen MAC is a known beacon
     if (cfg.monitormode) {
-      beaconID = isBeacon(macConvert(paddr));
+     
+       beaconID = isBeacon(macConvert(paddr)); ///MIRAR PARA CAMBIAR TODO:
+
       if (beaconID >= 0) {
+
         ESP_LOGI(TAG, "Beacon ID#%d detected", beaconID);
 #if (HAS_LED != NOT_A_PIN) || defined(HAS_RGB_LED)
         blink_LED(COLOR_WHITE, 2000);
@@ -191,8 +180,8 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     // added
 
     // Log scan result
-    if (added) {
-      ESP_LOGD(TAG, "%d salt", salt);
+  if (added) { //DESCOMENTAR PARA LOG CAMBIAR TODO:
+      ESP_LOGD(TAG, "%s salt", salt);
 
       ESP_LOGD(TAG,
                "%s %s RSSI %ddBi -> salted MAC %s -> Hash %s -> WiFi:%d  "
@@ -202,7 +191,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
                sniff_type == MAC_SNIFF_WIFI  ? "WiFi"
                : sniff_type == MAC_SNIFF_BLE ? "BLE"
                                              : "BLTH",
-               rssi, in, hashedmacbuff, macs_wifi, macs_ble, macs_bt,
+               rssi, out, hashedmacbuff, macs_wifi, macs_ble, macs_bt,
                getFreeRAM());
     }
 

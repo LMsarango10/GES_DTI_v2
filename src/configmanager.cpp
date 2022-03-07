@@ -36,10 +36,9 @@ void defaultConfig() {
   cfg.rgblum = RGBLUMINOSITY;      // RGB Led luminosity (0..100%)
   cfg.monitormode = 0;             // 0=disabled, 1=enabled
   cfg.payloadmask = PAYLOADMASK;   // all payload switched on
-  cfg.salt = 0xFFFFFFFF;
+  cfg.salt = "12345678";
   cfg.bsecstate[BSEC_MAX_STATE_BLOB_SIZE] = {
       0}; // init BSEC state for BME680 sensor
-
   strncpy(cfg.version, PROGVERSION, sizeof(cfg.version) - 1);
 }
 
@@ -172,9 +171,9 @@ void saveConfig() {
         flash16 != cfg.rssilimit)
       nvs_set_i16(my_handle, "rssilimit", cfg.rssilimit);
 
-    if (nvs_get_i32(my_handle, "salt", &flash32) != ESP_OK ||
-        flash32 != cfg.salt)
-      nvs_set_i32(my_handle, "salt", cfg.salt);
+   /* if (nvs_get_str(my_handle, "salt", &string) != ESP_OK ||  //TODO 
+        string != cfg.salt)
+      nvs_set_i32(my_handle, "salt", cfg.salt);*/
 
     err = nvs_commit(my_handle);
     nvs_close(my_handle);

@@ -426,11 +426,13 @@ int connectMqtt(char *url, int port, char *password, char *clientId)
     return -1;
   }
 
-  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCONN=0,\"%s\",\"gesinen\",\"%s\"",clientId, password);
+  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCONN=0,\"%s\",\"gesinen_app\",\"%s\"",clientId, password);
 
   bc95serial.print("AT+QMTCONN=0,\"");
   bc95serial.print(clientId);
-  bc95serial.print("\",\"gesinen\",\"");
+  //bc95serial.print("\",\"gesinen\",\""); // SERVIDOR MQTT    
+  bc95serial.print("\",\"gesinen \",\"");
+  //bc95serial.print("\",\"gesinen_app\",\"");
   bc95serial.print(password);
   bc95serial.println("\"");
 

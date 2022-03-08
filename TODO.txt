@@ -1,4 +1,5 @@
 Cambiar macsiniff-cpp 
+    * Revisar con Esim
 
     * DONE beaconId fix
         macsiniff.cpp:184
@@ -11,7 +12,7 @@ Cambiar macsiniff-cpp
                 string != cfg.salt)
             nvs_set_i32(my_handle, "salt", cfg.salt);
             """
-        ** payload.cpp:  
+        ** payload.cpp:  Falta Check
             """
             void PayloadConvert::addSalt(char * value) {
             buffer[cursor++] = (value >> 24) & 0xFF;
@@ -32,3 +33,11 @@ Cambiar macsiniff-cpp
         """
         [D][macsniff.cpp:116] mac_add(): Digest Mac: 72f5a
         """
+    * Revisar mac_add en ble y bt Wifi 
+        [E][blecsan.cpp:28] assertResponse(): received: +INQ:1 0x389C7F2A6C8B 
+        [V][blecsan.cpp:214] BLECycle(): finish INQ mode
+        [E][blecsan.cpp:28] assertResponse(): received: +INQ:2 0x359EB75557A5
+        [V][blecsan.cpp:217] BLECycle(): 75557 devices detected
+        [E][blecsan.cpp:28] assertResponse(): received: +INQ:3 0x4DC1F607DCCD
+        [E][blecsan.cpp:105] getMacsFromBLE(): error reading mac, ignoring
+        [E][blecsan.cpp:28] assertResponse(): received: ERROR 

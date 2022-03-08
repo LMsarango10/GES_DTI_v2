@@ -16,7 +16,7 @@ Cambiar macsiniff-cpp
         """
     * TODO (falta ble) Revisar mac_add en ble y bt Wifi 
 
-        ** Problema:
+        ** Problema BLE:
             [E][blecsan.cpp:28] assertResponse(): received: +INQ:1 0x389C7F2A6C8B 
             [V][blecsan.cpp:214] BLECycle(): finish INQ mode
             [E][blecsan.cpp:28] assertResponse(): received: +INQ:2 0x359EB75557A5

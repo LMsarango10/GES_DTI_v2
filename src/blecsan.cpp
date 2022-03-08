@@ -42,13 +42,14 @@ bool sendAndReadOkResponse(HardwareSerial *port, const char *command) {
 }
 
 int getDetectedDevices(char *buff, int buffLen) {
-  if (!assertResponse("Devices Found", buff, buffLen))
+  // if (!assertResponse("Devices Found", buff, buffLen))
+  if (!assertResponse("+INQ:", buff, buffLen))
     return -1;
   return strtoul(buff + 14, NULL, 10);
 }
 
 void getMac(char *buff, uint8_t *out) {
-    ESP_LOGI(TAG, "------------------- getMac() %s -------------------",buff);
+  ESP_LOGI(TAG, "------------------- getMac() %s -------------------", buff);
 
   for (int i = 1; i < 7; i++) {
     char tempbuff[3];
@@ -91,38 +92,27 @@ int getMacsFromBT(char *buff, int bytesRead) {
   return 0;
 }
 /*----------------------------------------------------------------*/
-int getMacsFromBLE(int totalMacs) {
-  ESP_LOGV(TAG, "----------------getMacsFromBLE %d---------------", totalMacs);
 
+int getMacsFromBLE(int totalMacs) {
   if (totalMacs <= 0)
     return 0;
-
   BLESerial.println("AT+SHOW");
   char buffer[64];
   long start_time = millis();
+  ESP_LOGV(TAG, "Recived by BLE %s ", buffer);
 
   for (int i = 0; i < totalMacs; i++) {
-
     int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
-    ESP_LOGI(TAG, "-------------------Got BLE MAC %s -------------------",buffer);
-
-    // if (!assertResponse("Device", buffer, bytesRead)) return -1;
-    if (!assertResponse("+INQ", buffer, bytesRead))
+    if (!assertResponse("Device", buffer, bytesRead))
       return -1;
-
     int deviceN = strtoul(buffer + 7, NULL, 10);
-    ESP_LOGI(TAG, "-------------------deviceN %d -------------------", deviceN);
-    
     bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
-    ESP_LOGI(TAG, "-------------------bytesRead %d -------------------", bytesRead);
-
     if (bytesRead != 15 || !assertResponse("0x", buffer, bytesRead)) {
-      ESP_LOGE(TAG, "-------------------error reading mac, ignoring-------------------");
+      ESP_LOGE(TAG, "error reading mac, ignoring");
       continue;
     }
     uint8_t mac[6];
     getMac(buffer, mac);
-    
     char tempBuffer[64];
     sprintf(tempBuffer, "Device #%d MAC: ", deviceN);
     for (int n = 0; n < 6; n++) {
@@ -134,11 +124,9 @@ int getMacsFromBLE(int totalMacs) {
   while (BLESerial.available()) {
     BLESerial.read();
   }
-  ESP_LOGV(TAG, "----------------FINISH getMacsFromBLE %d---------------",
-           totalMacs);
-
   return 0;
 }
+
 //----------------------------------------------------------------*/
 
 bool reinitBLE() {
@@ -210,35 +198,38 @@ bool initBLE() {
 bool BLECycle(void) {
   pinMode(BLEBTMUX_A, OUTPUT);
   digitalWrite(BLEBTMUX_A, 1);
-  ESP_LOGE(TAG, "cycling ble scan");
-  ESP_LOGE(TAG, "Set BLE inquiry mode");
+  if (!cfg.blescan)
+    return 0;
+  ESP_LOGV(TAG, "cycling ble scan");
+  ESP_LOGV(TAG, "Set BLE inquiry mode");
   char buffer[64];
   char tmpBuffer[64];
   sendAndReadOkResponse(&BLESerial, "AT+INQ");
   int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
-  /* Da error ya que al aparecer scanning y salta return comprobado para version
-  BLE V5.6 if (!assertResponse("+INQS\r", buffer, bytesRead))
-   {
-     ESP_LOGE(TAG, "Error setting BLE INQ mode");
-     //return false;
-   }*/
+  /*if (!assertResponse("+INQS", buffer, bytesRead)) {
+    ESP_LOGE(TAG, "Error setting BLE INQ mode");
+    return 0;
+  }*/
 
   // ENTER INQ MODE
-  ESP_LOGE(TAG, "start INQ mode ");
+  ESP_LOGV(TAG, "start INQ mode ");
   long start_time = millis();
   while (millis() - start_time < (BTLE_SCAN_TIME / 2) * 1000) {
     bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
     if (assertResponse("+INQE\r", buffer, bytesRead)) {
       ESP_LOGV(TAG, "finish INQ mode ");
+
       bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
-      ESP_LOGI(TAG, "BUFFER IN BLE %s", buffer);
-      for (uint32_t i = 7; i < bytesRead; i++) {
-         tmpBuffer[i-7] = buffer[i];
-         }
-      ESP_LOGI(TAG, "BUFFER IN tmpBuffer %s", tmpBuffer);
-     
-     
+      ESP_LOGV(TAG, "Recived by BLE %s with %d bytes", buffer, bytesRead);
+
       int devicesDetected = getDetectedDevices(buffer, bytesRead);
+      for (uint32_t i = 7; i < bytesRead; i++) {
+        tmpBuffer[i - 7] = buffer[i];
+      }
+      for (uint32_t i = 0; i < bytesRead; i++) {
+        buffer[i] = tmpBuffer[i];
+      }
+      ESP_LOGI(TAG, "BUFFER IN tmpBuffer %s", tmpBuffer);
       ESP_LOGV(TAG, "%d devices detected", devicesDetected);
       getMacsFromBLE(devicesDetected);
       break;

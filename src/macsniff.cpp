@@ -9,9 +9,9 @@
 // Local logging tag
 static const char TAG[] = __FILE__;
 
-char * salt;
+char *salt;
 
-  char * get_salt(void) {
+char *get_salt(void) {
   salt = cfg.salt;
   return cfg.salt;
 }
@@ -75,7 +75,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     // hashedmac = rokkit(&buff[0], 5);      // hash MAC 8 digit -> 5 digit
     char out[METIS_OUTPUT_HASH_LENGTH];
     char in[METIS_OUTPUT_HASH_LENGTH];
-    //ESP_LOGV(TAG, "salted MAC %d", in);
+    // ESP_LOGV(TAG, "salted MAC %d", in);
 
     memcpy(in, paddr, METIS_OUTPUT_HASH_LENGTH);
     metis_enable_printing(true);
@@ -94,7 +94,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     strcpy(in, buff);
     // metis_digest_mac_salt(in, salt, out); // Last version
 
-    if (metis_digest_mac_from_str_salt(in,  salt, out) ==
+    if (metis_digest_mac_from_str_salt(in, salt, out) ==
         metis_failure_reason_none) {
       ESP_LOGD(TAG, "(METIS) OK!\n");
       ESP_LOGD(TAG, "(METIS) Digest Mac: %s\n", out);
@@ -106,8 +106,10 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     uint32_t hashedmacH = (hashedmac >> 32) & 0xFFFFFFFF;
     uint32_t hashedmacL = (hashedmac)&0xFFFFFFFF;
 
-    //  for(int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++) in[n] = 0;
-    // for(int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++) out[n] = 0;
+    for (int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++)
+      in[n] = 0;
+    for (int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++)
+      out[n] = 0;
 
     // ESP_LOGD(TAG, "out: %d", out);
     char hashedmacbuff[20];
@@ -162,8 +164,8 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
 
     // in beacon monitor mode check if seen MAC is a known beacon
     if (cfg.monitormode) {
-     
-       beaconID = isBeacon(macConvert(paddr)); ///MIRAR PARA CAMBIAR TODO:
+
+      beaconID = isBeacon(macConvert(paddr)); /// MIRAR PARA CAMBIAR TODO:
 
       if (beaconID >= 0) {
 
@@ -180,7 +182,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     // added
 
     // Log scan result
-  if (added) { //DESCOMENTAR PARA LOG CAMBIAR TODO:
+    if (added) { // DESCOMENTAR PARA LOG CAMBIAR TODO:
       ESP_LOGD(TAG, "%s salt", salt);
 
       ESP_LOGD(TAG,

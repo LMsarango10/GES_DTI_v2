@@ -10,11 +10,13 @@ Cambiar macsiniff-cpp
         """
         [E][blecsan.cpp:28] assertResponse(): received: +INQ:6E70:46:0ACC3F,5A020C,FFAA,Umidigi S5 Pro 
         """
-    * TODO Al cambiar la libreria ahora hay un byte mas de la macDigest
+    * TODO Al cambiar la libreria ahora hay un byte mas de la macDigest antes eran 4bytes ahora son 5bytes
+        cambiar tambien el mensaje para que quepa en lora revisar Hash tambien
+        
         """
         [D][macsniff.cpp:116] mac_add(): Digest Mac: 72f5a
         """
-    * TODO (falta ble) Revisar mac_add en ble y bt Wifi 
+    * TODO (falta BLE) Revisar mac_add en ble y bt Wifi 
 
         ** Problema BLE:
             [E][blecsan.cpp:28] assertResponse(): received: +INQ:1 0x389C7F2A6C8B 
@@ -46,6 +48,10 @@ Cambiar macsiniff-cpp
                 [D][macsniff.cpp:99] mac_add(): (METIS) OK!
                 [D][macsniff.cpp:100] mac_add(): (METIS) Digest Mac: 2f4e3
     * TODO Salt variable:
+        - gestionar version de salt tipo Vxxx.yyy
+        - mensaje para solicitar version de salt ejemplo: SALT / VERSION / FECHA INICIO DE ESTA SALT (entrada en vigor)
+        - Ver tema de la fecha de entrada envigor ya que tienen que entrar en vigor todas a la vez en la misma fecha 
+        - modificable por lora,
         ** ConfigManager:  Check
             """ 
             if (nvs_get_str(my_handle, "salt", &string) != ESP_OK ||  //TODO check
@@ -65,3 +71,12 @@ Cambiar macsiniff-cpp
             """
               // {0x18, set_salt, 4, true}, eso no debe estar comentado
             """
+    * TODO: Gestionar 4G/ Lora que se pueda cambiar entre ellos dependiendo el buffer lo lleno que esté
+    * TODO:Mensaje para habilitar 4G o Lora 
+    * TODO: Definir cuando esta lleno el buffer y que sea modificable mediante lora
+    * TODO: Activar / desactvar vendor filter 
+    * TODO: vendor filter ?¿
+    * TODO: Fuota
+    * TODO: ?¿ modificar ventana de detección 
+    * TODO: mensaje para saber tiempo de escaneo , version salt, tamaño buffer, 4h o lora
+    

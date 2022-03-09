@@ -1,9 +1,8 @@
-Cambiar macsiniff-cpp 
-    * Revisar con Esim
+    * Revisar con Esim (PC Taller HP con esim)
 
-    * DONE beaconId fix
+    * DONE beaconId fix 
         macsiniff.cpp:184
-    * DONE Alfinal comentario debug fix
+    * DONE Alfinal comentario debug fix 
         macsiniff.cpp:200
 
     * DONE Al cambiar el BT revisar mac BT: 
@@ -58,7 +57,7 @@ Cambiar macsiniff-cpp
                 string != cfg.salt)
             nvs_set_i32(my_handle, "salt", cfg.salt);
             """
-        ** payload.cpp:  Falta Check
+        ** payload.cpp:  Falta Check Ahora esta como char[]
             """
             void PayloadConvert::addSalt(char * value) {
             buffer[cursor++] = (value >> 24) & 0xFF;
@@ -67,7 +66,7 @@ Cambiar macsiniff-cpp
             buffer[cursor++] = (value ) & 0xFF;
             }
             """
-        ** rcommand.cpp:506
+        ** rcommand.cpp:506  
             """
               // {0x18, set_salt, 4, true}, eso no debe estar comentado
             """
@@ -80,3 +79,4 @@ Cambiar macsiniff-cpp
     * TODO: ?¿ modificar ventana de detección 
     * TODO: mensaje para saber tiempo de escaneo , version salt, tamaño buffer, 4h o lora
     
+ 

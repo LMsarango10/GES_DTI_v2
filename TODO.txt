@@ -79,4 +79,4 @@
     * TODO: ?¿ modificar ventana de detección 
     * TODO: mensaje para saber tiempo de escaneo , version salt, tamaño buffer, 4h o lora
     
- 
+ https://docs.iotcreators.com/docs/quectel-bc95-g-1#receive-hello-device

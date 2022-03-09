@@ -96,8 +96,10 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
 
     if (metis_digest_mac_from_str_salt(in, salt, out) ==
         metis_failure_reason_none) {
+          #ifdef DEBUG_METIS
       ESP_LOGD(TAG, "(METIS) OK!\n");
       ESP_LOGD(TAG, "(METIS) Digest Mac: %s\n", out);
+      #endif
     } else {
       ESP_LOGD(TAG, "(METIS) FAILED\n");
     }

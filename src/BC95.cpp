@@ -14,7 +14,7 @@ int readResponseBC(HardwareSerial *port, char *buff, int b_size,
                    uint32_t timeout = 500) {
   port->setTimeout(timeout);
   buff[0] = 0;
-  int bytesRead = port->readBytes(buff, b_size);
+  int bytesRead = port->readBytes(buff, b_size-1);
   if (bytesRead > 0) {
     buff[bytesRead] = 0;
     ESP_LOGI(TAG, "%d bytes read", bytesRead);
@@ -407,8 +407,8 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
   bc95serial.print(url);
   bc95serial.print("\",");
   bc95serial.println(port);
-  char data[64];
-  int bytesRead = readResponseBC(&bc95serial, data, 64);
+  char data[128];
+  int bytesRead = readResponseBC(&bc95serial, data, 128);
 
   if (!assertResponseBC("OK\r", data, bytesRead)) {
     return -1;
@@ -416,7 +416,7 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
   int responseBytes = 0;
   if (!assertResponseBC("+QMTOPEN: 0,0", data, bytesRead)) {    
     for (int i = 0; i < 30; i++) {
-      responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
+      responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
       if (responseBytes != 0) {
         break;
       }
@@ -436,7 +436,7 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
   bc95serial.print(password);
   bc95serial.println("\"");
 
-  responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
+  responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
   if (!assertResponseBC("+QMTCONN: 0,0,0", data, responseBytes)) {
     return -2;
   }

@@ -114,17 +114,17 @@ void resetModem() {
 
 bool configModem() {
   ESP_LOGI(TAG, "Config NBIOT modem");
-  return /* sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
+  return /*sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
+                              globalBuff, sizeof(globalBuff)) &&  */
+        sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial,
-                                 "AT+CGDCONT=1,\"IP\",\"m2m.movistar.es\"",
+                                 "AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",
                                  globalBuff, sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+COPS=0", globalBuff,
-                                 sizeof(globalBuff));*/
-      sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
-                              globalBuff, sizeof(globalBuff));
+                                 sizeof(globalBuff));
 }
 
 bool attachNetwork()

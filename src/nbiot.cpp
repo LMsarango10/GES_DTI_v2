@@ -41,28 +41,28 @@ bool nb_enqueuedata(MessageBuffer_t *message) {
   return enqueued;
 }
 
-void connectModem() {
-  bool done = false;
-  while (!done) {
-    resetModem();
-    if(!configModem()) {
-      ESP_LOGE(TAG, "Could not config modem");
-    }
-    unsigned long t0 = millis();
-    ESP_LOGI(TAG, "Try connecting");
-    while (millis() < t0 + 60000) {
-      if (networkReady()) {
-        if (attachNetwork()) {
-          done = true;
-          break;
-        }
-        delay(1000);
-      } else {
-        ESP_LOGI(TAG, "Wait for network");
-        delay(5000);
+bool connectModem() {  
+  
+  resetModem();
+  if(!configModem()) {
+    ESP_LOGE(TAG, "Could not config modem");
+    delay(1000);
+    return false;
+  }
+  unsigned long t0 = millis();
+  ESP_LOGI(TAG, "Try connecting");
+  while (millis() < t0 + 60000) {
+    if (networkReady()) {
+      if (attachNetwork()) {
+        return true;
       }
+      delay(1000);
+    } else {
+      ESP_LOGI(TAG, "Wait for network");
+      delay(5000);
     }
   }
+  return false;
 }
 
 uint32_t getUint32FromBuffer(uint8_t *buffer) {
@@ -131,7 +131,8 @@ void nb_loop() {
     char devEui[17];
     sprintf(devEui, "%02x%02x%02x%02x%02x%02x%02x%02x", DEVEUI[0], DEVEUI[1], DEVEUI[2], DEVEUI[3], DEVEUI[4], DEVEUI[5], DEVEUI[6], DEVEUI[7]);
 
-    connectModem();
+    if(!connectModem())
+      return;    
     int connection_retries = 0;
     while(connection_retries < MQTT_CONN_RETRIES) {
       int conn_result = connectMqtt(conf.ServerAddress, conf.port, conf.ServerPassword, devEui);

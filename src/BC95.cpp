@@ -108,32 +108,30 @@ void resetModem() {
   delay(5000);
   while (bc95serial.available() > 0)
     bc95serial.read();
-  sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff));
-  // sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0");
+  sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff));  
 }
 
 bool configModem() {
   ESP_LOGI(TAG, "Config NBIOT modem");
   return /*sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
                               globalBuff, sizeof(globalBuff)) &&  */
+        sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0", globalBuff, sizeof(globalBuff)) &&
+        sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=0", globalBuff, sizeof(globalBuff)) &&
+        sendAndReadOkResponseBC(&bc95serial, "AT+NPSMR=0", globalBuff, sizeof(globalBuff)) &&
+         sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff, sizeof(globalBuff)) &&
         sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
-                                 sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial,
-                                 "AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",
-                                 globalBuff, sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff,
-                                 sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+COPS=0", globalBuff,
+                                 sizeof(globalBuff)) &&        
+         sendAndReadOkResponseBC(&bc95serial, "AT+COPS=1,2,\"21401\"", globalBuff,
                                  sizeof(globalBuff));
 }
 
 bool attachNetwork()
 
 {
-  return sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,
-                                 sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,
-                                 sizeof(globalBuff));
+  return  sendAndReadOkResponseBC(&bc95serial,"AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",globalBuff, sizeof(globalBuff)) &&
+          //sendAndReadOkResponseBC(&bc95serial,"AT+CGACT=1,1",globalBuff, sizeof(globalBuff));
+          //sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,sizeof(globalBuff)) &&
+         //sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,sizeof(globalBuff));
 }
 
 bool networkAttached() {
@@ -436,7 +434,19 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
   bc95serial.print(password);
   bc95serial.println("\"");
 
-  responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
+  bytesRead = readResponseBC(&bc95serial, data, 128);
+
+  if (!assertResponseBC("OK\r", data, bytesRead)) {
+    return -3;
+  }
+
+  for (int i = 0; i < 30; i++) {
+      responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
+      if (responseBytes != 0) {
+        break;
+      }
+      ESP_LOGI(TAG, "Wait for conn");
+    }  
   if (!assertResponseBC("+QMTCONN: 0,0,0", data, responseBytes)) {
     return -2;
   }

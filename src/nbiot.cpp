@@ -41,12 +41,11 @@ bool nb_enqueuedata(MessageBuffer_t *message) {
   return enqueued;
 }
 
-bool connectModem() {  
-  
-  resetModem();
+bool connectModem() {      
   if(!configModem()) {
-    ESP_LOGE(TAG, "Could not config modem");
+    ESP_LOGE(TAG, "Could not config modem");    
     delay(1000);
+    resetModem();
     return false;
   }
   unsigned long t0 = millis();
@@ -62,6 +61,7 @@ bool connectModem() {
       delay(5000);
     }
   }
+  resetModem();
   return false;
 }
 

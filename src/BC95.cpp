@@ -128,8 +128,8 @@ bool configModem() {
 bool attachNetwork()
 
 {
-  return  sendAndReadOkResponseBC(&bc95serial,"AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",globalBuff, sizeof(globalBuff)) &&
-          //sendAndReadOkResponseBC(&bc95serial,"AT+CGACT=1,1",globalBuff, sizeof(globalBuff));
+  return  sendAndReadOkResponseBC(&bc95serial,"AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",globalBuff, sizeof(globalBuff));// &&
+          //sendAndReadOkResponseBC(&bc95serial,"AT+CGACT=1,1",globalBuff, sizeof(globalBuff)); no anda este comando
           //sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,sizeof(globalBuff)) &&
          //sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,sizeof(globalBuff));
 }

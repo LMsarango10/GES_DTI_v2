@@ -179,7 +179,7 @@ void initBLESerial()
 void setSerialToBT() {
   BTSerial.flush();
   delay(100) ;
-  BTSerial.updateBaudRate(38400);
+  BTSerial.updateBaudRate(BT_BAUD);
   //initBTSerial(38400);
   digitalWrite(BLEBTMUX_A, LOW);
   delay(100);
@@ -197,6 +197,7 @@ void setSerialToBLE() {
 bool initBLE()
 {
   pinMode(EN_BLE, OUTPUT);
+  pinMode(BLEBTMUX_A, OUTPUT);
   digitalWrite(EN_BLE, HIGH);
   //initBLESerial();
   setSerialToBLE();
@@ -264,6 +265,7 @@ bool reinitBT()
 bool initBT(long baud)
 {
   pinMode(EN_BT, OUTPUT);  // this pin will pull the HC-05 pin 34 (key pin) HIGH to switch module to AT mode
+  pinMode(BLEBTMUX_A, OUTPUT);
   digitalWrite(EN_BT, HIGH);
   //initBTSerial(baud);  // HC-05 default speed in AT command more
   setSerialToBT();

@@ -108,30 +108,38 @@ void resetModem() {
   delay(5000);
   while (bc95serial.available() > 0)
     bc95serial.read();
-  sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff));  
+  sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff));
 }
 
 bool configModem() {
   ESP_LOGI(TAG, "Config NBIOT modem");
-  return /*sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
-                              globalBuff, sizeof(globalBuff)) &&  */
-        sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0", globalBuff, sizeof(globalBuff)) &&
+  return sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0", globalBuff, sizeof(globalBuff)) &&
+#ifdef VODAFONE_VERSION
         sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=0", globalBuff, sizeof(globalBuff)) &&
         sendAndReadOkResponseBC(&bc95serial, "AT+NPSMR=0", globalBuff, sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff, sizeof(globalBuff)) &&
+        sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff, sizeof(globalBuff)) &&
         sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
-                                 sizeof(globalBuff)) &&        
+                                 sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+COPS=1,2,\"21401\"", globalBuff,
                                  sizeof(globalBuff));
+#endif
+#ifdef AUTO_VERSION
+      sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
+                              globalBuff, sizeof(globalBuff));
+#endif
 }
 
 bool attachNetwork()
 
 {
-  return  sendAndReadOkResponseBC(&bc95serial,"AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",globalBuff, sizeof(globalBuff));// &&
-          //sendAndReadOkResponseBC(&bc95serial,"AT+CGACT=1,1",globalBuff, sizeof(globalBuff)); no anda este comando
-          //sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,sizeof(globalBuff)) &&
-         //sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,sizeof(globalBuff));
+  return
+#ifdef VODAFONE_VERSION
+  sendAndReadOkResponseBC(&bc95serial,"AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",globalBuff, sizeof(globalBuff));// &&
+#endif
+#ifdef AUTO_VERSION
+         sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,sizeof(globalBuff)) &&
+         sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,sizeof(globalBuff));
+#endif
 }
 
 bool networkAttached() {
@@ -412,7 +420,7 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
     return -1;
   }
   int responseBytes = 0;
-  if (!assertResponseBC("+QMTOPEN: 0,0", data, bytesRead)) {    
+  if (!assertResponseBC("+QMTOPEN: 0,0", data, bytesRead)) {
     for (int i = 0; i < 30; i++) {
       responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
       if (responseBytes != 0) {
@@ -446,7 +454,7 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
         break;
       }
       ESP_LOGI(TAG, "Wait for conn");
-    }  
+    }
   if (!assertResponseBC("+QMTCONN: 0,0,0", data, responseBytes)) {
     return -2;
   }

@@ -28,14 +28,25 @@ bool assertResponse(const char* expected, char* received, int bytesRead)
   if(bytesRead <= 0) return false;
   return strstr(received, expected) != nullptr;
 }
-
+void flushPort(HardwareSerial* port) {
+  while(port->available() > 0) {
+    port->read();
+  }
+}
 bool sendAndReadOkResponse(HardwareSerial* port, const char* command)
 {
+  flushPort(port);
   ESP_LOGV(TAG, "Command: %s", command);
   port->println(command);
   port->flush();
   char buffer[64];
-  int bytesRead = readResponse(port, buffer, sizeof(buffer));
+  buffer[0] = 0;
+  int bytesRead = readResponse(port, buffer, sizeof(buffer)-1, 2000);
+  buffer[bytesRead] = 0;
+  if(bytesRead > 0) {
+    ESP_LOGV(TAG, "Response: %s", buffer);
+  }
+
   return assertResponse("OK\r", buffer, bytesRead);
 }
 
@@ -211,11 +222,11 @@ void BLECycle(void)
   ESP_LOGV(TAG, "cycling ble scan");
   ESP_LOGV(TAG, "Set BLE inquiry mode");
   char buffer[64];
-  sendAndReadOkResponse(&BLESerial,"AT+INQ");
+  BLESerial.println("AT+INQ");
   int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
   if(! assertResponse("+INQS\r", buffer, bytesRead))
   {
-    ESP_LOGE(TAG, "Error setting BLE INQ mode");
+    ESP_LOGD(TAG, "Error setting BLE INQ mode");
     return;
   }
 
@@ -228,9 +239,17 @@ void BLECycle(void)
     if(assertResponse("+INQE\r", buffer, bytesRead))
     {
       ESP_LOGV(TAG, "finish INQ mode ");
+      ESP_LOGV(TAG, "Response: %s", buffer);
+      buffer[0] = 0;
       bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+      ESP_LOGV(TAG, "Response: %s", buffer);
       int devicesDetected = getDetectedDevices(buffer, bytesRead);
-      ESP_LOGV(TAG, "%d devices detected", devicesDetected);
+      if(devicesDetected == -1) {
+        ESP_LOGV(TAG, "No devices detected");
+      } else {
+        ESP_LOGV(TAG, "%d devices detected", devicesDetected);
+      }
+      
       getMacsFromBLE(devicesDetected);
       break;
     }
@@ -238,25 +257,34 @@ void BLECycle(void)
   return;
 }
 bool reinitBT()
-{
-  if (!(
-    sendAndReadOkResponse(&BTSerial, "AT+ORGL") &&
-    sendAndReadOkResponse(&BTSerial,"AT+RMAAD") &&
-    sendAndReadOkResponse(&BTSerial,"AT+ROLE=1")))
+{  
+  if (!(  
+    sendAndReadOkResponse(&BTSerial, "AT") &&    
+    sendAndReadOkResponse(&BTSerial, "AT+ORGL")
+    ))
     {
-      ESP_LOGE(TAG, "Error initializing BT");
+      ESP_LOGD(TAG, "Error initializing BT");
       return false;
     }
+  delay(5000);
+  if (!(    
+    sendAndReadOkResponse(&BTSerial,"AT+RMAAD") &&
+    sendAndReadOkResponse(&BTSerial,"AT+ROLE=1")
+  ))
+  {
+    ESP_LOGD(TAG, "Error initializing BT");
+    return false;
+  }
   sendAndReadOkResponse(&BTSerial,"AT+RESET");
-  delay(2000);
+  delay(5000);  
   if (!(
     sendAndReadOkResponse(&BTSerial,"AT+CMODE=1") &&
 #ifdef BT_OLD_MODULE
-    sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
+    //sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
 #endif
     sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7")))
     {
-      ESP_LOGE(TAG, "Error initializing BT");
+      ESP_LOGD(TAG, "Error initializing BT");
       return false;
     }
   ESP_LOGD(TAG, "BT initialized as Master");

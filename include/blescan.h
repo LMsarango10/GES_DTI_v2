@@ -8,7 +8,7 @@
 #include "soc/timer_group_struct.h"
 #include "soc/timer_group_reg.h"
 
-// #define BT_OLD_MODULE 1 para usar el viejo modulo
+#define BT_OLD_MODULE 1// para usar el viejo modulo
 
 #ifdef BT_OLD_MODULE
 #define BT_BAUD 38400

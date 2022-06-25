@@ -9,13 +9,8 @@
 
 #define NBSENDTIMEOUT 25000
 
-#define VERSION "vodafone"
-
-#ifdef VERSION == "vodafone"
 #define VODAFONE_VERSION
-#else
-#define AUTO_VERSION
-#endif
+//#define AUTO_VERSION
 
 #define DEBUG_MODEM
 

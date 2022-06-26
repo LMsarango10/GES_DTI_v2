@@ -57,7 +57,7 @@ void get_userSalt(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: get SALT");
   payload.reset();
   payload.addSalt(cfg.salt);
-  payload.addSaltVersion(cfg.saltVersion)
+  payload.addSaltVersion(cfg.saltVersion);
   SendPayload(CONFIGPORT, prio_high);
 }
 

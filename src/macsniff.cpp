@@ -48,7 +48,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
   char buff[32]; // temporary buffer for printf
   bool added = false;
   int8_t beaconID;    // beacon number in test monitor mode
-  uint64_t hashedmac; // temporary buffer for generated hash value
+  uint32_t hashedmac; // temporary buffer for generated hash value
 
 #if (VENDORFILTER)
   uint32_t *oui; // temporary buffer for vendor OUI
@@ -69,15 +69,11 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
 
     snprintf(buff, sizeof(buff), "%02X:%02X:%02X:%02X:%02X:%02X", paddr[0],
              paddr[1], paddr[2], paddr[3], paddr[4], paddr[5]);
-    ESP_LOGI(TAG, "Content of buff is: %s", buff);
     //  convert unsigned 32-bit salted MAC
     // to 8 digit hex string
     // hashedmac = rokkit(&buff[0], 5);      // hash MAC 8 digit -> 5 digit
     char out[METIS_OUTPUT_HASH_LENGTH];
-    char in[METIS_OUTPUT_HASH_LENGTH];
     // ESP_LOGV(TAG, "salted MAC %d", in);
-
-    memcpy(in, paddr, METIS_OUTPUT_HASH_LENGTH);
     metis_enable_printing(true);
 
     /**
@@ -91,10 +87,11 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
 
     bool *isDev = false;
     // metis_is_device((char *)in, isDev);
-    strcpy(in, buff);
     // metis_digest_mac_salt(in, salt, out); // Last version
-
-    if (metis_digest_mac_from_str_salt(in, salt, out) ==
+    #ifdef DEBUG_METIS
+    ESP_LOGI(TAG, "Content of buff is: %s", buff);
+    #endif
+    if (metis_digest_mac_from_str_salt(buff, salt, out) ==
         metis_failure_reason_none) {
           #ifdef DEBUG_METIS
       ESP_LOGD(TAG, "(METIS) OK!\n");
@@ -104,24 +101,15 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
       ESP_LOGD(TAG, "(METIS) FAILED\n");
     }
 
-    memcpy(&hashedmac, out, METIS_OUTPUT_HASH_LENGTH);
-    uint32_t hashedmacH = (hashedmac >> 32) & 0xFFFFFFFF;
-    uint32_t hashedmacL = (hashedmac)&0xFFFFFFFF;
+    hashedmac = (uint32_t) strtoul(out, NULL, 16);
 
-    for (int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++)
-      in[n] = 0;
-    for (int n = 0; n < METIS_OUTPUT_HASH_LENGTH; n++)
-      out[n] = 0;
-
-    // ESP_LOGD(TAG, "out: %d", out);
     char hashedmacbuff[20];
-    snprintf(hashedmacbuff, sizeof(hashedmacbuff), "%08X%08X", hashedmacH,
-             hashedmacL);
+    snprintf(hashedmacbuff, sizeof(hashedmacbuff), "%08X", hashedmac);
 
     switch (sniff_type) {
     case MAC_SNIFF_WIFI: {
       auto newmac =
-          macs_list_wifi.insert(hashedmacL); // add hashed MAC, if new unique
+          macs_list_wifi.insert(hashedmac); // add hashed MAC, if new unique
       added = newmac.second
                   ? true
                   : false; // true if hashed MAC is unique in container
@@ -136,7 +124,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     }
     case MAC_SNIFF_BLE: {
       auto newmac =
-          macs_list_ble.insert(hashedmacL); // add hashed MAC, if new unique
+          macs_list_ble.insert(hashedmac); // add hashed MAC, if new unique
       added = newmac.second
                   ? true
                   : false; // true if hashed MAC is unique in container
@@ -150,7 +138,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     }
     case MAC_SNIFF_BT: {
       auto newmac =
-          macs_list_bt.insert(hashedmacL); // add hashed MAC, if new unique
+          macs_list_bt.insert(hashedmac); // add hashed MAC, if new unique
       added = newmac.second
                   ? true
                   : false; // true if hashed MAC is unique in container

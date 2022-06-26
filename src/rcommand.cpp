@@ -49,8 +49,10 @@ void set_rssi(uint8_t val[]) {
 void set_salt(uint8_t val[]){ // salt receives 8 values, 4 for the salt and 4 for the version
   cfg.salt = (val[3]*256*256*256)+(val[2]*256*256)+(val[1]*256)+val[0];
   cfg.saltVersion = (val[7]*256*256*256)+(val[6]*256*256)+(val[5]*256)+val[4];
+  cfg.saltVersion = (val[11]*256*256*256)+(val[10]*256*256)+(val[9]*256)+val[8];
   ESP_LOGI(TAG, "Remote command: set SALT to %X", cfg.salt);
   ESP_LOGI(TAG, "Remote command: set SALT VERSION to %X", cfg.saltVersion);
+  ESP_LOGI(TAG, "Remote command: set SALT TIMESTAMP to %X", cfg.saltTimestamp);
 }
 
 void get_userSalt(uint8_t val[]) {
@@ -58,6 +60,7 @@ void get_userSalt(uint8_t val[]) {
   payload.reset();
   payload.addSalt(cfg.salt);
   payload.addSaltVersion(cfg.saltVersion);
+  payload.addSaltTimestamp(cfg.saltTimestamp);
   SendPayload(CONFIGPORT, prio_high);
 }
 
@@ -498,7 +501,7 @@ static cmd_t table[] = {
     {0x11, set_monitor, 1, true},       {0x12, set_beacon, 7, false},
     {0x13, set_sensor, 2, true},        {0x14, set_payloadmask, 1, true},
     {0x15, set_bme, 1, true},           {0x16, set_batt, 1, true},
-    {0x17, set_wifiscan, 1, true},      {0x18, set_salt, 8, true},
+    {0x17, set_wifiscan, 1, true},      {0x18, set_salt, 12, true},
     {0x19, set_btscan, 1, true},        {0x1A, set_nb_server, 45, true},
     {0x1B, set_nb_password, 45, true},  {0x1C, set_nb_app_id, 5, true},
     {0x1D, set_nb_app_name, 31, true},  {0x1E, set_nb_port, 2, true},

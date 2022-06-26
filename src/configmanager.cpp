@@ -38,6 +38,7 @@ void defaultConfig() {
   cfg.payloadmask = PAYLOADMASK;   // all payload switched on
   cfg.salt = 0x12345678;
   cfg.saltVersion = 0x00;
+  cfg.saltTimestamp = 0x00;
   cfg.bsecstate[BSEC_MAX_STATE_BLOB_SIZE] = {
       0}; // init BSEC state for BME680 sensor
   strncpy(cfg.version, PROGVERSION, sizeof(cfg.version) - 1);
@@ -179,6 +180,10 @@ void saveConfig() {
     if (nvs_get_i32(my_handle, "saltversion", &flash32) != ESP_OK ||
         flash32 != cfg.saltVersion)
       nvs_set_i32(my_handle, "saltversion", cfg.saltVersion);
+
+    if (nvs_get_i32(my_handle, "salttimestamp", &flash32) != ESP_OK ||
+        flash32 != cfg.saltTimestamp)
+      nvs_set_i32(my_handle, "salttimestamp", cfg.saltTimestamp);
 
     err = nvs_commit(my_handle);
     nvs_close(my_handle);
@@ -391,12 +396,21 @@ void loadConfig() {
       saveConfig();
     }
 
-    if (nvs_get_i32(my_handle, "saltVersion", &flash32) == ESP_OK) {
+    if (nvs_get_i32(my_handle, "saltversion", &flash32) == ESP_OK) {
       cfg.saltVersion = flash32;
       ESP_LOGI(TAG, "Salt Version = %d", flash32);
     } else {
       cfg.saltVersion = 0x00;
-      ESP_LOGI(TAG, "Salt set to default %d", cfg.saltVersion);
+      ESP_LOGI(TAG, "Salt version set to default %d", cfg.saltVersion);
+      saveConfig();
+    }
+
+    if (nvs_get_i32(my_handle, "salttimestamp", &flash32) == ESP_OK) {
+      cfg.saltTimestamp = flash32;
+      ESP_LOGI(TAG, "Salt Timestamp = %d", flash32);
+    } else {
+      cfg.saltTimestamp = 0x00;
+      ESP_LOGI(TAG, "Salt timestamp set to default %d", cfg.saltTimestamp);
       saveConfig();
     }
 

@@ -25,16 +25,19 @@ void PayloadConvert::addCount(uint16_t value, uint8_t snifftype) {
   buffer[cursor++] = lowByte(value);
 }
 
-void PayloadConvert::addSalt(char * value) { // TODO check
+void PayloadConvert::addSalt(uint32_t value) {
 // esto es para nueva version de METIS
-  buffer[cursor++] = value[0];
-  buffer[cursor++] = value[1];
-  buffer[cursor++] = value[2];
-  buffer[cursor++] = value[3];
-  buffer[cursor++] = value[4];
-  buffer[cursor++] = value[5];
-  buffer[cursor++] = value[6];
-  buffer[cursor++] = value[7];
+  buffer[cursor++] = (value >> 24) & 0xFF;
+  buffer[cursor++] = (value >> 16) & 0xFF;
+  buffer[cursor++] = (value >> 8) & 0xFF;
+  buffer[cursor++] = (value ) & 0xFF;
+}
+
+void PayloadConvert::addSaltVersion(uint32_t value) {
+  buffer[cursor++] = (value >> 24) & 0xFF;
+  buffer[cursor++] = (value >> 16) & 0xFF;
+  buffer[cursor++] = (value >> 8) & 0xFF;
+  buffer[cursor++] = (value ) & 0xFF;
 }
 
 void PayloadConvert::setupMac(uint16_t amount) {

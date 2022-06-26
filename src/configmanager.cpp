@@ -84,7 +84,6 @@ void saveConfig() {
     int8_t flash8 = 0;
     int16_t flash16 = 0;
     int32_t flash32 = 0;
-    int64_t flash64 = 0;
     size_t required_size;
     uint8_t bsecstate_buffer[BSEC_MAX_STATE_BLOB_SIZE + 1];
     char storedversion[10];

@@ -13,7 +13,7 @@
 #ifdef BT_OLD_MODULE
 #define BT_BAUD 38400
 #else
-#define BT_BAUD 38400
+#define BT_BAUD 9600
 #endif
 #define BLE_BAUD 9600
 
@@ -23,11 +23,11 @@
 
 #define RX_BLE 36
 #define TX_BLE 4
-#define EN_BLE 25
+#define EN_BLE 12
 #define BLESerial Serial2
 #define RX_BT 36 //
 #define TX_BT 4 //
-#define EN_BT 25 //
+#define EN_BT 12 //
 #define BTSerial Serial2
 
 #else
@@ -51,9 +51,9 @@
 void start_BLEscan(void);
 void stop_BLEscan(void);
 bool initBLE(void);
-bool initBT();
+bool initBT(long baud);
 void btHandler(void *pvParameters);
-bool BLECycle(void);
-bool BTCycle(void);
+void BLECycle(void);
+void BTCycle(void);
 
 #endif

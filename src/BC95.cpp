@@ -438,9 +438,7 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
 
   bc95serial.print("AT+QMTCONN=0,\"");
   bc95serial.print(clientId);
-  //bc95serial.print("\",\"gesinen\",\""); // SERVIDOR MQTT
   bc95serial.print("\",\"gesinen \",\"");
-  //bc95serial.print("\",\"gesinen_app\",\"");
   bc95serial.print(password);
   bc95serial.println("\"");
 

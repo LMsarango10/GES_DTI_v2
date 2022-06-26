@@ -80,7 +80,8 @@ typedef struct {
   uint8_t monitormode;   // 0=disabled, 1=enabled
   uint8_t runmode;       // 0=normal, 1=update
   uint8_t payloadmask;   // bitswitches for payload data
-  char *salt;
+  uint32_t saltH;
+  uint32_t saltL;
   char version[10]; // Firmware version
   uint8_t
       bsecstate[BSEC_MAX_STATE_BLOB_SIZE + 1]; // BSEC state for BME680 sensor

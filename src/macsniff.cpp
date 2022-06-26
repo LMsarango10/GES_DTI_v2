@@ -9,11 +9,11 @@
 // Local logging tag
 static const char TAG[] = __FILE__;
 
-char *salt;
+char salt[9];
 
 char *get_salt(void) {
-  salt = cfg.salt;
-  return cfg.salt;
+  snprintf(salt, sizeof(salt), "%08X%08X", cfg.saltH, cfg.saltL);
+  return salt;
 }
 
 int8_t isBeacon(uint64_t mac) {

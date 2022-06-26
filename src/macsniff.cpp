@@ -12,7 +12,7 @@ static const char TAG[] = __FILE__;
 char salt[9];
 
 char *get_salt(void) {
-  snprintf(salt, sizeof(salt), "%08X%08X", cfg.saltH, cfg.saltL);
+  snprintf(salt, sizeof(salt), "%08X", cfg.salt);
   return salt;
 }
 

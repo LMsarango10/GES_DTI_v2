@@ -103,23 +103,11 @@ PayloadConvert payload(PAYLOAD_BUFFER_SIZE);
 TimeChangeRule myDST = DAYLIGHT_TIME;
 TimeChangeRule mySTD = STANDARD_TIME;
 Timezone myTZ(myDST, mySTD);
-//#include "SoftwareSerial.h"
 
 // local Tag for logging
 static const char TAG[] = __FILE__;
-//SoftwareSerial Bluetooth(RX_BT,TX_BT);
-//https://www.youtube.com/watch?v=90JYo5e9eIk&ab_channel=RoelVandePaar
+
 void setup() {
-  /*
-  pinMode(EN_BT, OUTPUT);
-  digitalWrite(EN_BT,LOW);
-  Serial.begin(115200);
-  Serial.println("ready");
-  initBT();
-  BTCycle();
-
-  //Bluetooth.begin(38400);*/
-
 
   char features[100] = "";
 
@@ -504,18 +492,7 @@ ESP_ERROR_CHECK(esp_coex_preference_set(
   RTC_runmode = RUNMODE_NORMAL;
 
   vTaskDelete(NULL);
-/**/
+
 } // setup()
 
-char c=' ';
-void loop() { vTaskDelete(NULL);
- /*if(BTSerial.available())
-  {
-    c=BTSerial.read();
-    Serial.write(c);
-  }
-  if(Serial.available())
-  {
-    c=Serial.read();
-    BTSerial.write(c);
-  } /**/}
+void loop() { vTaskDelete(NULL); }

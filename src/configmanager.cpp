@@ -36,8 +36,8 @@ void defaultConfig() {
   cfg.rgblum = RGBLUMINOSITY;      // RGB Led luminosity (0..100%)
   cfg.monitormode = 0;             // 0=disabled, 1=enabled
   cfg.payloadmask = PAYLOADMASK;   // all payload switched on
-  cfg.saltL = 0x5678;
-  cfg.saltH = 0x1234;
+  cfg.salt = 0x12345678;
+  cfg.saltVersion = 0x00;
   cfg.bsecstate[BSEC_MAX_STATE_BLOB_SIZE] = {
       0}; // init BSEC state for BME680 sensor
   strncpy(cfg.version, PROGVERSION, sizeof(cfg.version) - 1);
@@ -84,6 +84,7 @@ void saveConfig() {
     int8_t flash8 = 0;
     int16_t flash16 = 0;
     int32_t flash32 = 0;
+    int64_t flash64 = 0;
     size_t required_size;
     uint8_t bsecstate_buffer[BSEC_MAX_STATE_BLOB_SIZE + 1];
     char storedversion[10];
@@ -172,13 +173,13 @@ void saveConfig() {
         flash16 != cfg.rssilimit)
       nvs_set_i16(my_handle, "rssilimit", cfg.rssilimit);
 
-    if (nvs_get_u32(my_handle, "saltL", &flash32) != ESP_OK ||
-        flash32 != cfg.saltL)
-      nvs_set_u32(my_handle, "saltL", cfg.saltL);
+    if (nvs_get_i32(my_handle, "salt", &flash32) != ESP_OK ||
+        flash32 != cfg.salt)
+      nvs_set_i32(my_handle, "salt", cfg.salt);
 
-    if (nvs_get_u32(my_handle, "saltH", &flash32) != ESP_OK ||
-        flash32 != cfg.saltH)
-      nvs_set_u32(my_handle, "saltH", cfg.saltH);
+    if (nvs_get_i32(my_handle, "saltversion", &flash32) != ESP_OK ||
+        flash32 != cfg.saltVersion)
+      nvs_set_i32(my_handle, "saltversion", cfg.saltVersion);
 
     err = nvs_commit(my_handle);
     nvs_close(my_handle);
@@ -383,10 +384,20 @@ void loadConfig() {
     }
 
     if (nvs_get_i32(my_handle, "salt", &flash32) == ESP_OK) {
-      cfg.monitormode = flash32;
+      cfg.salt = flash32;
       ESP_LOGI(TAG, "Salt = %d", flash32);
     } else {
-      ESP_LOGI(TAG, "Salt set to default %d", cfg.monitormode);
+      cfg.salt = 0x12345678;
+      ESP_LOGI(TAG, "Salt set to default %d", cfg.salt);
+      saveConfig();
+    }
+
+    if (nvs_get_i32(my_handle, "saltVersion", &flash32) == ESP_OK) {
+      cfg.saltVersion = flash32;
+      ESP_LOGI(TAG, "Salt Version = %d", flash32);
+    } else {
+      cfg.saltVersion = 0x00;
+      ESP_LOGI(TAG, "Salt set to default %d", cfg.saltVersion);
       saveConfig();
     }
 

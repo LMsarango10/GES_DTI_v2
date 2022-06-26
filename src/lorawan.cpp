@@ -220,7 +220,7 @@ void get_hard_deveui(uint8_t *pdeveui) {
   // Set back to 400KHz to speed up OLED
   Wire.setClock(400000);
 #endif // MCP 24AA02E64
-
+}
 #if (VERBOSE)
 
 // Display OTAA keys

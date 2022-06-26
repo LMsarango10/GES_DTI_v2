@@ -49,7 +49,7 @@ void set_rssi(uint8_t val[]) {
 void set_salt(uint8_t val[]){ // salt receives 8 values, 4 for the salt and 4 for the version
   cfg.salt = (val[3]*256*256*256)+(val[2]*256*256)+(val[1]*256)+val[0];
   cfg.saltVersion = (val[7]*256*256*256)+(val[6]*256*256)+(val[5]*256)+val[4];
-  cfg.saltVersion = (val[11]*256*256*256)+(val[10]*256*256)+(val[9]*256)+val[8];
+  cfg.saltTimestamp = (val[11]*256*256*256)+(val[10]*256*256)+(val[9]*256)+val[8];
   ESP_LOGI(TAG, "Remote command: set SALT to %X", cfg.salt);
   ESP_LOGI(TAG, "Remote command: set SALT VERSION to %X", cfg.saltVersion);
   ESP_LOGI(TAG, "Remote command: set SALT TIMESTAMP to %X", cfg.saltTimestamp);

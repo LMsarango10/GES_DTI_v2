@@ -36,10 +36,10 @@ void defaultConfig() {
   cfg.rgblum = RGBLUMINOSITY;      // RGB Led luminosity (0..100%)
   cfg.monitormode = 0;             // 0=disabled, 1=enabled
   cfg.payloadmask = PAYLOADMASK;   // all payload switched on
-  cfg.salt = 0xFFFFFFFF;
+  cfg.salt = 0x12345678;
+  cfg.saltVersion = 0x00;
   cfg.bsecstate[BSEC_MAX_STATE_BLOB_SIZE] = {
       0}; // init BSEC state for BME680 sensor
-
   strncpy(cfg.version, PROGVERSION, sizeof(cfg.version) - 1);
 }
 
@@ -175,6 +175,10 @@ void saveConfig() {
     if (nvs_get_i32(my_handle, "salt", &flash32) != ESP_OK ||
         flash32 != cfg.salt)
       nvs_set_i32(my_handle, "salt", cfg.salt);
+
+    if (nvs_get_i32(my_handle, "saltversion", &flash32) != ESP_OK ||
+        flash32 != cfg.saltVersion)
+      nvs_set_i32(my_handle, "saltversion", cfg.saltVersion);
 
     err = nvs_commit(my_handle);
     nvs_close(my_handle);
@@ -379,10 +383,20 @@ void loadConfig() {
     }
 
     if (nvs_get_i32(my_handle, "salt", &flash32) == ESP_OK) {
-      cfg.monitormode = flash32;
+      cfg.salt = flash32;
       ESP_LOGI(TAG, "Salt = %d", flash32);
     } else {
-      ESP_LOGI(TAG, "Salt set to default %d", cfg.monitormode);
+      cfg.salt = 0x12345678;
+      ESP_LOGI(TAG, "Salt set to default %d", cfg.salt);
+      saveConfig();
+    }
+
+    if (nvs_get_i32(my_handle, "saltVersion", &flash32) == ESP_OK) {
+      cfg.saltVersion = flash32;
+      ESP_LOGI(TAG, "Salt Version = %d", flash32);
+    } else {
+      cfg.saltVersion = 0x00;
+      ESP_LOGI(TAG, "Salt set to default %d", cfg.saltVersion);
       saveConfig();
     }
 

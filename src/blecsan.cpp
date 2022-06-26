@@ -249,7 +249,7 @@ void BLECycle(void)
       } else {
         ESP_LOGV(TAG, "%d devices detected", devicesDetected);
       }
-      
+
       getMacsFromBLE(devicesDetected);
       break;
     }
@@ -257,9 +257,9 @@ void BLECycle(void)
   return;
 }
 bool reinitBT()
-{  
-  if (!(  
-    sendAndReadOkResponse(&BTSerial, "AT") &&    
+{
+  if (!(
+    sendAndReadOkResponse(&BTSerial, "AT") &&
     sendAndReadOkResponse(&BTSerial, "AT+ORGL")
     ))
     {
@@ -267,7 +267,7 @@ bool reinitBT()
       return false;
     }
   delay(5000);
-  if (!(    
+  if (!(
     sendAndReadOkResponse(&BTSerial,"AT+RMAAD") &&
     sendAndReadOkResponse(&BTSerial,"AT+ROLE=1")
   ))
@@ -276,7 +276,7 @@ bool reinitBT()
     return false;
   }
   sendAndReadOkResponse(&BTSerial,"AT+RESET");
-  delay(5000);  
+  delay(5000);
   if (!(
     sendAndReadOkResponse(&BTSerial,"AT+CMODE=1") &&
 #ifdef BT_OLD_MODULE

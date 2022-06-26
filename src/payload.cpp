@@ -26,6 +26,14 @@ void PayloadConvert::addCount(uint16_t value, uint8_t snifftype) {
 }
 
 void PayloadConvert::addSalt(uint32_t value) {
+// esto es para nueva version de METIS
+  buffer[cursor++] = (value >> 24) & 0xFF;
+  buffer[cursor++] = (value >> 16) & 0xFF;
+  buffer[cursor++] = (value >> 8) & 0xFF;
+  buffer[cursor++] = (value ) & 0xFF;
+}
+
+void PayloadConvert::addSaltVersion(uint32_t value) {
   buffer[cursor++] = (value >> 24) & 0xFF;
   buffer[cursor++] = (value >> 16) & 0xFF;
   buffer[cursor++] = (value >> 8) & 0xFF;

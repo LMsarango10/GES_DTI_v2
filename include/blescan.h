@@ -15,6 +15,7 @@
 #else
 #define BT_BAUD 9600
 #endif
+#define BLE_BAUD 9600
 
 // #define LEGACY_MODULE Descomentar para usar placas viejas
 

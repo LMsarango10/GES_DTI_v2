@@ -1,0 +1,82 @@
+    * Revisar con Esim (PC Taller HP con esim)
+
+    * DONE beaconId fix 
+        macsiniff.cpp:184
+    * DONE Alfinal comentario debug fix 
+        macsiniff.cpp:200
+
+    * DONE Al cambiar el BT revisar mac BT: 
+        """
+        [E][blecsan.cpp:28] assertResponse(): received: +INQ:6E70:46:0ACC3F,5A020C,FFAA,Umidigi S5 Pro 
+        """
+    * TODO Al cambiar la libreria ahora hay un byte mas de la macDigest antes eran 4bytes ahora son 5bytes
+        cambiar tambien el mensaje para que quepa en lora revisar Hash tambien
+        
+        """
+        [D][macsniff.cpp:116] mac_add(): Digest Mac: 72f5a
+        """
+    * TODO (falta BLE) Revisar mac_add en ble y bt Wifi 
+
+        ** Problema BLE:
+            [E][blecsan.cpp:28] assertResponse(): received: +INQ:1 0x389C7F2A6C8B 
+            [V][blecsan.cpp:214] BLECycle(): finish INQ mode
+            [E][blecsan.cpp:28] assertResponse(): received: +INQ:2 0x359EB75557A5
+            [V][blecsan.cpp:217] BLECycle(): 75557 devices detected
+            [E][blecsan.cpp:28] assertResponse(): received: +INQ:3 0x4DC1F607DCCD
+            [E][blecsan.cpp:105] getMacsFromBLE(): error reading mac, ignoring
+            [E][blecsan.cpp:28] assertResponse(): received: ERROR 
+        ** Review: 
+            DONE BT:  
+                [I][macsniff.cpp:72] mac_add(): Content of buff is: 58:B1:0F:D6:D0:16
+                [D][macsniff.cpp:99] mac_add(): (METIS) OK!
+                [D][macsniff.cpp:100] mac_add(): (METIS) Digest Mac: 2f4e3
+                [D][macsniff.cpp:186] mac_add(): 12345678 salt
+                [D][macsniff.cpp:197] mac_add(): new   WiFi RSSI -74dBi -> salted MAC  -> Hash 0000003365346632 -> WiFi:1  BLE:0 -> BLTH:1 -> 171724 Bytes left
+                [I][macsniff.cpp:72] mac_add(): Content of buff is: 58:B1:0F:D6:D0:16
+                [D][macsniff.cpp:99] mac_add(): (METIS) OK!
+                [D][macsniff.cpp:100] mac_add(): (METIS) Digest Mac: 2f4e3
+            
+            DONE WIFI:
+                            
+                [I][macsniff.cpp:72] mac_add(): Content of buff is: 58:B1:0F:D6:D0:16
+                [D][macsniff.cpp:99] mac_add(): (METIS) OK!
+                [D][macsniff.cpp:100] mac_add(): (METIS) Digest Mac: 2f4e3
+                [D][macsniff.cpp:186] mac_add(): 12345678 salt
+                [D][macsniff.cpp:197] mac_add(): new   WiFi RSSI -92dBi -> salted MAC  -> Hash 0000003365346632 -> WiFi:1  BLE:0 -> BLTH:1 -> 171724 Bytes left
+                [I][macsniff.cpp:72] mac_add(): Content of buff is: 58:B1:0F:D6:D0:16
+                [D][macsniff.cpp:99] mac_add(): (METIS) OK!
+                [D][macsniff.cpp:100] mac_add(): (METIS) Digest Mac: 2f4e3
+    * TODO Salt variable:
+        - gestionar version de salt tipo Vxxx.yyy
+        - mensaje para solicitar version de salt ejemplo: SALT / VERSION / FECHA INICIO DE ESTA SALT (entrada en vigor)
+        - Ver tema de la fecha de entrada envigor ya que tienen que entrar en vigor todas a la vez en la misma fecha 
+        - modificable por lora,
+        ** ConfigManager:  Check
+            """ 
+            if (nvs_get_str(my_handle, "salt", &string) != ESP_OK ||  //TODO check
+                string != cfg.salt)
+            nvs_set_i32(my_handle, "salt", cfg.salt);
+            """
+        ** payload.cpp:  Falta Check Ahora esta como char[]
+            """
+            void PayloadConvert::addSalt(char * value) {
+            buffer[cursor++] = (value >> 24) & 0xFF;
+            buffer[cursor++] = (value >> 16) & 0xFF;
+            buffer[cursor++] = (value >> 8) & 0xFF;
+            buffer[cursor++] = (value ) & 0xFF;
+            }
+            """
+        ** rcommand.cpp:506  
+            """
+              // {0x18, set_salt, 4, true}, eso no debe estar comentado
+            """
+    * TODO: Gestionar 4G/ Lora que se pueda cambiar entre ellos dependiendo el buffer lo lleno que esté
+    * TODO:Mensaje para habilitar 4G o Lora 
+    * TODO: Definir cuando esta lleno el buffer y que sea modificable mediante lora
+    * TODO: Activar / desactvar vendor filter 
+    * TODO: vendor filter ?¿
+    * TODO: Fuota
+    * TODO: ?¿ modificar ventana de detección 
+    * TODO: mensaje para saber tiempo de escaneo , version salt, tamaño buffer, 4h o lora
+    
+ https://docs.iotcreators.com/docs/quectel-bc95-g-1#receive-hello-device

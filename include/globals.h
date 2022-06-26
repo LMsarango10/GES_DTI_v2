@@ -82,6 +82,7 @@ typedef struct {
   uint8_t payloadmask;   // bitswitches for payload data
   uint32_t salt;
   uint32_t saltVersion;
+  uint32_t saltTimestamp;
   char version[10]; // Firmware version
   uint8_t
       bsecstate[BSEC_MAX_STATE_BLOB_SIZE + 1]; // BSEC state for BME680 sensor

@@ -49,6 +49,7 @@ public:
   void addMac(uint32_t value);
   void addSalt(uint32_t value);
   void addSaltVersion(uint32_t value);
+  void addSaltTimestamp(uint32_t value);
   void addConfig(configData_t value);
   void addStatus(uint16_t voltage, uint64_t uptime, float cputemp, uint32_t mem,
                  uint8_t reset1, uint8_t reset2);

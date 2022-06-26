@@ -14,28 +14,28 @@ int readResponseBC(HardwareSerial *port, char *buff, int b_size,
                    uint32_t timeout = 500) {
   port->setTimeout(timeout);
   buff[0] = 0;
-  int bytesRead = port->readBytes(buff, b_size);
-  if(bytesRead > 0)
-  {
+  int bytesRead = port->readBytes(buff, b_size-1);
+  if (bytesRead > 0) {
     buff[bytesRead] = 0;
     ESP_LOGI(TAG, "%d bytes read", bytesRead);
     ESP_LOGI(TAG, "Message: %s", buff);
     return bytesRead;
-  }
-  else if (bytesRead < 0) return -1;
+  } else if (bytesRead < 0)
+    return -1;
   return 0;
 }
 
-int readResponseWithStop(HardwareSerial *port, char *buff, int b_size, char* stopWord, unsigned long timeout) {
+int readResponseWithStop(HardwareSerial *port, char *buff, int b_size,
+                         char *stopWord, unsigned long timeout) {
   buff[0] = 0;
   int p = 0;
 
   unsigned long startTime = millis();
 
-  while(millis() - startTime < timeout) {
-    if(port->available()) {
+  while (millis() - startTime < timeout) {
+    if (port->available()) {
       buff[p++] = port->read();
-      if(p >= b_size) {
+      if (p >= b_size) {
         ESP_LOGE(TAG, "Buffer too small to receive message");
         return -1;
       }
@@ -70,8 +70,8 @@ bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command,
 
 void initModem() {
   bc95serial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
-  //pinMode(RESET_PIN, OUTPUT);
-  // digitalWrite(RESET_PIN, HIGH);
+  // pinMode(RESET_PIN, OUTPUT);
+  //  digitalWrite(RESET_PIN, HIGH);
 
   /*digitalWrite(RESET_PIN, HIGH);
   delay(1000);
@@ -109,31 +109,37 @@ void resetModem() {
   while (bc95serial.available() > 0)
     bc95serial.read();
   sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff));
-  // sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0");
 }
 
 bool configModem() {
   ESP_LOGI(TAG, "Config NBIOT modem");
-  return /* sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
+  return sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0", globalBuff, sizeof(globalBuff)) &&
+#ifdef VODAFONE_VERSION
+        sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=0", globalBuff, sizeof(globalBuff)) &&
+        sendAndReadOkResponseBC(&bc95serial, "AT+NPSMR=0", globalBuff, sizeof(globalBuff)) &&
+        sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff, sizeof(globalBuff)) &&
+        sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
                                  sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial,
-                                 "AT+CGDCONT=1,\"IP\",\"m2m.movistar.es\"",
-                                 globalBuff, sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff,
-                                 sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+COPS=0", globalBuff,
-                                 sizeof(globalBuff));*/
-  sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE", globalBuff,
+         sendAndReadOkResponseBC(&bc95serial, "AT+COPS=1,2,\"21401\"", globalBuff,
                                  sizeof(globalBuff));
+#endif
+#ifdef AUTO_VERSION
+      sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
+                              globalBuff, sizeof(globalBuff));
+#endif
 }
 
 bool attachNetwork()
 
 {
-  return sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,
-                                 sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,
-                                 sizeof(globalBuff));
+  return
+#ifdef VODAFONE_VERSION
+  sendAndReadOkResponseBC(&bc95serial,"AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",globalBuff, sizeof(globalBuff));// &&
+#endif
+#ifdef AUTO_VERSION
+         sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,sizeof(globalBuff)) &&
+         sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,sizeof(globalBuff));
+#endif
 }
 
 bool networkAttached() {
@@ -337,7 +343,8 @@ int parseResponse(char *buff, int bytesReceived, int *responseCode) {
   return bodyLen;
 }
 
-int postPage(char *domainBuffer, int thisPort, char *page, char *thisData, char* identityKey) {
+int postPage(char *domainBuffer, int thisPort, char *page, char *thisData,
+             char *identityKey) {
   char outBuf[256];
 
   ESP_LOGI(TAG, "connecting...");
@@ -399,65 +406,68 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData, char*
   }
 }
 
-int connectMqtt(char *url, int port, char *password, char *clientId)
-{
-  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTOPEN=0,\"%s\",%d",url, port);
+int connectMqtt(char *url, int port, char *password, char *clientId) {
+  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTOPEN=0,\"%s\",%d", url, port);
 
   bc95serial.print("AT+QMTOPEN=0,\"");
   bc95serial.print(url);
   bc95serial.print("\",");
   bc95serial.println(port);
-  char data[64];
-  int bytesRead = readResponseBC(&bc95serial, data, 64);
+  char data[128];
+  int bytesRead = readResponseBC(&bc95serial, data, 128);
 
   if (!assertResponseBC("OK\r", data, bytesRead)) {
     return -1;
   }
   int responseBytes = 0;
-  for (int i = 0; i < 150; i++) {
-    responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
-    if(responseBytes != 0) {
-      break;
+  if (!assertResponseBC("+QMTOPEN: 0,0", data, bytesRead)) {
+    for (int i = 0; i < 30; i++) {
+      responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
+      if (responseBytes != 0) {
+        break;
+      }
+      ESP_LOGI(TAG, "Wait for conn");
     }
-    ESP_LOGI(TAG, "Wait for conn");
+    if (!assertResponseBC("+QMTOPEN: 0,0", data, responseBytes)) {
+      return -1;
+    }
   }
 
-  if (!assertResponseBC("+QMTOPEN: 0,0", data, responseBytes)) {
-    return -1;
-  }
-
-  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCONN=0,\"%s\",\"gesinen_app\",\"%s\"",clientId, password);
+  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCONN=0,\"%s\",\"gesinen\",\"%s\"",
+           clientId, password);
 
   bc95serial.print("AT+QMTCONN=0,\"");
   bc95serial.print(clientId);
-  //bc95serial.print("\",\"gesinen\",\""); // SERVIDOR MQTT    
+  //bc95serial.print("\",\"gesinen\",\""); // SERVIDOR MQTT
   bc95serial.print("\",\"gesinen \",\"");
   //bc95serial.print("\",\"gesinen_app\",\"");
   bc95serial.print(password);
   bc95serial.println("\"");
 
-  responseBytes = readResponseBC(&bc95serial, data, 64, 2000);
+  bytesRead = readResponseBC(&bc95serial, data, 128);
+
+  if (!assertResponseBC("OK\r", data, bytesRead)) {
+    return -3;
+  }
+
+  for (int i = 0; i < 30; i++) {
+      responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
+      if (responseBytes != 0) {
+        break;
+      }
+      ESP_LOGI(TAG, "Wait for conn");
+    }
   if (!assertResponseBC("+QMTCONN: 0,0,0", data, responseBytes)) {
     return -2;
   }
   return 0;
 }
 
-int subscribeMqtt(char *topic, int qos)
-{
-
-}
-int unsubscribeMqtt(char *topic, int qos)
-{
-
-}
-int checkSubscriptionMqtt(char *message)
-{
-
-}
-int publishMqtt(char *topic, char *message, int qos)
-{
-  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTPUB=0,0,0,0,\"%s\"",topic);
+int subscribeMqtt(char *topic, int qos) {}
+int unsubscribeMqtt(char *topic, int qos) {}
+int checkSubscriptionMqtt(char *message) {}
+int publishMqtt(char *topic, char *message, int qos) {
+  ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTPUB=0,0,0,0,\"%s\"", topic);
 
   bc95serial.print("AT+QMTPUB=0,0,0,0,\"");
   bc95serial.print(topic);
@@ -474,20 +484,20 @@ int publishMqtt(char *topic, char *message, int qos)
   bc95serial.print(message);
   bc95serial.write(26);
 
-  responseBytes = readResponseWithStop(&bc95serial, data, 512, "+QMTPUB: 0,0,0", 5000);
-  while(bc95serial.available()) {
+  responseBytes =
+      readResponseWithStop(&bc95serial, data, 512, "+QMTPUB: 0,0,0", 5000);
+  while (bc95serial.available()) {
     bc95serial.read();
   }
-  if(responseBytes < 0)
+  if (responseBytes < 0)
     return responseBytes;
   return 0;
 }
-int disconnectMqtt()
-{
+int disconnectMqtt() {
   ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTDISC=0");
   bc95serial.println("AT+QMTDISC=0");
-  //ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCLOSE=0");
-  //bc95serial.println("AT+QMTCLOSE=0");
+  // ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCLOSE=0");
+  // bc95serial.println("AT+QMTCLOSE=0");
   char data[64];
   int responseBytes = readResponseBC(&bc95serial, data, 64);
   if (!assertResponseBC("OK", data, responseBytes)) {

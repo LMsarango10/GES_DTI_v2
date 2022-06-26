@@ -30,15 +30,26 @@ bool assertResponse(const char *expected, char *received, int bytesRead) {
   return strstr(received, expected) != nullptr ||
          strstr(received, "x") != nullptr;
 }
-
-bool sendAndReadOkResponse(HardwareSerial *port, const char *command) {
-  ESP_LOGE(TAG, "Command: %s", command);
+void flushPort(HardwareSerial* port) {
+  while(port->available() > 0) {
+    port->read();
+  }
+}
+bool sendAndReadOkResponse(HardwareSerial* port, const char* command)
+{
+  flushPort(port);
+  ESP_LOGV(TAG, "Command: %s", command);
   port->println(command);
   port->flush();
   char buffer[64];
-  int bytesRead = readResponse(port, buffer, sizeof(buffer));
+  buffer[0] = 0;
+  int bytesRead = readResponse(port, buffer, sizeof(buffer)-1, 2000);
+  buffer[bytesRead] = 0;
+  if(bytesRead > 0) {
+    ESP_LOGV(TAG, "Response: %s", buffer);
+  }
 
-  return assertResponse("OK", buffer, bytesRead);
+  return assertResponse("OK\r", buffer, bytesRead);
 }
 
 int getDetectedDevices(char *buff, int buffLen) {
@@ -171,6 +182,10 @@ void initBLESerial() {
 }
 
 void setSerialToBT() {
+  BTSerial.flush();
+  delay(100) ;
+  BTSerial.updateBaudRate(BT_BAUD);
+  //initBTSerial(38400);
   digitalWrite(BLEBTMUX_A, LOW);
   BTSerial.flush();
   delay(100);
@@ -190,6 +205,7 @@ void setSerialToBLE() {
 
 bool initBLE() {
   pinMode(EN_BLE, OUTPUT);
+  pinMode(BLEBTMUX_A, OUTPUT);
   digitalWrite(EN_BLE, HIGH);
   setSerialToBLE();
   return reinitBLE();
@@ -203,13 +219,13 @@ bool BLECycle(void) {
   ESP_LOGV(TAG, "cycling ble scan");
   ESP_LOGV(TAG, "Set BLE inquiry mode");
   char buffer[64];
-  char tmpBuffer[64];
-  sendAndReadOkResponse(&BLESerial, "AT+INQ");
+  BLESerial.println("AT+INQ");
   int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
-  /*if (!assertResponse("+INQS", buffer, bytesRead)) {
-    ESP_LOGE(TAG, "Error setting BLE INQ mode");
-    return 0;
-  }*/
+  if(! assertResponse("+INQS\r", buffer, bytesRead))
+  {
+    ESP_LOGD(TAG, "Error setting BLE INQ mode");
+    return;
+  }
 
   // ENTER INQ MODE
   ESP_LOGV(TAG, "start INQ mode ");
@@ -218,92 +234,63 @@ bool BLECycle(void) {
     bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
     if (assertResponse("+INQE\r", buffer, bytesRead)) {
       ESP_LOGV(TAG, "finish INQ mode ");
-
+      ESP_LOGV(TAG, "Response: %s", buffer);
+      buffer[0] = 0;
       bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
-      ESP_LOGV(TAG, "Recived by BLE %s with %d bytes", buffer, bytesRead);
-
+      ESP_LOGV(TAG, "Response: %s", buffer);
       int devicesDetected = getDetectedDevices(buffer, bytesRead);
-      for (uint32_t i = 7; i < bytesRead; i++) {
-        tmpBuffer[i - 7] = buffer[i];
+      if(devicesDetected == -1) {
+        ESP_LOGV(TAG, "No devices detected");
+      } else {
+        ESP_LOGV(TAG, "%d devices detected", devicesDetected);
       }
-      for (uint32_t i = 0; i < bytesRead; i++) {
-        buffer[i] = tmpBuffer[i];
-      }
-      ESP_LOGI(TAG, "BUFFER IN tmpBuffer %s", tmpBuffer);
-      ESP_LOGV(TAG, "%d devices detected", devicesDetected);
+
       getMacsFromBLE(devicesDetected);
       break;
     }
   }
   return true;
 }
-
-bool reinitBT() {
-  ESP_LOGD(TAG, "Reinitializing BT");
+bool reinitBT()
+{
+  if (!(
+    sendAndReadOkResponse(&BTSerial, "AT") &&
+    sendAndReadOkResponse(&BTSerial, "AT+ORGL")
+    ))
+    {
+      ESP_LOGD(TAG, "Error initializing BT");
+      return false;
+    }
+  delay(5000);
+  if (!(
+    sendAndReadOkResponse(&BTSerial,"AT+RMAAD") &&
+    sendAndReadOkResponse(&BTSerial,"AT+ROLE=1")
+  ))
+  {
+    ESP_LOGD(TAG, "Error initializing BT");
+    return false;
+  }
+  sendAndReadOkResponse(&BTSerial,"AT+RESET");
+  delay(5000);
+  if (!(
+    sendAndReadOkResponse(&BTSerial,"AT+CMODE=1") &&
 #ifdef BT_OLD_MODULE
-  ESP_LOGE(TAG, "BT OLD MODULE");
-#else
-  ESP_LOGE(TAG, "---------BT NEW MODULE----------");
+    //sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
 #endif
-#ifdef BT_OLD_MODULE
-
-  if (!sendAndReadOkResponse(&BTSerial, "AT+ORGL")) {
-    ESP_LOGE(TAG, "FAIL AT+ORGL");
-    return false;
-  }
-  if (!sendAndReadOkResponse(&BTSerial, "AT+RMAAD")) {
-    ESP_LOGE(TAG, "FAIL AT+RMAAD");
-    return false;
-  }
-  if (!sendAndReadOkResponse(&BTSerial, "AT+ROLE=1")) {
-    ESP_LOGE(TAG, "FAIL AT+ROLE=1");
-    return false;
-  }
-
-  sendAndReadOkResponse(&BTSerial, "AT+RESET");
-  delay(2000);
-  if (!(sendAndReadOkResponse(&BTSerial, "AT+CMODE=1") &&
-#ifdef BT_OLD_MODULE
-        sendAndReadOkResponse(
-            &BTSerial, "AT+INIT") && // ESTE COMANDO FALLA EN ALGUNAS VERSIONES
-                                     // VERSION 4.0-20190815 NO ES NECESARIO
-#else
-#endif
-        sendAndReadOkResponse(
-            &BTSerial,
-            "AT+INQM=1,10000,7") // ESTE COMANDO FALLA EN ALGUNAS VERSIONES En
-                                 // esta version de BT en este tipo de modo
-                                 // master no devuelve ok con este comando pero
-                                 // si lo recibe y lo ejecuta OK
-        )) {
-    ESP_LOGE(TAG, "Error initializing BT2");
-    return false;
-  }
-#else
-  if (!sendAndReadOkResponse(&BTSerial, "AT")) {
-    ESP_LOGE(TAG, "FAIL AT");
-    return false;
-  }
-
-  sendAndReadOkResponse(&BTSerial, "AT+RESET");
-  sendAndReadOkResponse(&BTSerial, "AT+ORGL");
-  sendAndReadOkResponse(&BTSerial, "AT+RMAAD");
-  sendAndReadOkResponse(&BTSerial, "AT+ROLE=1");
-  sendAndReadOkResponse(&BTSerial, "AT+CMODE=1");
-  sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7");
-
-#endif
-
-  // sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7");
+    sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7")))
+    {
+      ESP_LOGD(TAG, "Error initializing BT");
+      return false;
+    }
   ESP_LOGD(TAG, "BT initialized as Master");
   return true;
 }
-
-bool initBT() {
-  pinMode(BLEBTMUX_A,
-          OUTPUT); // this pin will pull the HC-05 pin 34 (key pin) HIGH
-  digitalWrite(BLEBTMUX_A, LOW);
-  initBTSerial(BT_BAUD); // HC-05 default speed in AT command more
+bool initBT(long baud)
+{
+  pinMode(EN_BT, OUTPUT);  // this pin will pull the HC-05 pin 34 (key pin) HIGH to switch module to AT mode
+  pinMode(BLEBTMUX_A, OUTPUT);
+  digitalWrite(EN_BT, HIGH);
+  //initBTSerial(baud);  // HC-05 default speed in AT command more
   setSerialToBT();
   return reinitBT();
 }

@@ -9,6 +9,9 @@
 
 #define NBSENDTIMEOUT 25000
 
+#define VODAFONE_VERSION
+//#define AUTO_VERSION
+
 #define DEBUG_MODEM
 
 int readResponseBC(HardwareSerial *port, char *buff, int b_size, uint32_t timeout);

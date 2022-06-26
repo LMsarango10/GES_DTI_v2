@@ -401,7 +401,7 @@ void loadConfig() {
       ESP_LOGI(TAG, "Salt Version = %d", flash32);
     } else {
       cfg.saltVersion = 0x00;
-      ESP_LOGI(TAG, "Salt set to default %d", cfg.saltVersion);
+      ESP_LOGI(TAG, "Salt version set to default %d", cfg.saltVersion);
       saveConfig();
     }
 
@@ -410,7 +410,7 @@ void loadConfig() {
       ESP_LOGI(TAG, "Salt Timestamp = %d", flash32);
     } else {
       cfg.saltTimestamp = 0x00;
-      ESP_LOGI(TAG, "Salt set to default %d", cfg.saltTimestamp);
+      ESP_LOGI(TAG, "Salt timestamp set to default %d", cfg.saltTimestamp);
       saveConfig();
     }
 

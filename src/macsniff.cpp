@@ -69,7 +69,6 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
 
     snprintf(buff, sizeof(buff), "%02X:%02X:%02X:%02X:%02X:%02X", paddr[0],
              paddr[1], paddr[2], paddr[3], paddr[4], paddr[5]);
-    ESP_LOGI(TAG, "Content of buff is: %s", buff);
     //  convert unsigned 32-bit salted MAC
     // to 8 digit hex string
     // hashedmac = rokkit(&buff[0], 5);      // hash MAC 8 digit -> 5 digit
@@ -89,7 +88,9 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
     bool *isDev = false;
     // metis_is_device((char *)in, isDev);
     // metis_digest_mac_salt(in, salt, out); // Last version
-
+    #ifdef DEBUG_METIS
+    ESP_LOGI(TAG, "Content of buff is: %s", buff);
+    #endif
     if (metis_digest_mac_from_str_salt(buff, salt, out) ==
         metis_failure_reason_none) {
           #ifdef DEBUG_METIS

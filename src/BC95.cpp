@@ -409,7 +409,7 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData,
 bool checkMqttConnection() {
   ESP_LOGD(TAG, "SENDING TO Modem: AT+QMTCONN?");
 
-  bc95serial.println("AT+QMTCONN=?");
+  bc95serial.println("AT+QMTCONN?");
   char data[128];
   int bytesRead = readResponseBC(&bc95serial, data, 128);
   if (assertResponseBC("+QMTCONN: 0,3", data, bytesRead)) {

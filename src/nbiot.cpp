@@ -57,6 +57,7 @@ void nb_send(void *pvParameters) {
 }
 
 void NbIotManager::nb_init() {
+  initModem();
   sdLoadNbConfig(&nbConfig);
   if (strlen(nbConfig.ServerAddress) < 5) {
     ESP_LOGE(TAG, "Error in NB config, cant send");
@@ -64,9 +65,10 @@ void NbIotManager::nb_init() {
     return;
   }
 
+  resetModem();
+
   if (!configModem()) {
     ESP_LOGE(TAG, "Could not config modem");
-    delay(5000);
     this->initializeFailures++;
     return;
   }
@@ -221,7 +223,6 @@ void NbIotManager::loop() {
       this->mqttConnectFailures > MAX_MQTT_CONNECT_FAILURES ||
       this->subscribeFailures > MAX_MQTT_SUBSCRIBE_FAILURES) {
 
-    resetModem();
     this->nb_resetStatus();
     return;
   }

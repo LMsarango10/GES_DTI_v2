@@ -313,6 +313,9 @@ void NbIotManager::nb_readMessages() {
         rcommand((uint8_t *)base64Decoded, base64_length);
       }
     }
+    else {
+      ESP_LOGE(TAG, "MQTT message read failed with code %d", bytesRead);
+    }
   }
 }
 

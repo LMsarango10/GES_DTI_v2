@@ -419,7 +419,7 @@ bool checkMqttConnection() {
 }
 
 int readMqttSubData(char* buff, int bufflen) {
-  char data[256];
+  char data[2048];
   int bytesRead = readResponseBC(&bc95serial, data, sizeof(data));
 
   std::string response = std::string(data);

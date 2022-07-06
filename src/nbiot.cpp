@@ -286,7 +286,7 @@ void NbIotManager::nb_sendMessages() {
 
 void NbIotManager::nb_readMessages() {
   if (dataAvailable()) {
-    char data[256];
+    char data[2048];
     int bytesRead = readMqttSubData(data, sizeof(data));
 
     if (bytesRead > 0) {

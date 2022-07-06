@@ -435,19 +435,19 @@ int readMqttSubData(char* buff, int bufflen) {
   if (topicSecondQuote == std::string::npos) {
     return -3;
   }
-  int messageFirstQuote = response.find("\"", topicSecondQuote + 1);
-  if (messageFirstQuote == std::string::npos) {
+  int messageComma = response.find(",", topicSecondQuote + 1);
+  if (messageComma == std::string::npos) {
     return -4;
   }
 
-  int messageSecondQuote = response.find("\"", messageFirstQuote + 1);
-  if (messageSecondQuote == std::string::npos) {
+  int messageEnd = response.find("\n", messageComma + 1);
+  if (messageEnd == std::string::npos) {
     return -5;
   }
 
   // extract message between quotes
   std::string topic = response.substr(topicFirstQuote + 1, topicSecondQuote - topicFirstQuote - 1);
-  std::string message = response.substr(messageFirstQuote + 1, messageSecondQuote - messageFirstQuote - 1);
+  std::string message = response.substr(messageComma + 1, messageEnd - messageComma - 1);
   ESP_LOGD(TAG, "Message in Topic: %s", topic.c_str());
   ESP_LOGD(TAG, "Message: %s", message.c_str());
 

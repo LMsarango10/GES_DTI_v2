@@ -137,8 +137,8 @@ void NbIotManager::nb_connectMqtt() {
 
 void NbIotManager::nb_subscribeMqtt() {
   char topic[64];
-  sprintf(topic, "%s/application/%s/device/+/rx", nbConfig.GatewayId,
-          nbConfig.ApplicationId);
+  sprintf(topic, "%s/application/%s/device/%s/rx", nbConfig.GatewayId,
+          nbConfig.ApplicationId, this->devEui);
   if (subscribeMqtt(topic)) {
     ESP_LOGD(TAG, "MQTT SUBSCRIBED");
     subscribed = true;

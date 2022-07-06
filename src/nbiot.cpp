@@ -194,6 +194,10 @@ bool NbIotManager::nb_checkMqttConnected() {
 }
 
 bool NbIotManager::nb_checkStatus() {
+  if (millis() - this->nbLastStatusCheck < NB_STATUS_CHECK_TIME_MS)
+    return true;
+
+  this->nbLastStatusCheck = millis();
   if (!this->nb_checkNetworkRegister()) {
     this->registered = false;
     ESP_LOGD(TAG, "Network unregistered");

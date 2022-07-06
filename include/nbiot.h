@@ -21,6 +21,8 @@ extern "C" {
 #define MAX_MQTT_CONNECT_FAILURES 10
 #define MAX_MQTT_SUBSCRIBE_FAILURES 10
 
+#define NB_STATUS_CHECK_TIME_MS 60000
+
 class NbIotManager {
     ConfigBuffer_t nbConfig;
     char devEui[17];
@@ -38,6 +40,8 @@ class NbIotManager {
     int mqttConnectFailures;
     int subscribeFailures;
     int mqttSendFailures;
+
+    long nbLastStatusCheck;
 
     public:
         void loop();

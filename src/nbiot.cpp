@@ -64,10 +64,9 @@ void NbIotManager::nb_init() {
     return;
   }
 
-  resetModem();
-
   if (!configModem()) {
     ESP_LOGE(TAG, "Could not config modem");
+    delay(5000);
     this->initializeFailures++;
     return;
   }
@@ -222,6 +221,7 @@ void NbIotManager::loop() {
       this->mqttConnectFailures > MAX_MQTT_CONNECT_FAILURES ||
       this->subscribeFailures > MAX_MQTT_SUBSCRIBE_FAILURES) {
 
+    resetModem();
     this->nb_resetStatus();
     return;
   }

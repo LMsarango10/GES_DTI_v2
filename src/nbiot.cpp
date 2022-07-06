@@ -129,6 +129,7 @@ void NbIotManager::nb_connectMqtt() {
     mqttConnected = true;
     this->mqttConnectFailures = 0;
   } else {
+    ESP_LOGD(TAG, "MQTT CONNECTION FAILED");
     this->mqttConnectFailures++;
   }
   return;
@@ -149,6 +150,7 @@ void NbIotManager::nb_subscribeMqtt() {
 }
 
 void NbIotManager::nb_resetStatus() {
+  ESP_LOGD(TAG, "Reset nb status");
   registered = false;
   connected = false;
   mqttConnected = false;

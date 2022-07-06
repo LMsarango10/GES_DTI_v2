@@ -297,7 +297,7 @@ void NbIotManager::nb_readMessages() {
 
     if (bytesRead > 0) {
       ESP_LOGD(TAG, "MQTT message received");
-      StaticJsonDocument<48> doc;
+      StaticJsonDocument<1024> doc;
 
       DeserializationError error = deserializeJson(doc, data, bytesRead);
 

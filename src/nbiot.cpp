@@ -57,7 +57,6 @@ void nb_send(void *pvParameters) {
 }
 
 void NbIotManager::nb_init() {
-  initModem();
   sdLoadNbConfig(&nbConfig);
   if (strlen(nbConfig.ServerAddress) < 5) {
     ESP_LOGE(TAG, "Error in NB config, cant send");
@@ -326,6 +325,8 @@ esp_err_t nb_iot_init() {
   }
   ESP_LOGI(TAG, "NBIOT send queue created, size %d Bytes",
            SEND_QUEUE_SIZE * sizeof(MessageBuffer_t));
+
+  initModem();
 
   // start lorawan stack
   ESP_LOGI(TAG, "Starting NBIOT TASK...");

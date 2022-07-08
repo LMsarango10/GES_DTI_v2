@@ -71,6 +71,11 @@ void NbIotManager::nb_init() {
     this->initializeFailures++;
     return;
   }
+  if (!attachNetwork()) {
+    ESP_LOGE(TAG, "Could not attach network");
+    this->initializeFailures++;
+    return;
+  }
   this->initializeFailures = 0;
   initialized = true;
 }

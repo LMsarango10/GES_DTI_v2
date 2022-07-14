@@ -406,6 +406,63 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData,
   }
 }
 
+bool checkMqttConnection() {
+  ESP_LOGD(TAG, "SENDING TO Modem: AT+QMTCONN?");
+
+  bc95serial.println("AT+QMTCONN?");
+  char data[128];
+  int bytesRead = readResponseBC(&bc95serial, data, 128);
+  if (assertResponseBC("+QMTCONN: 0,3", data, bytesRead)) {
+    return true;
+  }
+  return false;
+}
+
+int readMqttSubData(char* buff, int bufflen) {
+  char data[2048];
+  int bytesRead = readResponseBC(&bc95serial, data, sizeof(data));
+
+  std::string response = std::string(data);
+  int firstResponse = response.find("+QMTRECV: 0,0,");
+  if (firstResponse == std::string::npos) {
+    return -1;
+  }
+  int topicFirstQuote = response.find("\"", firstResponse);
+  if (topicFirstQuote == std::string::npos) {
+    return -2;
+  }
+  int topicSecondQuote = response.find("\"", topicFirstQuote + 1);
+  if (topicSecondQuote == std::string::npos) {
+    return -3;
+  }
+  int messageComma = response.find(",", topicSecondQuote + 1);
+  if (messageComma == std::string::npos) {
+    return -4;
+  }
+
+  int messageEnd = response.find("\n", messageComma + 1);
+  if (messageEnd == std::string::npos) {
+    return -5;
+  }
+
+  // extract message between quotes
+  std::string topic = response.substr(topicFirstQuote + 1, topicSecondQuote - topicFirstQuote - 1);
+  std::string message = response.substr(messageComma + 1, messageEnd - messageComma - 1);
+  ESP_LOGD(TAG, "Message in Topic: %s", topic.c_str());
+  ESP_LOGD(TAG, "Message: %s", message.c_str());
+
+  // copy message to buffer
+  strncpy(buff, message.c_str(), bufflen);
+  return message.length();
+}
+
+bool dataAvailable() {
+  if (bc95serial.available()) {
+    return true;
+  }
+  return false;
+}
+
 int connectMqtt(char *url, int port, char *password, char *clientId) {
   ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTOPEN=0,\"%s\",%d", url, port);
 
@@ -461,7 +518,20 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
   return 0;
 }
 
-int subscribeMqtt(char *topic, int qos) {}
+bool subscribeMqtt(char *topic) {
+  ESP_LOGD(TAG, "SENDING TO Modem: AT+QMTSUB=0,1,\"%s\",%d", topic, 0);
+  bc95serial.print("AT+QMTSUB=0,1,\"");
+  bc95serial.print(topic);
+  bc95serial.print("\",");
+  bc95serial.println("0");
+  char data[128];
+  int bytesRead = readResponseBC(&bc95serial, data, 128);
+  if (!assertResponseBC("OK\r", data, bytesRead)) {
+    return false;
+  }
+  return true;
+}
+
 int unsubscribeMqtt(char *topic, int qos) {}
 int checkSubscriptionMqtt(char *message) {}
 int publishMqtt(char *topic, char *message, int qos) {

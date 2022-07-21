@@ -334,6 +334,12 @@ void BLECycle(void)
   }
   if(assertResponse("+INQS\r", buffer, bytesRead))
   {
+    int devicesDetected = getMacsFromBLE(buffer, bytesRead);
+      if(devicesDetected == 0) {
+        ESP_LOGV(TAG, "No devices detected");
+      } else {
+        ESP_LOGV(TAG, "%d devices detected", devicesDetected);
+      }
     ESP_LOGV(TAG, "finish INQ mode ");
     ESP_LOGV(TAG, "Response: %s", buffer);
   }

@@ -147,35 +147,25 @@ int getMacsFromBLE(char* buffer, int bytesRead)
   char* endPtr = nullptr;
 
   std::string response = std::string(buffer);
-  int startPos = -1;
-  int endPos = -1;
 
-  std::string macStr = "0000";
+  int startPos = response.find(" 0x") + 3;
+  std::string macStr = response.substr(startPos);
 
-  int totalMacs = 0;
-
-  while (macStr.length() > 0)
+  if (macStr.length() < 13)
   {
-    startPos = response.substr(endPos + 1).find("+INQ:") + 5;
-    endPos = response.substr(endPos + 1).find("\r", startPos);
-    macStr = response.substr(startPos, endPos - startPos);
-
-    if (macStr.length() < 13)
-    {
-      break;
-    }
-
-    ESP_LOGV(TAG, "MAC: %s", macStr.c_str());
-
-    uint8_t macBytes[6];
-    for (int i = 0; i < 6; i++)
-    {
-      macBytes[i] = strtoul(macStr.substr(i * 2, 2).c_str(), nullptr, 16);
-    }
-    totalMacs += 1;
-    mac_add((uint8_t *)macBytes, 0, MAC_SNIFF_BLE);
+    ESP_LOGE(TAG, "error reading mac, ignoring");
+    return 0;
   }
-  return totalMacs;
+
+  ESP_LOGV(TAG, "MAC: %s", macStr.c_str());
+
+  uint8_t macBytes[6];
+  for (int i = 0; i < 6; i++)
+  {
+    macBytes[i] = strtoul(macStr.substr(i * 2, 2).c_str(), nullptr, 16);
+  }
+  mac_add((uint8_t *)macBytes, 0, MAC_SNIFF_BLE);
+  return 1;
 }
 #endif
 
@@ -345,7 +335,8 @@ void BLECycle(void)
       }
       return;
     }
-    else {
+    if(assertResponse("+INQ:", buffer, bytesRead))
+    {
       devicesDetected += getMacsFromBLE(buffer, bytesRead);
     }
   }

@@ -142,7 +142,7 @@ int getMacsFromBLE(int totalMacs)
 #else
 int getMacsFromBLE(char* buffer, int bytesRead)
 {
-  if (!assertResponse("+INQ:", buffer, bytesRead)) return -1;
+  if (!assertResponse("+INQ:", buffer, bytesRead)) return 0;
 
   char* endPtr = nullptr;
 
@@ -304,24 +304,24 @@ void BLECycle(void)
   ESP_LOGV(TAG, "Set BLE inquiry mode");
   char buffer[512];
   BLESerial.println("AT+INQ");
-  int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+
+  //ENTER INQ MODE
+  ESP_LOGV(TAG, "start INQ mode ");
+  long start_time = millis();
+  delay(2000);
+  int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
   if(! assertResponse("+INQS\r", buffer, bytesRead))
   {
     ESP_LOGD(TAG, "Error setting BLE INQ mode");
     return;
   }
-
-  //ENTER INQ MODE
-  ESP_LOGV(TAG, "start INQ mode ");
-  long start_time = millis();
   while(millis() - start_time < (BTLE_SCAN_TIME/2) * 1000)
   {
-    bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 5000);
+    //bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 5000);
     if(assertResponse("+INQE\r", buffer, bytesRead))
     {
       ESP_LOGV(TAG, "finish INQ mode ");
       ESP_LOGV(TAG, "Response: %s", buffer);
-
 
       int devicesDetected = getMacsFromBLE(buffer, bytesRead);
       if(devicesDetected == 0) {

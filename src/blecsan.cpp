@@ -103,6 +103,7 @@ int getMacsFromBT(char* buff, int bytesRead)
   return 0;
 }
 
+#ifdef OLD_BLE_METHOD
 int getMacsFromBLE(int totalMacs)
 {
   if (totalMacs <= 0 )
@@ -138,6 +139,45 @@ int getMacsFromBLE(int totalMacs)
   }
   return 0;
 }
+#else
+int getMacsFromBLE(char* buffer, int bytesRead)
+{
+  if (!assertResponse("+INQ:", buffer, bytesRead)) return -1;
+
+  char* endPtr = nullptr;
+
+  std::string response = std::string(buffer);
+  int startPos = -1;
+  int endPos = -1;
+
+  std::string macStr = "0000";
+
+  int totalMacs = 0;
+
+  while (macStr.length() > 0)
+  {
+    startPos = response.substr(endPos + 1).find("+INQ:") + 5;
+    endPos = response.substr(endPos + 1).find("\r", startPos);
+    macStr = response.substr(startPos, endPos - startPos);
+
+    if (macStr.length() < 13)
+    {
+      break;
+    }
+
+    ESP_LOGV(TAG, "MAC: %s", macStr.c_str());
+
+    uint8_t macBytes[6];
+    for (int i = 0; i < 6; i++)
+    {
+      macBytes[i] = strtoul(macStr.substr(i * 2, 2).c_str(), nullptr, 16);
+    }
+    totalMacs += 1;
+    mac_add((uint8_t *)macBytes, 0, MAC_SNIFF_BLE);
+  }
+  return totalMacs;
+}
+#endif
 
 bool reinitBLE()
 {
@@ -215,7 +255,7 @@ bool initBLE()
   return reinitBLE();
 }
 
-
+#ifdef OLD_BLE_METHOD
 void BLECycle(void)
 {
   if(!cfg.blescan) return;
@@ -256,6 +296,51 @@ void BLECycle(void)
   }
   return;
 }
+#else
+void BLECycle(void)
+{
+  if(!cfg.blescan) return;
+  ESP_LOGV(TAG, "cycling ble scan");
+  ESP_LOGV(TAG, "Set BLE inquiry mode");
+  char buffer[512];
+  BLESerial.println("AT+INQ");
+  int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer));
+  if(! assertResponse("+INQS\r", buffer, bytesRead))
+  {
+    ESP_LOGD(TAG, "Error setting BLE INQ mode");
+    return;
+  }
+
+  //ENTER INQ MODE
+  ESP_LOGV(TAG, "start INQ mode ");
+  long start_time = millis();
+  while(millis() - start_time < (BTLE_SCAN_TIME/2) * 1000)
+  {
+    bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 5000);
+    if(assertResponse("+INQE\r", buffer, bytesRead))
+    {
+      ESP_LOGV(TAG, "finish INQ mode ");
+      ESP_LOGV(TAG, "Response: %s", buffer);
+
+
+      int devicesDetected = getMacsFromBLE(buffer, bytesRead);
+      if(devicesDetected == 0) {
+        ESP_LOGV(TAG, "No devices detected");
+      } else {
+        ESP_LOGV(TAG, "%d devices detected", devicesDetected);
+      }
+      return;
+    }
+  }
+  if(assertResponse("+INQS\r", buffer, bytesRead))
+  {
+    ESP_LOGV(TAG, "finish INQ mode ");
+    ESP_LOGV(TAG, "Response: %s", buffer);
+  }
+  return;
+}
+#endif
+
 bool reinitBT()
 {
   if (!(

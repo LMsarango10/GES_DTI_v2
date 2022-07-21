@@ -307,6 +307,7 @@ void BLECycle(void)
 
   //ENTER INQ MODE
   ESP_LOGV(TAG, "start INQ mode ");
+  buffer[0] = 0;
   int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
   if(! assertResponse("+INQS\r", buffer, bytesRead))
   {
@@ -314,6 +315,7 @@ void BLECycle(void)
     return;
   }
   delay(1000);
+  buffer[0] = 0;
   bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
   if(! assertResponse("Scanning...", buffer, bytesRead))
   {
@@ -325,9 +327,13 @@ void BLECycle(void)
   int devicesDetected = 0;
   while(bytesRead > 0 || (millis() - start_time < (BTLE_SCAN_TIME/2) * 1000) )
   {
+    buffer[0] = 0;
     bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 5000);
+    if(bytesRead <= 0)
+    {
+      break;
+    }
     ESP_LOGV(TAG, "Response: %s", buffer);
-    devicesDetected += getMacsFromBLE(buffer, bytesRead);
     if(assertResponse("+INQE\r", buffer, bytesRead))
     {
       ESP_LOGV(TAG, "finish INQ mode ");
@@ -338,6 +344,9 @@ void BLECycle(void)
         ESP_LOGV(TAG, "%d devices detected", devicesDetected);
       }
       return;
+    }
+    else {
+      devicesDetected += getMacsFromBLE(buffer, bytesRead);
     }
   }
   return;

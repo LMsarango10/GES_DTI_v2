@@ -479,11 +479,12 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
   int responseBytes = 0;
   if (!assertResponseBC("+QMTOPEN: 0,0", data, bytesRead)) {
     for (int i = 0; i < 30; i++) {
-      responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
+      responseBytes = readResponseBC(&bc95serial, data, 128, 1000);
       if (responseBytes != 0) {
         break;
       }
       ESP_LOGI(TAG, "Wait for conn");
+      delay(1000);
     }
     if (!assertResponseBC("+QMTOPEN: 0,0", data, responseBytes)) {
       return -1;
@@ -506,11 +507,12 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
   }
 
   for (int i = 0; i < 30; i++) {
-      responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
+      responseBytes = readResponseBC(&bc95serial, data, 128, 1000);
       if (responseBytes != 0) {
         break;
       }
       ESP_LOGI(TAG, "Wait for conn");
+      delay(1000);
     }
   if (!assertResponseBC("+QMTCONN: 0,0,0", data, responseBytes)) {
     return -2;

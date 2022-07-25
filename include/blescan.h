@@ -9,6 +9,7 @@
 #include "soc/timer_group_reg.h"
 
 #define BT_OLD_MODULE 1// para usar el viejo modulo
+// #define BT_OLD_MODULE2 1 // para usar versiones muy viejas que no inicializan BT
 
 #ifdef BT_OLD_MODULE
 #define BT_BAUD 38400

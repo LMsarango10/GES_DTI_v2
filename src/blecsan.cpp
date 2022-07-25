@@ -367,8 +367,8 @@ bool reinitBT()
   delay(5000);
   if (!(
     sendAndReadOkResponse(&BTSerial,"AT+CMODE=1") &&
-#ifdef BT_OLD_MODULE
-    //sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
+#ifdef BT_OLD_MODULE2
+    sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
 #endif
     sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7")))
     {

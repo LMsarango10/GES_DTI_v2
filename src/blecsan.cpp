@@ -17,6 +17,8 @@ int readResponse(HardwareSerial* port, char* buff, int b_size, uint32_t timeout=
   if(bytesRead > 0)
   {
     buff[bytesRead] = 0;
+    ESP_LOGD(TAG, "%d bytes read", bytesRead);
+    ESP_LOGD(TAG, "Message: %s", buff);
     return bytesRead;
   }
   else if (bytesRead < 0) return -1;

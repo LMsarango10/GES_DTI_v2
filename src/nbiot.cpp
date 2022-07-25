@@ -156,11 +156,11 @@ void NbIotManager::nb_subscribeMqtt() {
 
 void NbIotManager::nb_resetStatus() {
   ESP_LOGD(TAG, "Reset nb status");
+  initialized = false;
   registered = false;
   connected = false;
   mqttConnected = false;
   subscribed = false;
-  mqttConnected = false;
 
   consecutiveFailures = 0;
   initializeFailures = 0;
@@ -233,6 +233,7 @@ void NbIotManager::loop() {
       this->mqttConnectFailures > MAX_MQTT_CONNECT_FAILURES ||
       this->subscribeFailures > MAX_MQTT_SUBSCRIBE_FAILURES) {
 
+    ESP_LOGE(TAG, "Too many consecutive failures");
     this->nb_resetStatus();
     return;
   }

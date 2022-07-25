@@ -301,6 +301,14 @@ void BLECycle(void)
   ESP_LOGV(TAG, "start INQ mode ");
   buffer[0] = 0;
   int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
+#ifdef BLE_RETURNS_OK_ON_INIT
+  if(! assertResponse("OK", buffer, bytesRead))
+  {
+    ESP_LOGD(TAG, "Error setting BLE INQ mode");
+    return;
+  }
+  bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
+#endif
   if(! assertResponse("+INQS\r", buffer, bytesRead))
   {
     ESP_LOGD(TAG, "Error setting BLE INQ mode");
@@ -308,12 +316,14 @@ void BLECycle(void)
   }
   delay(1000);
   buffer[0] = 0;
+#ifdef BLE_RETURNS_SCANNING
   bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
   if(! assertResponse("Scanning...", buffer, bytesRead))
   {
     ESP_LOGD(TAG, "Error setting BLE INQ scanning mode");
     return;
   }
+#endif
   delay(5000);
   long start_time = millis();
   int devicesDetected = 0;
@@ -369,7 +379,7 @@ bool reinitBT()
   delay(5000);
   if (!(
     sendAndReadOkResponse(&BTSerial,"AT+CMODE=1") &&
-#ifdef BT_OLD_MODULE2
+#ifdef BT_REQUIRES_INIT
     sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
 #endif
     sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7")))

@@ -105,7 +105,7 @@ void resetModem() {
   delay(2000);
   int bytesRead = readResponseBC(&bc95serial, globalBuff, sizeof(globalBuff));
   assertResponseBC("REBOOTING", globalBuff, bytesRead);
-  delay(5000);
+  delay(7000);
   while (bc95serial.available() > 0)
     bc95serial.read();
   sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff));

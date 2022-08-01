@@ -71,11 +71,6 @@ void NbIotManager::nb_init() {
     this->initializeFailures++;
     return;
   }
-  if (!attachNetwork()) {
-    ESP_LOGE(TAG, "Could not attach network");
-    this->initializeFailures++;
-    return;
-  }
   this->initializeFailures = 0;
   initialized = true;
 }
@@ -158,12 +153,14 @@ void NbIotManager::nb_resetStatus() {
   ESP_LOGD(TAG, "Reset nb status");
   initialized = false;
   registered = false;
+  attached = false;
   connected = false;
   mqttConnected = false;
   subscribed = false;
 
   consecutiveFailures = 0;
   initializeFailures = 0;
+  attachFailures = 0;
   registerFailures = 0;
   connectFailures = 0;
   mqttConnectFailures = 0;
@@ -200,6 +197,16 @@ bool NbIotManager::nb_checkMqttConnected() {
   }
 }
 
+bool NbIotManager::nb_attachNetwork() {
+  if (!attachNetwork()) {
+    ESP_LOGE(TAG, "Could not attach network");
+    this->attachFailures++;
+    return false;
+  }
+  this->attachFailures = 0;
+  return true;
+}
+
 bool NbIotManager::nb_checkStatus() {
   if (millis() - this->nbLastStatusCheck < NB_STATUS_CHECK_TIME_MS)
     return true;
@@ -228,6 +235,7 @@ void NbIotManager::loop() {
 
   if (this->consecutiveFailures > MAX_CONSECUTIVE_FAILURES ||
       this->initializeFailures > MAX_INITIALIZE_FAILURES ||
+      this->attachFailures > MAX_ATTACH_FAILURES ||
       this->registerFailures > MAX_REGISTER_FAILURES ||
       this->connectFailures > MAX_CONNECT_FAILURES ||
       this->mqttConnectFailures > MAX_MQTT_CONNECT_FAILURES ||
@@ -245,6 +253,11 @@ void NbIotManager::loop() {
 
   if (!this->registered) {
     this->nb_registerNetwork();
+    return;
+  }
+
+  if (!this->attached) {
+    this->nb_attachNetwork();
     return;
   }
 

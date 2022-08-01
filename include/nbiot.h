@@ -18,6 +18,7 @@ extern "C" {
 #define MAX_INITIALIZE_FAILURES 10
 #define MAX_REGISTER_FAILURES 100
 #define MAX_CONNECT_FAILURES 10
+#define MAX_ATTACH_FAILURES 10
 #define MAX_MQTT_CONNECT_FAILURES 10
 #define MAX_MQTT_SUBSCRIBE_FAILURES 10
 
@@ -28,6 +29,7 @@ class NbIotManager {
     char devEui[17];
     bool initialized;
     bool registered;
+    bool attached;
     bool connected;
     bool mqttConnected;
     bool subscribed;
@@ -36,6 +38,7 @@ class NbIotManager {
     int consecutiveFailures;
     int initializeFailures;
     int registerFailures;
+    int attachFailures;
     int connectFailures;
     int mqttConnectFailures;
     int subscribeFailures;
@@ -50,6 +53,7 @@ class NbIotManager {
         void nb_loop();
         bool nb_connectModem();
         void nb_registerNetwork();
+        bool nb_attachNetwork();
         void nb_connectNetwork();
         void nb_connectMqtt();
         void nb_subscribeMqtt();

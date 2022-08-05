@@ -50,6 +50,9 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
   int8_t beaconID;    // beacon number in test monitor mode
   uint32_t hashedmac; // temporary buffer for generated hash value
 
+  // if it is NOT a locally administered ("random") mac, we don't count it
+  if (!(paddr[0] & 0b10)) return false;
+
 #if (VENDORFILTER)
   uint32_t *oui; // temporary buffer for vendor OUI
   oui = (uint32_t *)paddr;
@@ -185,6 +188,8 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
                                              : "BLTH",
                rssi, out, hashedmacbuff, macs_wifi, macs_ble, macs_bt,
                getFreeRAM());
+      ESP_LOGV(TAG, "MAC is: %02X%02X%02X%02X%02X%02X",
+      paddr[0],paddr[1],paddr[2],paddr[3],paddr[4],paddr[5]);
     }
 
 #if (VENDORFILTER)

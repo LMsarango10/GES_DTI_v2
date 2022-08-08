@@ -8,6 +8,7 @@
 #define TX_PIN 0
 
 #define NBSENDTIMEOUT 25000
+#define HTTP_READ_TIMEOUT 10000
 
 #define VODAFONE_VERSION
 //#define AUTO_VERSION
@@ -36,5 +37,6 @@ int checkSubscriptionMqtt(char *message);
 int publishMqtt(char *topic, char *message, int qos);
 int disconnectMqtt();
 int postPage(char *domainBuffer, int thisPort, char *page, char *thisData, char* identityKey);
+int getData(char *ip, int port, char *page, char *response);
 
 #endif

@@ -148,6 +148,9 @@ void NbIotManager::nb_subscribeMqtt() {
     ESP_LOGD(TAG, "MQTT SUBSCRIBED");
     subscribed = true;
     this->subscribeFailures = 0;
+    char buff[2048];
+    if(getData("82.223.84.231",8000,"/1.bin", buff) >= 0)
+      ESP_LOGD(TAG, "DATA: %s", buff);
   } else {
     this->subscribeFailures++;
   }

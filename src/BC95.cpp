@@ -239,7 +239,7 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
 {
   ESP_LOGV(TAG, "Sending data: %s", data);
   char outBuffer[256];
-  sprintf(outBuffer, "AT+NSOST=%d,%d,", socket, datalen);
+  sprintf(outBuffer, "AT+NSOSD=%d,%d,", socket, datalen);
   for (int i = 0; i < datalen; i++) {
     char b2[3];
     sprintf(b2, "%02X", data[i]);

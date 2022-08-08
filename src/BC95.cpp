@@ -237,7 +237,7 @@ bool connectSocket(int socket, char *ip, int port) {
 int sendData(int socket, char *data, int datalen, char *responseBuff,
              int responseBuffSize) // returns bytes read
 {
-  ESP_LOGV(TAG, "Sending data");
+  ESP_LOGV(TAG, "Sending data: %s", data);
   char outBuffer[256];
   sprintf(outBuffer, "AT+NSOST=%d,%d,", socket, datalen);
   for (int i = 0; i < datalen; i++) {
@@ -430,7 +430,6 @@ int getData(char *ip, int port, char *page, char *response) {
 
   // Open socket
   int socketN = openSocket();
-  char outBuf[256];
 
   bool connected = connectSocket(socketN, ip, port);
 

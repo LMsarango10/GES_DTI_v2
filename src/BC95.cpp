@@ -264,13 +264,11 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     delay(100);
     while (bc95serial.available()) {
       char value = bc95serial.read();
-      if (value != '\r' && value != '\n') {
-        responseBuff[buffPtr++] = value;
-        if (buffPtr == responseBuffSize) {
-          return -10;
-        }
-        responseBuff[buffPtr] = 0;
+      responseBuff[buffPtr++] = value;
+      if (buffPtr == responseBuffSize) {
+        return -10;
       }
+      responseBuff[buffPtr] = 0;
     }
     char expected[18];
     switch (status) {
@@ -300,7 +298,7 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     }
     case SENTOK: {
       ESP_LOGV(TAG, "SENTOK");
-      sprintf(expected, "+NSOSTR:1,101,1");
+      sprintf(expected, "+NSOSTR:%d,101,1",socket);
       char *val = strstr(responseBuff, expected);
       if (val != nullptr) {
         scanPtr = val + strlen(expected);

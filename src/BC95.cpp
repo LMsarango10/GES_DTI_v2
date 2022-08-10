@@ -354,7 +354,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
   char* scanPtr = buffer;
 
   unsigned long startT = millis();
-  while (millis() > startT + HTTP_READ_TIMEOUT) {
+  while (millis() > startT + HTTP_SOCKET_TIMEOUT) {
     delay(500);
     while (bc95serial.available()) {
       buffer[buffPtr++] =  bc95serial.read();
@@ -457,6 +457,9 @@ int getData(char *ip, int port, char *page, char *response) {
   }
 
   ESP_LOGV(TAG, "Data remaining: %s", globalBuff);
+  if(strlen(globalBuff) < 5) {
+    delay(HTTP_READ_TIMEOUT);
+  }
   int bytesReceived = getReceivedBytes(socketN, globalBuff, sizeof(globalBuff));
 
   ESP_LOGV(TAG, "Data received: %s", globalBuff);

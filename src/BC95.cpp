@@ -272,6 +272,7 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     char expected[18];
     switch (status) {
     case INIT: {
+      ESP_LOGV(TAG, "INIT");
       sprintf(expected, "1,%d", datalen);
       if (strlen(responseBuff) == strlen(expected)) {
         char *val = strstr(responseBuff, expected);
@@ -286,6 +287,7 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
       break;
     }
     case DATAOK: {
+      ESP_LOGV(TAG, "DATAOK");
       sprintf(expected, "OK");
       if (strlen(responseBuff) == strlen(expected)) {
         char *val = strstr(responseBuff, expected);
@@ -300,6 +302,7 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
       break;
     }
     case SENTOK: {
+      ESP_LOGV(TAG, "SENTOK");
       sprintf(expected, "+NSOSTR:1,101,1");
       if (strlen(responseBuff) == strlen(expected)) {
         char *val = strstr(responseBuff, expected);

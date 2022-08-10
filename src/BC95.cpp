@@ -355,9 +355,11 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
 
   unsigned long startT = millis();
   while (millis() > startT + HTTP_READ_TIMEOUT) {
+    delay(500);
     while (bc95serial.available()) {
-      char value = bc95serial.read();
-      buffer[buffPtr++] = value;
+      buffer[buffPtr++] =  bc95serial.read();
+      readBytes+=1;
+      ESP_LOGV(TAG, "char: %c", buffer[buffPtr-1]);
       if (buffPtr == bufferSize) {
         return -10;
       }
@@ -365,21 +367,28 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     }
 
     char expected[128];
+
+    sprintf(expected, "+NSONMI:%d", socket);
+    char *val = strstr(scanPtr, expected);
+    if (val != nullptr) {
+      char dataBuffer[2048];
+      int len = readResponseData(scanPtr, strlen(scanPtr), dataBuffer,
+                                 sizeof(dataBuffer));
+
+      scanPtr = val + strlen(expected);
+      ESP_LOGV(TAG, "Data received: %s", dataBuffer);
+      strcat(responseBuffer, dataBuffer);
+
+      continue;
+    }
+
     sprintf(expected, "+NSOCLI: %d", socket);
     ESP_LOGV(TAG, "Received: %s", buffer);
-    if (assertResponseBC(expected, buffer, readBytes)) {
+    val = strstr(scanPtr, expected);
+    if (val != nullptr) {
       ESP_LOGV(TAG, "Socket closed");
       strcpy(buffer, responseBuffer);
       return strlen(responseBuffer);
-    }
-
-    sprintf(expected, "+NSONMI:%d", socket);
-    if (assertResponseBC(expected, responseBuffer, readBytes)) {
-      char dataBuffer[2048];
-      int len = readResponseData(responseBuffer, readBytes, dataBuffer,
-                                 sizeof(dataBuffer));
-      ESP_LOGV(TAG, "Data received: %s", dataBuffer);
-      strcat(responseBuffer, dataBuffer);
     }
   };
 

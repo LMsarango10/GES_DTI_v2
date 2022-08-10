@@ -259,7 +259,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
   responseBuff[buffPtr] = 0;
   sendStatus status = INIT;
   while (!timeout) {
-    ESP_LOGV(TAG, "buff: %s", scanPtr);
     timeout = (millis() - startTime > NBSENDTIMEOUT);
     delay(100);
     while (bc95serial.available()) {
@@ -354,7 +353,8 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
   char* scanPtr = buffer;
 
   unsigned long startT = millis();
-  while (millis() > startT + HTTP_SOCKET_TIMEOUT) {
+  while (millis() > startT + HTTP_READ_TIMEOUT) {
+    ESP_LOGV(TAG, "buff: %s", scanPtr);
     delay(500);
     while (bc95serial.available()) {
       buffer[buffPtr++] =  bc95serial.read();
@@ -376,14 +376,13 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
                                  sizeof(dataBuffer));
 
       scanPtr = val + strlen(expected);
-      ESP_LOGV(TAG, "Data received: %s", dataBuffer);
+      ESP_LOGV(TAG, "Data received from server: %s", dataBuffer);
       strcat(responseBuffer, dataBuffer);
 
       continue;
     }
 
     sprintf(expected, "+NSOCLI: %d", socket);
-    ESP_LOGV(TAG, "Received: %s", buffer);
     val = strstr(scanPtr, expected);
     if (val != nullptr) {
       ESP_LOGV(TAG, "Socket closed");
@@ -456,10 +455,6 @@ int getData(char *ip, int port, char *page, char *response) {
     return -1;
   }
 
-  ESP_LOGV(TAG, "Data remaining: %s", globalBuff);
-  if(strlen(globalBuff) < 5) {
-    delay(HTTP_READ_TIMEOUT);
-  }
   int bytesReceived = getReceivedBytes(socketN, globalBuff, sizeof(globalBuff));
 
   ESP_LOGV(TAG, "Data received: %s", globalBuff);

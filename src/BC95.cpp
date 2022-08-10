@@ -258,6 +258,7 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
   responseBuff[buffPtr] = 0;
   sendStatus status = INIT;
   while (!timeout) {
+    ESP_LOGV(TAG, "buff: %s", responseBuff);
     timeout = (millis() - startTime > NBSENDTIMEOUT);
     delay(100);
     while (bc95serial.available()) {

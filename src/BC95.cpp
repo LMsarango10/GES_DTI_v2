@@ -246,14 +246,15 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     strcat(outBuffer, b2);
   }
   strcat(outBuffer, ",0x100,101");
-  if (!sendAndReadOkResponseBC(&bc95serial, outBuffer, globalBuff,
-                               sizeof(globalBuff))) {
+  responseBuff[0] = 0;
+  if (!sendAndReadOkResponseBC(&bc95serial, outBuffer, responseBuff,
+                               responseBuffSize)) {
     return -1;
   }
 
   bool timeout = false;
   unsigned long startTime = millis();
-  int buffPtr = 0;
+  int buffPtr = strlen(responseBuff);
   responseBuff[buffPtr] = 0;
   sendStatus status = INIT;
   while (!timeout) {

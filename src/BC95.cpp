@@ -310,6 +310,7 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     case RECOK: {
       ESP_LOGV(TAG, "RECOK");
       strcpy(responseBuff, scanPtr);
+      return strlen(responseBuff);
       break;
     }
     }

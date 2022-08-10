@@ -264,7 +264,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     delay(100);
     while (bc95serial.available()) {
       responseBuff[buffPtr++] = bc95serial.read();
-      ESP_LOGV(TAG, "val: %c", responseBuff[buffPtr - 1]);
       if (buffPtr == responseBuffSize) {
         return -10;
       }
@@ -273,7 +272,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     char expected[18];
     switch (status) {
     case INIT: {
-      ESP_LOGV(TAG, "INIT");
       sprintf(expected, "%d,%d\r\n", socket, datalen);
 
       char *val = strstr(responseBuff, expected);
@@ -285,7 +283,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
       break;
     }
     case DATAOK: {
-      ESP_LOGV(TAG, "DATAOK");
       sprintf(expected, "OK\r\n");
 
       char *val = strstr(responseBuff, expected);
@@ -297,7 +294,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
       break;
     }
     case SENTOK: {
-      ESP_LOGV(TAG, "SENTOK");
       sprintf(expected, "+NSOSTR:%d,101,1",socket);
       char *val = strstr(responseBuff, expected);
       if (val != nullptr) {
@@ -308,7 +304,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
       break;
     }
     case RECOK: {
-      ESP_LOGV(TAG, "RECOK");
       strcpy(responseBuff, scanPtr);
       return strlen(responseBuff);
       break;
@@ -452,7 +447,10 @@ int getData(char *ip, int port, char *page, char *response) {
     return -1;
   }
 
+  ESP_LOGV(TAG, "Data remaining: %s", globalBuff);
   int bytesReceived = getReceivedBytes(socketN, globalBuff, sizeof(globalBuff));
+
+  ESP_LOGV(TAG, "Data received: %s", globalBuff);
 
   if (bytesReceived < 0) {
     ESP_LOGE(TAG, "failed sending data with error code: %d", bytesReceived);

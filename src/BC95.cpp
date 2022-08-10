@@ -263,8 +263,8 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     timeout = (millis() - startTime > NBSENDTIMEOUT);
     delay(100);
     while (bc95serial.available()) {
-      char value = bc95serial.read();
-      responseBuff[buffPtr++] = value;
+      responseBuff[buffPtr++] = bc95serial.read();
+      ESP_LOGV(TAG, "val: %c", responseBuff[buffPtr - 1]);
       if (buffPtr == responseBuffSize) {
         return -10;
       }

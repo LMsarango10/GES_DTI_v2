@@ -417,6 +417,14 @@ int parseResponse(char *buff, int bytesReceived, int *responseCode) {
 
 int getData(char *ip, int port, char *page, char *response) {
   char outBuf[256];
+
+  int responseCode = 0;
+
+  // Open socket
+  int socketN = openSocket();
+
+  bool connected = connectSocket(socketN, ip, port);
+
   // send the header
   globalBuff[0] = 0;
   sprintf(outBuf, "GET %s HTTP/1.1\r\n", page);
@@ -424,14 +432,7 @@ int getData(char *ip, int port, char *page, char *response) {
   sprintf(outBuf, "Host: %s\r\n", ip);
   strcat(globalBuff, outBuf);
   strcat(globalBuff, "\r\n");
-
-  int responseCode = 0;
   ESP_LOGD(TAG, "Data string: %s", globalBuff);
-
-  // Open socket
-  int socketN = openSocket();
-
-  bool connected = connectSocket(socketN, ip, port);
 
   int sentOk = sendData(socketN, globalBuff, strlen(globalBuff), globalBuff,
                         sizeof(globalBuff));

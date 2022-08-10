@@ -255,10 +255,11 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
   bool timeout = false;
   unsigned long startTime = millis();
   int buffPtr = strlen(responseBuff);
+  char* scanPtr = responseBuff;
   responseBuff[buffPtr] = 0;
   sendStatus status = INIT;
   while (!timeout) {
-    ESP_LOGV(TAG, "buff: %s", responseBuff);
+    ESP_LOGV(TAG, "buff: %s", scanPtr);
     timeout = (millis() - startTime > NBSENDTIMEOUT);
     delay(100);
     while (bc95serial.available()) {
@@ -275,51 +276,47 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     switch (status) {
     case INIT: {
       ESP_LOGV(TAG, "INIT");
-      sprintf(expected, "1,%d", datalen);
-      if (strlen(responseBuff) == strlen(expected)) {
-        char *val = strstr(responseBuff, expected);
-        if (val != nullptr) {
-          buffPtr = 0;
-          responseBuff[buffPtr] = 0;
-          status = DATAOK;
-          continue;
-        }
-        return -1;
+      sprintf(expected, "%d,%d\r\n", socket, datalen);
+
+      char *val = strstr(responseBuff, expected);
+      if (val != nullptr) {
+        scanPtr = val + strlen(expected);
+        status = DATAOK;
+        continue;
       }
       break;
     }
     case DATAOK: {
       ESP_LOGV(TAG, "DATAOK");
-      sprintf(expected, "OK");
-      if (strlen(responseBuff) == strlen(expected)) {
-        char *val = strstr(responseBuff, expected);
-        if (val != nullptr) {
-          buffPtr = 0;
-          responseBuff[buffPtr] = 0;
-          status = SENTOK;
-          continue;
-        }
-        return -2;
+      sprintf(expected, "OK\r\n");
+
+      char *val = strstr(responseBuff, expected);
+      if (val != nullptr) {
+        scanPtr = val + strlen(expected);
+        status = SENTOK;
+        continue;
       }
       break;
     }
     case SENTOK: {
       ESP_LOGV(TAG, "SENTOK");
       sprintf(expected, "+NSOSTR:1,101,1");
-      if (strlen(responseBuff) == strlen(expected)) {
-        char *val = strstr(responseBuff, expected);
-        if (val != nullptr) {
-          buffPtr = 0;
-          responseBuff[buffPtr] = 0;
-          status = RECOK;
-          continue;
-        }
-        return -3;
+      char *val = strstr(responseBuff, expected);
+      if (val != nullptr) {
+        scanPtr = val + strlen(expected);
+        status = RECOK;
+        continue;
       }
+      break;
+    }
+    case RECOK: {
+      ESP_LOGV(TAG, "RECOK");
+      strcpy(responseBuff, scanPtr);
       break;
     }
     }
   }
+
   return 0;
 }
 

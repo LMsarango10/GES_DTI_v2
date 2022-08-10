@@ -353,15 +353,27 @@ int readResponseData(char *response, int responseLen, char *buffer,
 int getReceivedBytes(int socket, char *buffer, int bufferSize) {
   char responseBuffer[2048];
   ESP_LOGV(TAG, "Getting received bytes");
-  int readBytes =
-      readResponseBC(&bc95serial, responseBuffer, sizeof(responseBuffer));
+  int readBytes = strlen(buffer);
+  int buffPtr = readBytes;
+  char* scanPtr = buffer;
+
   unsigned long startT = millis();
-  while (readBytes > 0 || millis() > startT + HTTP_READ_TIMEOUT) {
+  while (millis() > startT + HTTP_READ_TIMEOUT) {
+    while (bc95serial.available()) {
+      char value = bc95serial.read();
+      buffer[buffPtr++] = value;
+      if (buffPtr == bufferSize) {
+        return -10;
+      }
+      buffer[buffPtr] = 0;
+    }
+
     char expected[128];
     sprintf(expected, "+NSOCLI: %d", socket);
     ESP_LOGV(TAG, "Received: %s", buffer);
-    if (assertResponseBC(expected, responseBuffer, readBytes)) {
+    if (assertResponseBC(expected, buffer, readBytes)) {
       ESP_LOGV(TAG, "Socket closed");
+      strcpy(buffer, responseBuffer);
       return strlen(responseBuffer);
     }
 
@@ -371,11 +383,8 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       int len = readResponseData(responseBuffer, readBytes, dataBuffer,
                                  sizeof(dataBuffer));
       ESP_LOGV(TAG, "Data received: %s", dataBuffer);
-      strcat(buffer, dataBuffer);
+      strcat(responseBuffer, dataBuffer);
     }
-
-    readBytes =
-        readResponseBC(&bc95serial, responseBuffer, sizeof(responseBuffer));
   };
 
   return strlen(buffer);

@@ -348,7 +348,7 @@ int readResponseData(char *response, int responseLen, char *buffer,
     tmp[2] = 0;
     buffer[i / 2] = strtoul(tmp, NULL, 16);
   }
-  buffer[strLen] = 0;
+  buffer[strLen/2] = 0;
   delete tempBuff;
   return strLen;
 }
@@ -383,7 +383,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       continue;
     }
     token = strtok(scanPtr, "\r\n");
-    scanPtr += strlen(token) + 1;
+    scanPtr += strlen(token);
 
     ESP_LOGD(TAG, "line scan: %s", token);
     sprintf(expected, "+NSONMI:%d", socket);

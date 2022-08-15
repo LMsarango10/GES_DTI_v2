@@ -329,7 +329,7 @@ int readResponseData(char *response, int responseLen, char *buffer,
   ESP_LOGD(TAG, "dataLen: %d", dataLen);
   ESP_LOGD(TAG, "strLen: %d", strLen);
 
-  if (false && dataLen != strLen / 2) {
+  if (dataLen != strLen / 2) {
     ESP_LOGE(TAG, "Size mismatch");
     return -1;
   }
@@ -349,7 +349,6 @@ int readResponseData(char *response, int responseLen, char *buffer,
   }
   buffer[strLen] = 0;
   delete tempBuff;
-  strcpy(response, endToken);
   return strLen;
 }
 
@@ -384,7 +383,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       if (len < 0) {
         return len;
       }
-      scanPtr = val + strlen(expected);
+      scanPtr = val + len;
       ESP_LOGV(TAG, "Data received from server: %s", dataBuffer);
       strcat(responseBuffer, dataBuffer);
 

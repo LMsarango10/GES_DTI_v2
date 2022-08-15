@@ -350,7 +350,7 @@ int readResponseData(char *response, int responseLen, char *buffer,
   }
   buffer[strLen] = 0;
   delete tempBuff;
-  return strLen;
+  return endToken - response;
 }
 
 int getReceivedBytes(int socket, char *buffer, int bufferSize) {
@@ -385,7 +385,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       if (len < 0) {
         return len;
       }
-      scanPtr = val + len;
+      scanPtr += len;
       ESP_LOGV(TAG, "Data received from server: %s", dataBuffer);
       strcat(responseBuffer, dataBuffer);
 
@@ -401,7 +401,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     }
   };
 
-  return strlen(buffer);
+  return -2;
 }
 
 int parseResponse(char *buff, int bytesReceived, int *responseCode) {

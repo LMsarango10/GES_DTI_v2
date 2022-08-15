@@ -329,7 +329,7 @@ int readResponseData(char *response, int responseLen, char *buffer,
   ESP_LOGD(TAG, "dataLen: %d", dataLen);
   ESP_LOGD(TAG, "strLen: %d", strLen);
 
-  if (dataLen != strLen / 2) {
+  if (false && dataLen != strLen / 2) {
     ESP_LOGE(TAG, "Size mismatch");
     return -1;
   }

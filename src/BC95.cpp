@@ -385,6 +385,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     token = strtok(scanPtr, "\r\n");
     scanPtr += strlen(token) + 1;
 
+    ESP_LOGD(TAG, "line scan: %s", token);
     sprintf(expected, "+NSONMI:%d", socket);
     val = strstr(token, expected);
     if (val != nullptr) {

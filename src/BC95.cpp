@@ -314,19 +314,23 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
   return 0;
 }
 
-int readResponseData(char *response, int responseLen, char *buffer,
-                     int bufferSize) {
+int readResponseData(std::string response, char *buffer, int bufferSize) {
   ESP_LOGV(TAG, "Reading response: %s", response);
-  char *socketPtr = strtok(response, ",");
-  char *lenPtr = strtok(NULL, ",");
-  char *dataPtr = strtok(NULL, "\r\n");
-  char *endToken = strtok(NULL, "\r\n");
-  int dataLen = strtoul(lenPtr, NULL, 10);
-  int strLen = strlen(dataPtr);
+  int socketIndex = response.find(",");
+  int lenIndex = response.find(",", socketIndex + 1);
+  int dataIndex = response.find("\r\n", lenIndex + 1);
+  int endIndex = response.find("\r\n", dataIndex + 1);
 
-  ESP_LOGD(TAG, "socketPtr: %s", socketPtr);
-  ESP_LOGD(TAG, "lenPtr: %s", lenPtr);
-  ESP_LOGD(TAG, "dataPtr: %s", dataPtr);
+  std::string socketString = response.substr(0, socketIndex);
+  std::string lenString = response.substr(socketIndex + 1, lenIndex - socketIndex - 1);
+  std::string dataString = response.substr(lenIndex + 1, dataIndex - lenIndex - 1);
+
+  int dataLen = strtoul(lenString.c_str(), NULL, 10);
+  int strLen = strlen(dataString.c_str());
+
+  ESP_LOGD(TAG, "socketPtr: %s", socketString.c_str());
+  ESP_LOGD(TAG, "lenPtr: %s", lenString.c_str());
+  ESP_LOGD(TAG, "dataPtr: %s", dataString.c_str());
   ESP_LOGD(TAG, "dataLen: %d", dataLen);
   ESP_LOGD(TAG, "strLen: %d", strLen);
 
@@ -341,7 +345,7 @@ int readResponseData(char *response, int responseLen, char *buffer,
   }
 
   char *tempBuff = new char[strLen + 1];
-  memcpy(tempBuff, dataPtr, strLen + 1);
+  memcpy(tempBuff, dataString.c_str(), strLen + 1);
   for (int i = 0; i < strLen; i += 2) {
     char tmp[3];
     memcpy(tmp, tempBuff + i, 2);
@@ -373,25 +377,23 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       }
       buffer[buffPtr] = 0;
     }
-
-    char expected[128];
+    std::string current = std::string(scanPtr);
+    char expected[32];
 
     sprintf(expected, "\r\n");
-    char *val = strstr(scanPtr, expected);
-    char *token = nullptr;
-    if (val == nullptr) {
+
+    if (current.find("\r\n") == std::string::npos) {
       continue;
     }
-    token = strtok(scanPtr, "\r\n");
-    scanPtr += strlen(token);
+    std::string line = current.substr(0, current.find("\r\n"));
 
-    ESP_LOGD(TAG, "line scan: %s", token);
+    scanPtr += line.length();
+
+    ESP_LOGD(TAG, "line scan: %s", line);
     sprintf(expected, "+NSONMI:%d", socket);
-    val = strstr(token, expected);
-    if (val != nullptr) {
+    if (line.find(expected) != std::string::npos) {
       char dataBuffer[2048];
-      int len = readResponseData(token, strlen(token), dataBuffer,
-                                 sizeof(dataBuffer));
+      int len = readResponseData(line, dataBuffer, sizeof(dataBuffer));
       if (len < 0) {
         return len;
       }
@@ -402,8 +404,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     }
 
     sprintf(expected, "+NSOCLI: %d", socket);
-    val = strstr(token, expected);
-    if (val != nullptr) {
+    if (line.find(expected) != std::string::npos) {
       ESP_LOGV(TAG, "Socket closed");
       strcpy(buffer, responseBuffer);
       return strlen(responseBuffer);

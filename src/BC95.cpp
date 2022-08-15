@@ -376,16 +376,24 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
 
     char expected[128];
 
-    sprintf(expected, "+NSONMI:%d", socket);
+    sprintf(expected, "\r\n");
     char *val = strstr(scanPtr, expected);
+    char *token = nullptr;
+    if (val == nullptr) {
+      continue;
+    }
+    token = strtok(scanPtr, "\r\n");
+    scanPtr += strlen(token) + 1;
+
+    sprintf(expected, "+NSONMI:%d", socket);
+    val = strstr(token, expected);
     if (val != nullptr) {
       char dataBuffer[2048];
-      int len = readResponseData(scanPtr, strlen(scanPtr), dataBuffer,
+      int len = readResponseData(token, strlen(token), dataBuffer,
                                  sizeof(dataBuffer));
       if (len < 0) {
         return len;
       }
-      scanPtr += len;
       ESP_LOGV(TAG, "Data received from server: %s", dataBuffer);
       strcat(responseBuffer, dataBuffer);
 
@@ -393,7 +401,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     }
 
     sprintf(expected, "+NSOCLI: %d", socket);
-    val = strstr(scanPtr, expected);
+    val = strstr(token, expected);
     if (val != nullptr) {
       ESP_LOGV(TAG, "Socket closed");
       strcpy(buffer, responseBuffer);
@@ -401,6 +409,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     }
   };
 
+  strcpy(buffer, responseBuffer);
   return -2;
 }
 

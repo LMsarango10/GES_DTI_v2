@@ -353,7 +353,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
   char* scanPtr = buffer;
 
   unsigned long startT = millis();
-  while (millis() > startT + HTTP_READ_TIMEOUT) {
+  while (millis() < startT + HTTP_READ_TIMEOUT) {
     ESP_LOGV(TAG, "buff: %s", scanPtr);
     delay(500);
     while (bc95serial.available()) {

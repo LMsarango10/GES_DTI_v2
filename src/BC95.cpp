@@ -527,6 +527,7 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
     if (parsedData >= 0) {
       memcpy(responseBuffer, globalBuff, parsedData);
       *responseSizePtr = parsedData;
+      responseBuffer[parsedData] = 0;
       return responseCode;
     }
   } else {

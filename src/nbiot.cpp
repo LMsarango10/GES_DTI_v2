@@ -47,6 +47,34 @@ uint16_t getCount(uint8_t *buffer) {
   return ((buffer[0] << 8) & 0xFF00) + (buffer[1] & 0x00FF);
 }
 
+bool NbIotManager::nb_checkLastSoftwareVersion()
+{
+  char buff[2048];
+  int responseSize = 0;
+  if(getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT,UPDATES_SERVER_INDEX, buff, sizeof(buff), &responseSize) >= 0)
+  {
+    ESP_LOGD(TAG, "INDEX: %s", buff);
+    ESP_LOGD(TAG, "DATALEN: %d", responseSize);
+    strcpy(updatesServerResponse, buff);
+
+    ESP_LOGD(TAG, "Current Version: %s", PROGVERSION);
+    std::string bufferString = std::string(updatesServerResponse);
+    std::size_t found = bufferString.find("\r\n");
+    if (found != std::string::npos)
+    {
+      std::string version = bufferString.substr(0, found);
+      ESP_LOGD(TAG, "Latest Version: %s", version.c_str());
+      if(strcmp(version.c_str(), PROGVERSION) != 0)
+      {
+        ESP_LOGI(TAG, "New Version available: %s", version.c_str());
+        return true;
+      }
+      lastUpdateCheck = millis();
+    }
+  }
+  return false;
+}
+
 void nb_send(void *pvParameters) {
   configASSERT(((uint32_t)pvParameters) == 1); // FreeRTOS check
   NbIotManager manager = NbIotManager();
@@ -148,13 +176,6 @@ void NbIotManager::nb_subscribeMqtt() {
     ESP_LOGD(TAG, "MQTT SUBSCRIBED");
     subscribed = true;
     this->subscribeFailures = 0;
-    char buff[2048];
-    int responseSize = 0;
-    if(getData("82.223.84.231",8000,"/1.bin", buff, sizeof(buff), &responseSize) >= 0)
-    {
-      ESP_LOGD(TAG, "DATA: %s", buff);
-      ESP_LOGD(TAG, "DATALEN: %d", responseSize);
-    }
   } else {
     this->subscribeFailures++;
   }
@@ -274,6 +295,11 @@ void NbIotManager::loop() {
     ESP_LOGD(TAG, "NB status changed");
     return;
   }
+
+  if (this->lastUpdateCheck + UPDATES_CHECK_INTERVAL < millis()) {
+    this->nb_checkLastSoftwareVersion();
+  }
+
   this->nb_readMessages();
   this->nb_sendMessages();
   this->consecutiveFailures = 0;

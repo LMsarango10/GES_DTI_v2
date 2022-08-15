@@ -14,6 +14,11 @@ extern "C" {
 #include "crypto/base64.h"
 }
 
+#define UPDATES_SERVER_IP "82.223.84.231"
+#define UPDATES_SERVER_PORT 8000
+#define UPDATES_SERVER_INDEX "/index.txt"
+#define UPDATES_CHECK_INTERVAL 30*1000
+
 #define MAX_CONSECUTIVE_FAILURES 10
 #define MAX_INITIALIZE_FAILURES 10
 #define MAX_REGISTER_FAILURES 100
@@ -43,6 +48,9 @@ class NbIotManager {
 
     long nbLastStatusCheck;
 
+    char updatesServerResponse[1600];
+    long lastUpdateCheck;
+
     public:
         void loop();
     private:
@@ -60,6 +68,7 @@ class NbIotManager {
         bool nb_checkNetworkRegister();
         bool nb_checkNetworkConnected();
         bool nb_checkMqttConnected();
+        bool nb_checkLastSoftwareVersion();
 };
 
 extern TaskHandle_t nbIotTask;

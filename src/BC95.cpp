@@ -315,7 +315,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
 }
 
 int readResponseData(std::string response, char *buffer, int bufferSize) {
-  ESP_LOGV(TAG, "Reading response: %s", response);
   int socketIndex = response.find(",");
   int lenIndex = response.find(",", socketIndex + 1);
   int dataIndex = response.find("\r\n", lenIndex + 1);
@@ -327,12 +326,6 @@ int readResponseData(std::string response, char *buffer, int bufferSize) {
 
   int dataLen = strtoul(lenString.c_str(), NULL, 10);
   int strLen = strlen(dataString.c_str());
-
-  ESP_LOGD(TAG, "socketPtr: %s", socketString.c_str());
-  ESP_LOGD(TAG, "lenPtr: %s", lenString.c_str());
-  ESP_LOGD(TAG, "dataPtr: %s", dataString.c_str());
-  ESP_LOGD(TAG, "dataLen: %d", dataLen);
-  ESP_LOGD(TAG, "strLen: %d", strLen);
 
   if (dataLen != strLen / 2) {
     ESP_LOGE(TAG, "Size mismatch");
@@ -367,7 +360,6 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
 
   unsigned long startT = millis();
   while (millis() < startT + HTTP_READ_TIMEOUT) {
-    ESP_LOGV(TAG, "buff: %s", scanPtr);
     delay(500);
     while (bc95serial.available()) {
       buffer[buffPtr++] =  bc95serial.read();
@@ -391,7 +383,6 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
 
     scanPtr += line.length();
 
-    ESP_LOGD(TAG, "line scan: %s", line.c_str());
     sprintf(expected, "+NSONMI:%d", socket);
     if (line.find(expected) != std::string::npos) {
       char dataBuffer[2048];
@@ -399,7 +390,6 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       if (len < 0) {
         return len;
       }
-      ESP_LOGV(TAG, "Data received from server: %s", dataBuffer);
       strcat(responseBuffer, dataBuffer);
 
       continue;
@@ -451,7 +441,43 @@ int parseResponse(char *buff, int bytesReceived, int *responseCode) {
   return bodyLen;
 }
 
-int getData(char *ip, int port, char *page, char *response) {
+int parseResponseCode(char* buff, int buffSize)
+{
+  std::string inputString = std::string(buff);
+  size_t pos = inputString.find("\r\n");
+  if(pos == std::string::npos)
+  {
+    return -1;
+  }
+
+  std::string httpResponseLine = inputString.substr(0, pos+2);
+  ESP_LOGV(TAG, "Response line: %s", httpResponseLine.c_str());
+
+  size_t responseCodePos = httpResponseLine.find(" ");
+  size_t responseCodePosEnd = httpResponseLine.find(" ", responseCodePos+1);
+
+  std::string responseCodeStr = httpResponseLine.substr(responseCodePos+1, responseCodePosEnd-responseCodePos-1);
+  ESP_LOGV(TAG, "Response code: %s", responseCodeStr.c_str());
+  return strtoul(responseCodeStr.c_str(), NULL, 10);
+}
+
+int parseData(char* buff, int buffSize, char* outBuff, int outBuffSize)
+{
+  std::string inputString = std::string(buff);
+  size_t pos = inputString.find("\r\n\r\n");
+  if(pos == std::string::npos)
+  {
+    return -1;
+  }
+
+  size_t endPos = inputString.find("\r\n\r\n", pos+4);
+  std::string dataStr = inputString.substr(pos+4, endPos-pos-4);
+  ESP_LOGV(TAG, "Data: %s", dataStr.c_str());
+  memcpy(outBuff, dataStr.c_str(), dataStr.length());
+  return dataStr.length();
+}
+
+int getData(char *ip, int port, char *page, char *responseBuffer, int responseBufferSize, int *responseSizePtr) {
   char outBuf[256];
 
   int responseCode = 0;
@@ -486,21 +512,22 @@ int getData(char *ip, int port, char *page, char *response) {
     ESP_LOGE(TAG, "failed sending data with error code: %d", bytesReceived);
     responseCode = bytesReceived;
   } else if (bytesReceived > 0) {
-    if (receiveData(globalBuff, bytesReceived, sizeof(globalBuff))) {
-      ESP_LOGD(TAG, "Received %d bytes", bytesReceived);
-      ESP_LOGD(TAG, "%s", globalBuff);
-      int bodyBytes = parseResponse(globalBuff, bytesReceived, &responseCode);
-      if (bodyBytes < 0) {
-        ESP_LOGE(TAG, "Error: %d while parsing response", bodyBytes);
-        responseCode = -12;
-      } else {
-        ESP_LOGD(TAG, "Response Code: %d", responseCode);
-        ESP_LOGD(TAG, "Body: %s", globalBuff);
-      }
-    } else {
-      cleanbuffer();
-      ESP_LOGE(TAG, "Failed retrieving data");
-      responseCode = -11;
+    ESP_LOGD(TAG, "Received %d bytes", bytesReceived);
+    responseCode = parseResponseCode(globalBuff, bytesReceived);
+    ESP_LOGD(TAG, "Response Code: %d", responseCode);
+
+    if (responseCode != 200) {
+      ESP_LOGE(TAG, "Error code: %d", responseCode);
+      return responseCode;
+    }
+
+    char* inputBuffer = new char[bytesReceived + 1];
+    memcpy(inputBuffer, globalBuff, bytesReceived);
+    int parsedData = parseData(inputBuffer, bytesReceived, globalBuff, sizeof(globalBuff));
+    if (parsedData >= 0) {
+      memcpy(responseBuffer, globalBuff, parsedData);
+      *responseSizePtr = parsedData;
+      return responseCode;
     }
   } else {
     ESP_LOGE(TAG, "Timeout");

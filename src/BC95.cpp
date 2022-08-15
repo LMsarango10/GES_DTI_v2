@@ -382,14 +382,16 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
 
     sprintf(expected, "\r\n");
 
-    if (current.find("\r\n") == std::string::npos) {
+    size_t pos = current.find(expected);
+    if (pos == std::string::npos) {
       continue;
     }
-    std::string line = current.substr(0, current.find("\r\n"));
+
+    std::string line = current.substr(0, pos);
 
     scanPtr += line.length();
 
-    ESP_LOGD(TAG, "line scan: %s", line);
+    ESP_LOGD(TAG, "line scan: %s", line.c_str());
     sprintf(expected, "+NSONMI:%d", socket);
     if (line.find(expected) != std::string::npos) {
       char dataBuffer[2048];

@@ -350,7 +350,7 @@ int readResponseData(char *response, int responseLen, char *buffer,
   }
   buffer[strLen] = 0;
   delete tempBuff;
-  return endToken - response;
+  return strLen;
 }
 
 int getReceivedBytes(int socket, char *buffer, int bufferSize) {

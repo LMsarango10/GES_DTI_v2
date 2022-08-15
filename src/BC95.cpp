@@ -318,7 +318,8 @@ int readResponseData(char *response, int responseLen, char *buffer,
   ESP_LOGV(TAG, "Reading response: %s", response);
   char *socketPtr = strtok(response, ",");
   char *lenPtr = strtok(NULL, ",");
-  char *dataPtr = strtok(NULL, ",");
+  char *dataPtr = strtok(NULL, "\r\n");
+  char *endToken = strtok(NULL, "\r\n");
   int dataLen = strtoul(lenPtr, NULL, 10);
   int strLen = strlen(dataPtr);
 
@@ -348,6 +349,7 @@ int readResponseData(char *response, int responseLen, char *buffer,
   }
   buffer[strLen] = 0;
   delete tempBuff;
+  strcpy(response, endToken);
   return strLen;
 }
 
@@ -365,7 +367,6 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     while (bc95serial.available()) {
       buffer[buffPtr++] =  bc95serial.read();
       readBytes+=1;
-      ESP_LOGV(TAG, "char: %c", buffer[buffPtr-1]);
       if (buffPtr == bufferSize) {
         return -10;
       }

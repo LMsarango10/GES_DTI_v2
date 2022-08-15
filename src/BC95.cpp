@@ -387,7 +387,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       continue;
     }
 
-    std::string line = current.substr(0, pos);
+    std::string line = current.substr(0, pos + 2);
 
     scanPtr += line.length();
 

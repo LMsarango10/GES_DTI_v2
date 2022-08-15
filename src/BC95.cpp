@@ -70,6 +70,7 @@ bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command,
 
 void initModem() {
   bc95serial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
+  bc95serial.setRxBufferSize(4096);
   // pinMode(RESET_PIN, OUTPUT);
   //  digitalWrite(RESET_PIN, HIGH);
 

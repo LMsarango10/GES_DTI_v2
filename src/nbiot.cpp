@@ -151,7 +151,10 @@ void NbIotManager::nb_subscribeMqtt() {
     char buff[2048];
     int responseSize = 0;
     if(getData("82.223.84.231",8000,"/1.bin", buff, sizeof(buff), &responseSize) >= 0)
+    {
       ESP_LOGD(TAG, "DATA: %s", buff);
+      ESP_LOGD(TAG, "DATALEN: %d", responseSize);
+    }
   } else {
     this->subscribeFailures++;
   }

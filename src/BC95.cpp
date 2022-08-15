@@ -355,6 +355,7 @@ int readResponseData(char *response, int responseLen, char *buffer,
 
 int getReceivedBytes(int socket, char *buffer, int bufferSize) {
   char responseBuffer[2048];
+  responseBuffer[0] = 0;
   ESP_LOGV(TAG, "Getting received bytes");
   int readBytes = strlen(buffer);
   int buffPtr = readBytes;

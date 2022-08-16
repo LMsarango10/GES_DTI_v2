@@ -55,9 +55,13 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   CRC32 crcFile;
   crcFile.reset();
 
+    ESP_LOGD(TAG, "File size: %d", fileSize);
   // Here we add each byte to the checksum, caclulating the checksum as we go.
   for (size_t i = 0; i < fileSize; i++) {
     crcFile.update(buff[i]);
+    if (i > fileSize - 20) {
+      ESP_LOGD(TAG, "f: %02x", buff[i]);
+    }
   }
 
   // Once we have added all of the data, generate the final CRC32 checksum.

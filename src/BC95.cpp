@@ -404,6 +404,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     if (line.find(expected) != std::string::npos) {
       ESP_LOGV(TAG, "Socket closed");
       strcpy(buffer, responseBuffer);
+      buffer[strlen(responseBuffer)] = 0;
       return strlen(responseBuffer);
     }
   };

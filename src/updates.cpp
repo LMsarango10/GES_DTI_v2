@@ -148,7 +148,7 @@ bool downloadUpdates(std::string index) {
 
     ESP_LOGD(TAG, "Number of parts: %d", parts);
 
-    for (int i = 0; i < parts; i++) {
+    for (int i = 1; i <= parts; i++) {
       if (!downloadFile(i)) {
         ESP_LOGE(TAG, "Failed to download file number: %d", i);
         return false;

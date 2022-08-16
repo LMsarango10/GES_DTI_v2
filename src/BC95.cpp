@@ -355,6 +355,7 @@ int readResponseData(std::string response, char *buffer, int bufferSize) {
 int getReceivedBytes(int socket, char *buffer, int bufferSize) {
   char responseBuffer[2048];
   responseBuffer[0] = 0;
+  size_t responseBufferPos = 0;
   ESP_LOGV(TAG, "Getting received bytes");
   int readBytes = strlen(buffer);
   int buffPtr = readBytes;
@@ -362,7 +363,6 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
 
   unsigned long startT = millis();
   while (millis() < startT + HTTP_READ_TIMEOUT) {
-    delay(500);
     while (bc95serial.available()) {
       buffer[buffPtr++] =  bc95serial.read();
       readBytes+=1;
@@ -393,9 +393,10 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
         return len;
       }
       ESP_LOGE(TAG, "datalen: %d", len);
-      ESP_LOGE(TAG, "data str len: %d", strlen(dataBuffer));
-      strcat(responseBuffer, dataBuffer);
-      ESP_LOGE(TAG, "responsebuff len after append: %d", strlen(responseBuffer));
+      ESP_LOGE(TAG, "responsebuff pos before append: %d", responseBufferPos);
+      memcpy(responseBuffer + responseBufferPos, dataBuffer, len);
+      responseBufferPos += len;
+      ESP_LOGE(TAG, "responsebuff pos append: %d", responseBufferPos);
 
       continue;
     }
@@ -403,13 +404,13 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     sprintf(expected, "+NSOCLI: %d", socket);
     if (line.find(expected) != std::string::npos) {
       ESP_LOGV(TAG, "Socket closed");
-      strcpy(buffer, responseBuffer);
-      buffer[strlen(responseBuffer)] = 0;
-      return strlen(responseBuffer);
+      memcpy(buffer, responseBuffer, responseBufferPos);
+      buffer[responseBufferPos] = 0;
+      return responseBufferPos;
     }
   };
 
-  strcpy(buffer, responseBuffer);
+  memcpy(buffer, responseBuffer, responseBufferPos);
   return -2;
 }
 
@@ -535,6 +536,7 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
 
     char* inputBuffer = new char[bytesReceived + 1];
     memcpy(inputBuffer, globalBuff, bytesReceived);
+    inputBuffer[bytesReceived] = 0;
     int parsedData = parseData(inputBuffer, bytesReceived, globalBuff, sizeof(globalBuff));
     if (parsedData >= 0) {
       memcpy(responseBuffer, globalBuff, parsedData);

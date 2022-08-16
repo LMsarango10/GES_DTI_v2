@@ -4,7 +4,7 @@
 #include <CRC32.h>
 #include <Update.h>
 
-#define UPDATE_FOLDER "/update"
+#define UPDATE_FOLDER "update"
 
 
 bool checkUpdateFile(char * filename, uint32_t crc);

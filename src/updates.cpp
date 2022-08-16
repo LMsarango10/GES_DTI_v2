@@ -11,7 +11,7 @@ bool savePartUpdateFile(int fileNumber, char *buff, int size) {
   }
 
   char filename[20];
-  sprintf(filename, "update/%d.bin", fileNumber);
+  sprintf(filename, "%s/%d.bin", UPDATE_FOLDER,fileNumber);
 
   File file;
   if (!createFile(filename, file)) {
@@ -72,15 +72,18 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
 }
 
 bool unifyUpdates(int parts) {
+  char finalFilename[20];
+  sprintf(finalFilename, "%s/final.bin", UPDATE_FOLDER);
+
   File finalFile;
-  if (!createFile("update/final.bin", finalFile)) {
+  if (!createFile(finalFilename, finalFile)) {
     ESP_LOGE(TAG, "Failed to create final file");
     return false;
   }
   for (int i = 1; i <= parts; i++) {
     File file;
     char filename[20];
-    sprintf(filename, "%d.bin", i);
+    sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, i);
 
     if (!openFile(filename, file)) {
       ESP_LOGE(TAG, "Failed to open file number: %d", i);
@@ -98,11 +101,11 @@ bool unifyUpdates(int parts) {
 
 bool downloadFile(int i) {
   char filename[20];
-  sprintf(filename, "%d.bin", i);
+  sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, i);
   ESP_LOGD(TAG, "Downloading %s", filename);
 
   char checksum[20];
-  sprintf(checksum, "%d.sum", i);
+  sprintf(checksum, "%s/%d.sum", UPDATE_FOLDER, i);
   ESP_LOGD(TAG, "Downloading %s", checksum);
 
   char buff[2048];
@@ -189,8 +192,10 @@ bool performUpdate(Stream &updateSource, size_t updateSize) {
 // check given FS for valid update.bin and perform update if available
 bool updateFromFS() {
   bool result = false;
+  char finalFilename[20];
+  sprintf(finalFilename, "%s/final.bin", UPDATE_FOLDER);
   File updateBin;
-  if (!openFile("update/final.bin", updateBin)) {
+  if (!openFile(finalFilename, updateBin)) {
     ESP_LOGE(TAG, "Failed to open final update file");
     return false;
   }

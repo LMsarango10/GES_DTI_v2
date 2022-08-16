@@ -392,7 +392,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       if (len < 0) {
         return len;
       }
-      ESP_LOGE(TAG, "datalen: %s", len);
+      ESP_LOGE(TAG, "datalen: %d", len);
       ESP_LOGE(TAG, "data str len: %d", strlen(dataBuffer));
       ESP_LOGE(TAG, "responsebuff len before append: %d", strlen(responseBuffer));
       strcat(responseBuffer, dataBuffer);

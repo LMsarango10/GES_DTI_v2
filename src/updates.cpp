@@ -101,11 +101,11 @@ bool unifyUpdates(int parts) {
 
 bool downloadFile(int i) {
   char filename[20];
-  sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, i);
+  sprintf(filename, "%d.bin", i);
   ESP_LOGD(TAG, "Downloading %s", filename);
 
   char checksum[20];
-  sprintf(checksum, "%s/%d.sum", UPDATE_FOLDER, i);
+  sprintf(checksum, "%d.sum", i);
   ESP_LOGD(TAG, "Downloading %s", checksum);
 
   char buff[2048];

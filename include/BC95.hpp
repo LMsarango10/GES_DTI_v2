@@ -1,6 +1,7 @@
 #ifndef _BC95_H
 #define _BC95_H
 #include <Arduino.h>
+#include "lorawan.h"
 
 //#define bc95serial Serial1
 //#define RESET_PIN 25

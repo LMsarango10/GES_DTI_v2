@@ -11,7 +11,7 @@ bool savePartUpdateFile(int fileNumber, char *buff, int size) {
   }
 
   char filename[20];
-  sprintf(filename, "%s/%d.bin", UPDATE_FOLDER,fileNumber);
+  sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, fileNumber);
 
   File file;
   if (!createFile(filename, file)) {
@@ -99,7 +99,36 @@ bool unifyUpdates(int parts) {
   return true;
 }
 
-bool downloadFile(int i) {
+bool downloadChecksumFile(int i, uint32_t* crcBuffer, int bufferSize) {
+  char filename[20];
+  sprintf(filename, "%d.chk", i);
+  ESP_LOGD(TAG, "Downloading %s", filename);
+
+  char buff[2048];
+  int responseSize = 0;
+
+  if (getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT, filename, buff,
+              sizeof(buff), &responseSize) >= 0) {
+    if (responseSize > 0) {
+        int checksumsPerFile = responseSize / sizeof(uint32_t);
+        for (int i = 0; i < checksumsPerFile; i++) {
+          uint32_t crc = *((uint32_t *)&buff[i * sizeof(uint32_t)]);
+          if( i >= bufferSize ) {
+            ESP_LOGE(TAG, "Buffer overflow");
+            return false;
+          }
+          crcBuffer[i] = crc;
+          if (i == responseSize) {
+            break;
+          }
+        }
+        return true;
+    }
+  }
+  return false;
+}
+
+bool downloadFile(int i, uint32_t crc) {
   char filename[20];
   sprintf(filename, "%d.bin", i);
   ESP_LOGD(TAG, "Downloading %s", filename);
@@ -119,19 +148,9 @@ bool downloadFile(int i) {
       }
     }
   }
-  if (getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT, checksum, buff,
-              sizeof(buff), &responseSize) >= 0) {
-    if (responseSize > 0) {
-      long val = 0;
-      val += buff[0] << 24;
-      val += buff[1] << 16;
-      val += buff[2] << 8;
-      val += buff[3];
-      if (!checkUpdateFile(i, val)) {
-        ESP_LOGE(TAG, "Failed to save checksum file number: %d", i);
-        return false;
-      }
-    }
+  if (!checkUpdateFile(i, crc)) {
+    ESP_LOGE(TAG, "Checksum fail for file: %d", i);
+    return false;
   }
 }
 
@@ -150,15 +169,40 @@ bool downloadUpdates(std::string index) {
       return false;
     }
 
-    ESP_LOGD(TAG, "Number of parts: %d", parts);
+    const char *checksumsPerFileStr = index.substr(found + 2).c_str();
+    long checksumsPerFile = strtol(checksumsPerFileStr, &end, 10);
 
-    for (int i = 1; i <= parts; i++) {
-      if (!downloadFile(i)) {
-        ESP_LOGE(TAG, "Failed to download file number: %d", i);
-        return false;
-      }
+    if (end == checksumsPerFileStr || errno == ERANGE) {
+      ESP_LOGE(TAG, "Invalid number of checksums per part: %s",
+               checksumsPerFileStr);
+      return false;
     }
 
+    ESP_LOGD(TAG, "Number of parts: %d", parts);
+    ESP_LOGD(TAG, "Number of checksums per file: %d", checksumsPerFile);
+
+    uint32_t* crcBuffer = new uint32_t[parts];
+    for (int i = 1; i <= parts; i += checksumsPerFile) {
+        uint32_t* tempBuffer = new uint32_t[checksumsPerFile];
+        downloadChecksumFile(i, tempBuffer, checksumsPerFile);
+        for (int j = 0; j < checksumsPerFile; j++) {
+            if( i - 1 + j >= parts ) {
+                break;
+            }
+            crcBuffer[i - 1 + j] = tempBuffer[j];
+        }
+        delete tempBuffer;
+    }
+
+    for (int i = 1; i <= parts; i++) {
+      if (!downloadFile(i, crcBuffer[i-1])) {
+        ESP_LOGE(TAG, "Failed to download file number: %d", i);
+        delete crcBuffer;
+        return false;
+      }
+
+    }
+    delete crcBuffer;
     return unifyUpdates(parts);
   }
 }

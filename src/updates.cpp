@@ -77,11 +77,10 @@ bool unifyUpdates(int parts) {
     ESP_LOGE(TAG, "Failed to create final file");
     return false;
   }
-  for (int i = 0; i < parts; i++) {
+  for (int i = 1; i <= parts; i++) {
     File file;
     char filename[20];
     sprintf(filename, "%d.bin", i);
-    ESP_LOGD(TAG, "Downloading %s", filename);
 
     if (!openFile(filename, file)) {
       ESP_LOGE(TAG, "Failed to open file number: %d", i);

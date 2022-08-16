@@ -451,6 +451,7 @@ void btHandler(void *pvParameters)
   ESP_LOGV(TAG,"start loop");
   while(true)
   {
+    continue;
     setSerialToBT();
     if(btInitialized)
       BTCycle(BT_BAUD);

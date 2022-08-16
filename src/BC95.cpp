@@ -349,7 +349,7 @@ int readResponseData(std::string response, char *buffer, int bufferSize) {
   }
   buffer[strLen/2] = 0;
   delete tempBuff;
-  return strLen;
+  return dataLen;
 }
 
 int getReceivedBytes(int socket, char *buffer, int bufferSize) {
@@ -392,7 +392,11 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       if (len < 0) {
         return len;
       }
+      ESP_LOGE(TAG, "datalen: %s", len);
+      ESP_LOGE(TAG, "data str len: %d", strlen(dataBuffer));
+      ESP_LOGE(TAG, "responsebuff len before append: %d", strlen(responseBuffer));
       strcat(responseBuffer, dataBuffer);
+      ESP_LOGE(TAG, "responsebuff len after append: %d", strlen(responseBuffer));
 
       continue;
     }

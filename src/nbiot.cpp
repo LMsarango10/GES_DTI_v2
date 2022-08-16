@@ -306,6 +306,10 @@ void NbIotManager::loop() {
       if(downloadUpdates(std::string(updatesServerResponse)))
       {
         ESP_LOGD(TAG, "Updates downloaded");
+        if(updateFromFS())
+        {
+          ESP_LOGD(TAG, "Updates installed");
+        }
       }
     }
   }

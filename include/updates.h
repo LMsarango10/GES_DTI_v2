@@ -9,3 +9,4 @@
 
 bool checkUpdateFile(char * filename, uint32_t crc);
 bool downloadUpdates(std::string index);
+bool updateFromFS(void);

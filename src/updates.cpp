@@ -69,66 +69,66 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   return true;
 }
 
-bool unifyUpdates(int parts)
-{
-    File finalFile;
-    if (!createFile("update/final.bin", finalFile)) {
-        ESP_LOGE(TAG, "Failed to create final file");
-        return false;
-    }
-    for (int i = 0; i < parts; i++) {
-        File file;
-        char filename[20];
-        sprintf(filename, "%d.bin", i);
-        ESP_LOGD(TAG, "Downloading %s", filename);
-
-        if (!openFile(filename, file)) {
-            ESP_LOGE(TAG, "Failed to open file number: %d", i);
-            return false;
-        }
-        ESP_LOGD(TAG, "Reading file number: %d", i);
-        while (file.available()) {
-            finalFile.write(file.read());
-        }
-        file.close();
-    }
-    finalFile.close();
-    return true;
-}
-
-bool downloadFile(int i)
-{
+bool unifyUpdates(int parts) {
+  File finalFile;
+  if (!createFile("update/final.bin", finalFile)) {
+    ESP_LOGE(TAG, "Failed to create final file");
+    return false;
+  }
+  for (int i = 0; i < parts; i++) {
+    File file;
     char filename[20];
     sprintf(filename, "%d.bin", i);
     ESP_LOGD(TAG, "Downloading %s", filename);
 
-    char checksum[20];
-    sprintf(checksum, "%d.sum", i);
-    ESP_LOGD(TAG, "Downloading %s", checksum);
+    if (!openFile(filename, file)) {
+      ESP_LOGE(TAG, "Failed to open file number: %d", i);
+      return false;
+    }
+    ESP_LOGD(TAG, "Reading file number: %d", i);
+    while (file.available()) {
+      finalFile.write(file.read());
+    }
+    file.close();
+  }
+  finalFile.close();
+  return true;
+}
 
-    char buff[2048];
-    int responseSize = 0;
-    if(getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT, filename, buff, sizeof(buff), &responseSize) >= 0) {
-        if(responseSize > 0) {
-            if(!savePartUpdateFile(i, buff, responseSize)) {
-                ESP_LOGE(TAG, "Failed to save file number: %d", i);
-                return false;
-            }
-        }
+bool downloadFile(int i) {
+  char filename[20];
+  sprintf(filename, "%d.bin", i);
+  ESP_LOGD(TAG, "Downloading %s", filename);
+
+  char checksum[20];
+  sprintf(checksum, "%d.sum", i);
+  ESP_LOGD(TAG, "Downloading %s", checksum);
+
+  char buff[2048];
+  int responseSize = 0;
+  if (getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT, filename, buff,
+              sizeof(buff), &responseSize) >= 0) {
+    if (responseSize > 0) {
+      if (!savePartUpdateFile(i, buff, responseSize)) {
+        ESP_LOGE(TAG, "Failed to save file number: %d", i);
+        return false;
+      }
     }
-    if(getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT, checksum, buff, sizeof(buff), &responseSize) >= 0) {
-        if(responseSize > 0) {
-            long val = 0;
-            val += buff[0] << 24;
-            val += buff[1] << 16;
-            val += buff[2] << 8;
-            val += buff[3];
-            if(!checkUpdateFile(i, val)) {
-                ESP_LOGE(TAG, "Failed to save checksum file number: %d", i);
-                return false;
-            }
-        }
+  }
+  if (getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT, checksum, buff,
+              sizeof(buff), &responseSize) >= 0) {
+    if (responseSize > 0) {
+      long val = 0;
+      val += buff[0] << 24;
+      val += buff[1] << 16;
+      val += buff[2] << 8;
+      val += buff[3];
+      if (!checkUpdateFile(i, val)) {
+        ESP_LOGE(TAG, "Failed to save checksum file number: %d", i);
+        return false;
+      }
     }
+  }
 }
 
 bool downloadUpdates(std::string index) {
@@ -149,71 +149,69 @@ bool downloadUpdates(std::string index) {
     ESP_LOGD(TAG, "Number of parts: %d", parts);
 
     for (int i = 0; i < parts; i++) {
-        if (!downloadFile(i)) {
-            ESP_LOGE(TAG, "Failed to download file number: %d", i);
-            return false;
-        }
+      if (!downloadFile(i)) {
+        ESP_LOGE(TAG, "Failed to download file number: %d", i);
+        return false;
+      }
     }
 
     return unifyUpdates(parts);
   }
 }
 
-void performUpdate(Stream &updateSource, size_t updateSize) {
-   if (Update.begin(updateSize)) {
-      size_t written = Update.writeStream(updateSource);
-      if (written == updateSize) {
-         ESP_LOGD(TAG, "Written : %d bytes successfully", written);
+bool performUpdate(Stream &updateSource, size_t updateSize) {
+  if (Update.begin(updateSize)) {
+    size_t written = Update.writeStream(updateSource);
+    if (written == updateSize) {
+      ESP_LOGD(TAG, "Written : %d bytes successfully", written);
+    } else {
+      ESP_LOGD(TAG, "Written only : %d/%d. Retry?", written, updateSize);
+    }
+    if (Update.end()) {
+      ESP_LOGI(TAG, "OTA done!");
+      if (Update.isFinished()) {
+        ESP_LOGI(TAG, "Update successfully completed. Rebooting.");
+        return true;
+      } else {
+        ESP_LOGE(TAG, "Update not finished? Something went wrong!");
       }
-      else {
-         ESP_LOGD(TAG, "Written only : %d/%d. Retry?", written, updateSize);
-      }
-      if (Update.end()) {
-         ESP_LOGI(TAG, "OTA done!");
-         if (Update.isFinished()) {
-            ESP_LOGI(TAG, "Update successfully completed. Rebooting.");
-         }
-         else {
-            ESP_LOGE(TAG, "Update not finished? Something went wrong!");
-         }
-      }
-      else {
-         ESP_LOGE(TAG, "Error Occurred. Error #: %d", Update.getError());
-      }
+    } else {
+      ESP_LOGE(TAG, "Error Occurred. Error #: %d", Update.getError());
+    }
 
-   }
-   else
-   {
-      ESP_LOGW(TAG, "Not enough space to begin OTA");
-   }
+  } else {
+    ESP_LOGW(TAG, "Not enough space to begin OTA");
+  }
+  return false;
 }
 
 // check given FS for valid update.bin and perform update if available
-void updateFromFS() {
-   File updateBin;
-    if (!openFile("update/final.bin", updateBin)) {
-        ESP_LOGE(TAG, "Failed to open final update file");
-    }
-   if (updateBin) {
-      if(updateBin.isDirectory()){
-         ESP_LOGW(TAG, "Error, update.bin is not a file");
-         updateBin.close();
-         return;
-      }
-
-      size_t updateSize = updateBin.size();
-
-      if (updateSize > 0) {
-         ESP_LOGD(TAG, "Try to start update");
-         performUpdate(updateBin, updateSize);
-      }
-      else {
-         ESP_LOGW(TAG, "Error, file is empty");
-      }
-
+bool updateFromFS() {
+  bool result = false;
+  File updateBin;
+  if (!openFile("update/final.bin", updateBin)) {
+    ESP_LOGE(TAG, "Failed to open final update file");
+    return false;
+  }
+  if (updateBin) {
+    if (updateBin.isDirectory()) {
+      ESP_LOGW(TAG, "Error, update.bin is not a file");
       updateBin.close();
-   }
-   else {
-      ESP_LOGW(TAG, "Could not load update.bin from sd root");
-   }
+      return false;
+    }
+
+    size_t updateSize = updateBin.size();
+
+    if (updateSize > 0) {
+      ESP_LOGD(TAG, "Try to start update");
+      result = performUpdate(updateBin, updateSize);
+    } else {
+      ESP_LOGW(TAG, "Error, file is empty");
+    }
+
+    updateBin.close();
+  } else {
+    ESP_LOGW(TAG, "Could not load update.bin from sd root");
+  }
+  return result;
 }

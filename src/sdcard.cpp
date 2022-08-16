@@ -28,6 +28,11 @@ bool createFile(std::string filename, File &file)
 {
   if (!useSDCard)
     return false;
+
+  char* path_c = (char*)filename.c_str();
+  if (SD.exists(path_c)) {
+    SD.remove(path_c);
+  }
   file = SD.open(filename.c_str(), FILE_WRITE);
   if (!fileSDCard) {
     ESP_LOGE(TAG, "Failed to open file for writing");

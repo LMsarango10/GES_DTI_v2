@@ -403,12 +403,13 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     sprintf(expected, "+NSOCLI: %d", socket);
     if (line.find(expected) != std::string::npos) {
       ESP_LOGV(TAG, "Socket closed");
+      responseBuffer[responseBufferPos] = 0;
       memcpy(buffer, responseBuffer, responseBufferPos);
       return responseBufferPos;
     }
   };
 
-  strcpy(buffer, responseBuffer);
+  memcpy(buffer, responseBuffer, responseBufferPos);
   return -2;
 }
 

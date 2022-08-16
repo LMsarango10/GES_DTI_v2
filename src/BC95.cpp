@@ -471,7 +471,7 @@ int parseData(char* buff, int buffSize, char* outBuff, int outBuffSize)
 
   size_t endPos = inputString.find("\r\n\r\n", pos+4);
   std::string dataStr = inputString.substr(pos+4, endPos-pos-4);
-  ESP_LOGV(TAG, "Data: %s", dataStr.c_str());
+  //ESP_LOGV(TAG, "Data: %s", dataStr.c_str());
   memcpy(outBuff, dataStr.c_str(), dataStr.length());
   return dataStr.length();
 }

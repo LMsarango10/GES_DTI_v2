@@ -24,6 +24,46 @@ bool sdcardInit() {
   return useSDCard;
 }
 
+bool createFile(std::string filename, File &file)
+{
+  if (!useSDCard)
+    return false;
+  file = SD.open(filename.c_str(), FILE_WRITE);
+  if (!fileSDCard) {
+    ESP_LOGE(TAG, "Failed to open file for writing");
+    return false;
+  }
+  return true;
+}
+
+bool openFile(std::string filename, File &file)
+{
+  if (!useSDCard)
+    return false;
+  file = SD.open(filename.c_str());
+  if (!fileSDCard) {
+    ESP_LOGE(TAG, "Failed to open file for reading");
+    return false;
+  }
+  return true;
+}
+
+bool createFolder(std::string path)
+{
+  if (!useSDCard)
+    return false;
+  char* path_c = (char*)path.c_str();
+  return SD.mkdir(path_c);
+}
+
+bool folderExists(std::string path)
+{
+  if (!useSDCard)
+    return false;
+  char* path_c = (char*)path.c_str();
+  return SD.exists(path_c);
+}
+
 void sdcardWriteData(uint16_t noWifi, uint16_t noBle) {
   static int counterWrites = 0;
   char tempBuffer[12 + 1];

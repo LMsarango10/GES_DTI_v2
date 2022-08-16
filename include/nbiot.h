@@ -9,6 +9,7 @@
 #include <Ticker.h>
 #include <TimeLib.h>
 #include "lorawan.h"
+#include "updates.h"
 
 extern "C" {
 #include "crypto/base64.h"

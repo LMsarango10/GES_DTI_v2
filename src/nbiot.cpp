@@ -51,11 +51,17 @@ bool NbIotManager::nb_checkLastSoftwareVersion()
 {
   char buff[2048];
   int responseSize = 0;
+  lastUpdateCheck = millis();
   if(getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT,UPDATES_SERVER_INDEX, buff, sizeof(buff), &responseSize) >= 0)
   {
     ESP_LOGD(TAG, "INDEX: %s", buff);
     ESP_LOGD(TAG, "DATALEN: %d", responseSize);
     strcpy(updatesServerResponse, buff);
+
+    if (responseSize <= 0) {
+      ESP_LOGD(TAG, "No response from server");
+      return false;
+    }
 
     ESP_LOGD(TAG, "Current Version: %s", PROGVERSION);
     std::string bufferString = std::string(updatesServerResponse);
@@ -69,7 +75,6 @@ bool NbIotManager::nb_checkLastSoftwareVersion()
         ESP_LOGI(TAG, "New Version available: %s", version.c_str());
         return true;
       }
-      lastUpdateCheck = millis();
     }
   }
   return false;
@@ -297,7 +302,12 @@ void NbIotManager::loop() {
   }
 
   if (this->lastUpdateCheck + UPDATES_CHECK_INTERVAL < millis()) {
-    this->nb_checkLastSoftwareVersion();
+    if(this->nb_checkLastSoftwareVersion()) {
+      if(downloadUpdates(std::string(updatesServerResponse)))
+      {
+        ESP_LOGD(TAG, "Updates downloaded");
+      }
+    }
   }
 
   this->nb_readMessages();

@@ -359,7 +359,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
 
   unsigned long startT = millis();
   while (millis() < startT + HTTP_READ_TIMEOUT) {
-    //delay(500);
+    delay(500);
     while (bc95serial.available()) {
       buffer[buffPtr++] =  bc95serial.read();
       readBytes+=1;

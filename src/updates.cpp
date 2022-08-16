@@ -72,7 +72,7 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
 bool unifyUpdates(int parts)
 {
     File finalFile;
-    if (!createFile("/update/final.bin", finalFile)) {
+    if (!createFile("update/final.bin", finalFile)) {
         ESP_LOGE(TAG, "Failed to create final file");
         return false;
     }
@@ -157,4 +157,63 @@ bool downloadUpdates(std::string index) {
 
     return unifyUpdates(parts);
   }
+}
+
+void performUpdate(Stream &updateSource, size_t updateSize) {
+   if (Update.begin(updateSize)) {
+      size_t written = Update.writeStream(updateSource);
+      if (written == updateSize) {
+         ESP_LOGD(TAG, "Written : %d bytes successfully", written);
+      }
+      else {
+         ESP_LOGD(TAG, "Written only : %d/%d. Retry?", written, updateSize);
+      }
+      if (Update.end()) {
+         ESP_LOGI(TAG, "OTA done!");
+         if (Update.isFinished()) {
+            ESP_LOGI(TAG, "Update successfully completed. Rebooting.");
+         }
+         else {
+            ESP_LOGE(TAG, "Update not finished? Something went wrong!");
+         }
+      }
+      else {
+         ESP_LOGE(TAG, "Error Occurred. Error #: %d", Update.getError());
+      }
+
+   }
+   else
+   {
+      ESP_LOGW(TAG, "Not enough space to begin OTA");
+   }
+}
+
+// check given FS for valid update.bin and perform update if available
+void updateFromFS() {
+   File updateBin;
+    if (!openFile("update/final.bin", updateBin)) {
+        ESP_LOGE(TAG, "Failed to open final update file");
+    }
+   if (updateBin) {
+      if(updateBin.isDirectory()){
+         ESP_LOGW(TAG, "Error, update.bin is not a file");
+         updateBin.close();
+         return;
+      }
+
+      size_t updateSize = updateBin.size();
+
+      if (updateSize > 0) {
+         ESP_LOGD(TAG, "Try to start update");
+         performUpdate(updateBin, updateSize);
+      }
+      else {
+         ESP_LOGW(TAG, "Error, file is empty");
+      }
+
+      updateBin.close();
+   }
+   else {
+      ESP_LOGW(TAG, "Could not load update.bin from sd root");
+   }
 }

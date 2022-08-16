@@ -2,6 +2,7 @@
 #include <globals.h>
 #include <sdcard.h>
 #include <CRC32.h>
+#include <Update.h>
 
 #define UPDATE_FOLDER "/update"
 

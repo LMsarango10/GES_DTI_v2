@@ -52,6 +52,7 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   }
 
   CRC32 crcFile;
+  crcFile.reset();
 
   // Here we add each byte to the checksum, caclulating the checksum as we go.
   for (size_t i = 0; i < res; i++) {

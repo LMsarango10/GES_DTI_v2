@@ -511,7 +511,7 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
 
   int bytesReceived = getReceivedBytes(socketN, globalBuff, sizeof(globalBuff));
 
-  ESP_LOGV(TAG, "Data received: %s", globalBuff);
+  //ESP_LOGV(TAG, "Data received: %s", globalBuff);
 
   if (bytesReceived < 0) {
     ESP_LOGE(TAG, "failed sending data with error code: %d", bytesReceived);

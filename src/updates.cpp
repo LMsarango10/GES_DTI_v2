@@ -141,7 +141,7 @@ bool downloadUpdates(std::string index) {
     char *end;
     long parts = strtol(partsStr, &end, 10);
 
-    if (end == partsStr || *end != '\0' || errno == ERANGE) {
+    if (end == partsStr || errno == ERANGE) {
       ESP_LOGE(TAG, "Invalid number of parts: %s", partsStr);
       return false;
     }

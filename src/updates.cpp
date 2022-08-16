@@ -44,6 +44,7 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
 
   char buff[2048];
   size_t res = updateFile.readBytes(buff, sizeof(buff));
+  size_t fileSize = updateFile.size();
   updateFile.close();
 
   if (res <= 0) {
@@ -55,7 +56,7 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   crcFile.reset();
 
   // Here we add each byte to the checksum, caclulating the checksum as we go.
-  for (size_t i = 0; i < res; i++) {
+  for (size_t i = 0; i < fileSize; i++) {
     crcFile.update(buff[i]);
   }
 

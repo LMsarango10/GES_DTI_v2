@@ -114,8 +114,8 @@ bool downloadChecksumFile(int i, uint32_t *crcBuffer, int bufferSize,
       std::string fileString = std::string(buff);
       unsigned long pos = 0;
       for (int i = 0; i < checksumsPerFile; i++) {
-        unsigned long endPos = fileString.find("\r\n", pos + 2);
-        std::string crcLine = fileString.substr(pos, endPos - pos);
+        unsigned long endPos = fileString.find("\r\n", pos);
+        std::string crcLine = fileString.substr(pos, endPos + 2 - pos);
         if (endPos == std::string::npos) {
           break;
         }
@@ -126,6 +126,7 @@ bool downloadChecksumFile(int i, uint32_t *crcBuffer, int bufferSize,
           return false;
         }
         crcBuffer[i] = crc;
+        pos = endPos + 2;
       }
       return true;
     }

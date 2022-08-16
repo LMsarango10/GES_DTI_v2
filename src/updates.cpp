@@ -208,6 +208,8 @@ bool updateFromFS() {
 
     size_t updateSize = updateBin.size();
 
+    ESP_LOGD(TAG, "Update file: %s", updateBin.readString().c_str());
+
     if (updateSize > 0) {
       ESP_LOGD(TAG, "Try to start update");
       result = performUpdate(updateBin, updateSize);

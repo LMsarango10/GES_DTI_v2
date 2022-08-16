@@ -478,6 +478,11 @@ int parseData(char* buff, int buffSize, char* outBuff, int outBuffSize)
 }
 
 int getData(char *ip, int port, char *page, char *responseBuffer, int responseBufferSize, int *responseSizePtr) {
+  char devEui[32];
+  sprintf(devEui, "%02x%02x%02x%02x%02x%02x%02x%02x", DEVEUI[0],
+          DEVEUI[1], DEVEUI[2], DEVEUI[3], DEVEUI[4], DEVEUI[5], DEVEUI[6],
+          DEVEUI[7]);
+
   char outBuf[256];
 
   int responseCode = 0;
@@ -487,9 +492,11 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
 
   bool connected = connectSocket(socketN, ip, port);
 
+  char pageWithParams[256];
+  sprintf(pageWithParams, "%s?deveui=%s", page, devEui);
   // send the header
   globalBuff[0] = 0;
-  sprintf(outBuf, "GET %s HTTP/1.1\r\n", page);
+  sprintf(outBuf, "GET %s HTTP/1.1\r\n", pageWithParams);
   strcat(globalBuff, outBuf);
   sprintf(outBuf, "Host: %s\r\n", ip);
   strcat(globalBuff, outBuf);

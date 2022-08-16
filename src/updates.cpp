@@ -169,7 +169,8 @@ bool downloadUpdates(std::string index) {
       return false;
     }
 
-    const char *checksumsPerFileStr = index.substr(found + 2).c_str();
+    char *checksumsPerFileStr = new char[strlen(end) + 1];
+    strcpy(checksumsPerFileStr, end);
     long checksumsPerFile = strtol(checksumsPerFileStr, &end, 10);
 
     if (end == checksumsPerFileStr || errno == ERANGE) {

@@ -238,7 +238,6 @@ bool connectSocket(int socket, char *ip, int port) {
 int sendData(int socket, char *data, int datalen, char *responseBuff,
              int responseBuffSize) // returns bytes read
 {
-  ESP_LOGV(TAG, "Sending data: %s", data);
   char outBuffer[256];
   sprintf(outBuffer, "AT+NSOSD=%d,%d,", socket, datalen);
   for (int i = 0; i < datalen; i++) {
@@ -501,7 +500,6 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
   sprintf(outBuf, "Host: %s\r\n", ip);
   strcat(globalBuff, outBuf);
   strcat(globalBuff, "\r\n");
-  ESP_LOGD(TAG, "Data string: %s", globalBuff);
 
   int sentOk = sendData(socketN, globalBuff, strlen(globalBuff), globalBuff,
                         sizeof(globalBuff));

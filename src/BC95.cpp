@@ -355,7 +355,6 @@ int readResponseData(std::string response, char *buffer, int bufferSize) {
 int getReceivedBytes(int socket, char *buffer, int bufferSize) {
   char responseBuffer[2048];
   responseBuffer[0] = 0;
-  size_t responseBufferPos = 0;
   ESP_LOGV(TAG, "Getting received bytes");
   int readBytes = strlen(buffer);
   int buffPtr = readBytes;
@@ -393,23 +392,23 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       if (len < 0) {
         return len;
       }
+      ESP_LOGE(TAG, "datalen: %d", len);
+      ESP_LOGE(TAG, "data str len: %d", strlen(dataBuffer));
+      strcat(responseBuffer, dataBuffer);
+      ESP_LOGE(TAG, "responsebuff len after append: %d", strlen(responseBuffer));
 
-      for (int i =0; i < len; i++) {
-        responseBuffer[responseBufferPos++] = dataBuffer[i];
-      }
       continue;
     }
 
     sprintf(expected, "+NSOCLI: %d", socket);
     if (line.find(expected) != std::string::npos) {
       ESP_LOGV(TAG, "Socket closed");
-      responseBuffer[responseBufferPos] = 0;
-      memcpy(buffer, responseBuffer, responseBufferPos);
-      return responseBufferPos;
+      strcpy(buffer, responseBuffer);
+      return strlen(responseBuffer);
     }
   };
 
-  memcpy(buffer, responseBuffer, responseBufferPos);
+  strcpy(buffer, responseBuffer);
   return -2;
 }
 

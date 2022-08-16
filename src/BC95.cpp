@@ -261,7 +261,7 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
   sendStatus status = INIT;
   while (!timeout) {
     timeout = (millis() - startTime > NBSENDTIMEOUT);
-    delay(100);
+    //delay(100);
     while (bc95serial.available()) {
       responseBuff[buffPtr++] = bc95serial.read();
       if (buffPtr == responseBuffSize) {
@@ -360,7 +360,7 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
 
   unsigned long startT = millis();
   while (millis() < startT + HTTP_READ_TIMEOUT) {
-    delay(500);
+    //delay(500);
     while (bc95serial.available()) {
       buffer[buffPtr++] =  bc95serial.read();
       readBytes+=1;

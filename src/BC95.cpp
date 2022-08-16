@@ -324,7 +324,10 @@ int readResponseData(std::string response, char *buffer, int bufferSize) {
   std::string dataString = response.substr(lenIndex + 1, dataIndex - lenIndex - 1);
 
   int dataLen = strtoul(lenString.c_str(), NULL, 10);
+  ESP_LOGE(TAG, "data1: %s", dataString.c_str());
   int strLen = strlen(dataString.c_str());
+
+  ESP_LOGE(TAG, "datalen: %d, strlen: %d", dataLen, strLen);
 
   if (dataLen != strLen / 2) {
     ESP_LOGE(TAG, "Size mismatch");

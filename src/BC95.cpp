@@ -497,7 +497,7 @@ int parseData(char* buff, int dataSize, char* outBuff, int outBuffSize)
   }
 
   char* dataPos = buff + pos + 4;
-  ESP_LOGV(TAG, "Data: %s", dataPos);
+  //ESP_LOGV(TAG, "Data: %s", dataPos);
   memcpy(outBuff, dataPos, dataSize);
   return dataSize;
 }

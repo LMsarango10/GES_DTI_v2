@@ -521,7 +521,7 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
   std::string version = std::string(PROGVERSION);
   std::replace( version.begin(), version.end(), '.', '_'); // replace all '.' to '_'
 
-  sprintf(pageWithParams, "%s?deveui=%s&version=%s", page, devEui, version);
+  sprintf(pageWithParams, "%s?deveui=%s&version=%s", page, devEui, version.c_str());
   // send the header
   globalBuff[0] = 0;
   sprintf(outBuf, "GET %s HTTP/1.1\r\n", pageWithParams);

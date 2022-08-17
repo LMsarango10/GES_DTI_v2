@@ -184,7 +184,6 @@ bool downloadUpdates(std::string index) {
 
     uint32_t *crcBuffer = new uint32_t[parts];
     for (int i = 1; i <= parts; i += checksumsPerFile) {
-        ESP_LOGI(TAG, "Downloading part: %d/%d", i, parts);
       uint32_t *tempBuffer = new uint32_t[checksumsPerFile];
       downloadChecksumFile(i, tempBuffer, checksumsPerFile, checksumsPerFile);
       for (int j = 0; j < checksumsPerFile; j++) {
@@ -198,6 +197,7 @@ bool downloadUpdates(std::string index) {
 
     int retries = 0;
     for (int i = 1; i <= parts; i++) {
+        ESP_LOGI(TAG, "Downloading part: %d/%d", i, parts);
       retries = 0;
       while (retries < MAX_DOWNLOAD_RETRIES) {
         if (checkUpdateFile(i, crcBuffer[i - 1])) {

@@ -55,13 +55,10 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   CRC32 crcFile;
   crcFile.reset();
 
-    ESP_LOGD(TAG, "File size: %d", fileSize);
+  ESP_LOGD(TAG, "File size: %d", fileSize);
   // Here we add each byte to the checksum, caclulating the checksum as we go.
   for (size_t i = 0; i < fileSize; i++) {
     crcFile.update(buff[i]);
-    if (i > fileSize - 20) {
-      ESP_LOGD(TAG, "f: %02x", buff[i]);
-    }
   }
 
   // Once we have added all of the data, generate the final CRC32 checksum.
@@ -115,22 +112,17 @@ bool downloadChecksumFile(int i, uint32_t *crcBuffer, int bufferSize,
   if (getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT, filename, buff,
               sizeof(buff), &responseSize) >= 0) {
     if (responseSize > 0) {
-      std::string fileString = std::string(buff);
-      unsigned long pos = 0;
       for (int i = 0; i < checksumsPerFile; i++) {
-        unsigned long endPos = fileString.find("\r\n", pos);
-        std::string crcLine = fileString.substr(pos, endPos + 2 - pos);
-        if (endPos == std::string::npos) {
+        if (i * 4 >= responseSize) {
           break;
         }
-        ESP_LOGE(TAG, "line: %s", crcLine.c_str());
-        uint32_t crc = strtoul(crcLine.c_str(), NULL, 16);
+        uint32_t crc = *((uint32_t *)&buff[i * sizeof(uint32_t)]);
         if (i >= bufferSize) {
           ESP_LOGE(TAG, "Buffer overflow");
           return false;
         }
         crcBuffer[i] = crc;
-        pos = endPos + 2;
+        ESP_LOGD(TAG, "CRC: %08x", crc);
       }
       return true;
     }

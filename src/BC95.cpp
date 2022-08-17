@@ -17,8 +17,8 @@ int readResponseBC(HardwareSerial *port, char *buff, int b_size,
   int bytesRead = port->readBytes(buff, b_size - 1);
   if (bytesRead > 0) {
     buff[bytesRead] = 0;
-    ESP_LOGI(TAG, "%d bytes read", bytesRead);
-    ESP_LOGI(TAG, "Message: %s", buff);
+    ESP_LOGV(TAG, "%d bytes read", bytesRead);
+    ESP_LOGV(TAG, "Message: %s", buff);
     return bytesRead;
   } else if (bytesRead < 0)
     return -1;
@@ -41,9 +41,9 @@ int readResponseWithStop(HardwareSerial *port, char *buff, int b_size,
       }
     }
     if (strstr(buff, stopWord)) {
-      ESP_LOGI(TAG, "Stopword %s found", stopWord);
-      ESP_LOGI(TAG, "%d bytes read", p);
-      ESP_LOGI(TAG, "Message: %s", buff);
+      ESP_LOGV(TAG, "Stopword %s found", stopWord);
+      ESP_LOGV(TAG, "%d bytes read", p);
+      ESP_LOGV(TAG, "Message: %s", buff);
       return p;
     }
   }
@@ -324,10 +324,7 @@ int readResponseData(std::string response, char *buffer, int bufferSize) {
   std::string dataString = response.substr(lenIndex + 1, dataIndex - lenIndex - 1);
 
   int dataLen = strtoul(lenString.c_str(), NULL, 10);
-  ESP_LOGE(TAG, "data1: %s", dataString.c_str());
   int strLen = strlen(dataString.c_str());
-
-  ESP_LOGE(TAG, "datalen: %d, strlen: %d", dataLen, strLen);
 
   if (dataLen != strLen / 2) {
     ESP_LOGE(TAG, "Size mismatch");
@@ -392,12 +389,9 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       if (len < 0) {
         return len;
       }
-      ESP_LOGE(TAG, "datalen: %d", len);
-      ESP_LOGE(TAG, "responsebuff pos before append: %d", responseBufferPos);
+
       memcpy(responseBuffer + responseBufferPos, dataBuffer, len);
       responseBufferPos += len;
-      ESP_LOGE(TAG, "responsebuff pos append: %d", responseBufferPos);
-
       continue;
     }
 

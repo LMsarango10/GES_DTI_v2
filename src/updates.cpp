@@ -55,7 +55,7 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   CRC32 crcFile;
   crcFile.reset();
 
-  ESP_LOGD(TAG, "File size: %d", fileSize);
+  ESP_LOGV(TAG, "File size: %d", fileSize);
   // Here we add each byte to the checksum, caclulating the checksum as we go.
   for (size_t i = 0; i < fileSize; i++) {
     crcFile.update(buff[i]);
@@ -122,7 +122,7 @@ bool downloadChecksumFile(int i, uint32_t *crcBuffer, int bufferSize,
           return false;
         }
         crcBuffer[i] = crc;
-        ESP_LOGD(TAG, "CRC: %08x", crc);
+        //ESP_LOGD(TAG, "CRC: %08x", crc);
       }
       return true;
     }

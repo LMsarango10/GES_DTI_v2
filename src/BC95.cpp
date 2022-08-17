@@ -518,7 +518,10 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
   bool connected = connectSocket(socketN, ip, port);
 
   char pageWithParams[256];
-  sprintf(pageWithParams, "%s?deveui=%s", page, devEui);
+  std::string version = std::string(PROGVERSION);
+  std::replace( version.begin(), version.end(), '.', '_'); // replace all '.' to '_'
+
+  sprintf(pageWithParams, "%s?deveui=%s&version=%s", page, devEui, version);
   // send the header
   globalBuff[0] = 0;
   sprintf(outBuf, "GET %s HTTP/1.1\r\n", pageWithParams);

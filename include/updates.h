@@ -5,6 +5,7 @@
 #include <Update.h>
 
 #define UPDATE_FOLDER "update"
+#define MAX_DOWNLOAD_RETRIES 3
 
 
 bool checkUpdateFile(char * filename, uint32_t crc);

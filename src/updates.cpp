@@ -65,7 +65,7 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   uint32_t checksum = crcFile.finalize();
 
   if (checksum != crc) {
-    ESP_LOGD(TAG, "Update file CRC mismatch, FILE: %08x, EXPECTED CRC: %08x",
+    ESP_LOGW(TAG, "Update file CRC mismatch, FILE: %08x, EXPECTED CRC: %08x",
              checksum, crc);
     return false;
   }
@@ -133,11 +133,7 @@ bool downloadChecksumFile(int i, uint32_t *crcBuffer, int bufferSize,
 bool downloadFile(int i, uint32_t crc) {
   char filename[20];
   sprintf(filename, "%d.bin", i);
-  ESP_LOGD(TAG, "Downloading %s", filename);
-
-  char checksum[20];
-  sprintf(checksum, "%d.sum", i);
-  ESP_LOGD(TAG, "Downloading %s", checksum);
+  ESP_LOGI(TAG, "Downloading %s", filename);
 
   char buff[2048];
   int responseSize = 0;
@@ -160,7 +156,7 @@ bool downloadUpdates(std::string index) {
   std::size_t found = index.find("\r\n");
   if (found != std::string::npos) {
     std::string version = index.substr(0, found);
-    ESP_LOGD(TAG, "Latest Version: %s", version.c_str());
+    ESP_LOGI(TAG, "Latest Version: %s", version.c_str());
 
     const char *partsStr = index.substr(found + 2).c_str();
     char *end;
@@ -197,8 +193,24 @@ bool downloadUpdates(std::string index) {
       delete tempBuffer;
     }
 
+    int retries = 0;
     for (int i = 1; i <= parts; i++) {
-      if (!downloadFile(i, crcBuffer[i - 1])) {
+      retries = 0;
+      while (retries < MAX_DOWNLOAD_RETRIES) {
+        if (checkUpdateFile(i, crcBuffer[i - 1])) {
+            ESP_LOGI(TAG, "File %d already downloaded, skipping", i);
+            break;
+        }
+        if (!downloadFile(i, crcBuffer[i - 1])) {
+          ESP_LOGE(TAG, "Failed to download file number: %d", i);
+          retries += 1;
+        }
+        else {
+          break;
+        }
+        ESP_LOGW(TAG, "Retrying download file number: %d", i);
+      }
+      if (retries == MAX_DOWNLOAD_RETRIES) {
         ESP_LOGE(TAG, "Failed to download file number: %d", i);
         delete crcBuffer;
         return false;
@@ -213,9 +225,9 @@ bool performUpdate(Stream &updateSource, size_t updateSize) {
   if (Update.begin(updateSize)) {
     size_t written = Update.writeStream(updateSource);
     if (written == updateSize) {
-      ESP_LOGD(TAG, "Written : %d bytes successfully", written);
+      ESP_LOGI(TAG, "Written : %d bytes successfully", written);
     } else {
-      ESP_LOGD(TAG, "Written only : %d/%d. Retry?", written, updateSize);
+      ESP_LOGW(TAG, "Written only : %d/%d. Retry?", written, updateSize);
     }
     if (Update.end()) {
       ESP_LOGI(TAG, "OTA done!");

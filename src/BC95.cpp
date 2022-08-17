@@ -468,7 +468,7 @@ int parseResponseCode(char* buff, int buffSize)
   return strtoul(responseCodeStr.c_str(), NULL, 10);
 }
 
-int parseData(char* buff, int buffSize, char* outBuff, int outBuffSize)
+int parseData(char* buff, int dataSize, char* outBuff, int outBuffSize)
 {
   std::string inputString = std::string(buff);
   size_t pos = inputString.find("\r\n\r\n");
@@ -477,11 +477,10 @@ int parseData(char* buff, int buffSize, char* outBuff, int outBuffSize)
     return -1;
   }
 
-  size_t endPos = inputString.find("\r\n\r\n", pos+4);
-  std::string dataStr = inputString.substr(pos+4, endPos-pos-4);
-  //ESP_LOGV(TAG, "Data: %s", dataStr.c_str());
-  memcpy(outBuff, dataStr.c_str(), dataStr.length());
-  return dataStr.length();
+  char* dataPos = buff + pos + 4;
+  ESP_LOGV(TAG, "Data: %s", dataPos);
+  memcpy(outBuff, dataPos, dataSize);
+  return dataSize;
 }
 
 int getData(char *ip, int port, char *page, char *responseBuffer, int responseBufferSize, int *responseSizePtr) {

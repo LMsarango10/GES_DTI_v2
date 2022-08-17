@@ -468,6 +468,31 @@ int parseResponseCode(char* buff, int buffSize)
   return strtoul(responseCodeStr.c_str(), NULL, 10);
 }
 
+int parseContentLength(char* buff, int buffSize)
+{
+  std::string inputString = std::string(buff);
+  size_t pos = inputString.find("\r\n\r\n");
+  if(pos == std::string::npos)
+  {
+    return -1;
+  }
+
+  std::string httpString = inputString.substr(0, pos+4);
+
+  std::for_each(httpString.begin(), httpString.end(), [](char & c) {
+        c = ::tolower(c);
+    });
+
+  size_t contentLengthPos = httpString.find("content-length:");
+  size_t contentLengthPosEnd = httpString.find("\r\n", contentLengthPos+1);
+  std::string contentLengthStr = httpString.substr(contentLengthPos+15, contentLengthPosEnd-contentLengthPos-15);
+
+  ESP_LOGV(TAG, "Content Length str: %s", contentLengthStr.c_str());
+
+  unsigned long contentLength = strtoul(contentLengthStr.c_str(), NULL, 10);
+  return contentLength;
+}
+
 int parseData(char* buff, int dataSize, char* outBuff, int outBuffSize)
 {
   std::string inputString = std::string(buff);
@@ -536,7 +561,8 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
     char* inputBuffer = new char[bytesReceived + 1];
     memcpy(inputBuffer, globalBuff, bytesReceived);
     inputBuffer[bytesReceived] = 0;
-    int parsedData = parseData(inputBuffer, bytesReceived, globalBuff, sizeof(globalBuff));
+    int contentLength = parseContentLength(inputBuffer, bytesReceived);
+    int parsedData = parseData(inputBuffer, contentLength, globalBuff, sizeof(globalBuff));
     if (parsedData >= 0) {
       memcpy(responseBuffer, globalBuff, parsedData);
       *responseSizePtr = parsedData;

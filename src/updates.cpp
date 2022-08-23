@@ -13,13 +13,77 @@ bool savePartUpdateFile(int fileNumber, char *buff, int size) {
   char filename[20];
   sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, fileNumber);
 
-  File file;
+  FileMySD file;
   if (!createFile(filename, file)) {
     ESP_LOGE(TAG, "Failed to create %s file", filename);
     return false;
   }
-  file.write(buff, size);
+  file.write((uint8_t*)buff, size);
   file.close();
+  return true;
+}
+
+bool generateChecksumFile(int fileNumber)
+{
+  char filename[20];
+  sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, fileNumber);
+
+  char checksumFilename[20];
+  sprintf(checksumFilename, "%s/%d.sum", UPDATE_FOLDER, fileNumber);
+
+  std::string fileName = std::string(filename);
+  FileMySD updateFile;
+  if (!openFile(fileName, updateFile)) {
+    ESP_LOGE(TAG, "Failed to open file: %s", fileName.c_str());
+    return false;
+  }
+
+  CRC32 crcFile;
+  crcFile.reset();
+
+  char buff[2048];
+  size_t res = updateFile.readBytes(buff, sizeof(buff));
+  size_t fileSize = updateFile.size();
+  updateFile.close();
+
+  if (res <= 0) {
+    ESP_LOGE(TAG, "Failed to read file (empty): %s", fileName.c_str());
+    return false;
+  }
+
+  ESP_LOGV(TAG, "File size: %d", fileSize);
+  // Here we add each byte to the checksum, caclulating the checksum as we go.
+  for (size_t i = 0; i < fileSize; i++) {
+    crcFile.update(buff[i]);
+  }
+
+  // Once we have added all of the data, generate the final CRC32 checksum.
+  uint32_t checksum = crcFile.finalize();
+
+  std::string checksumFilenameString = std::string(checksumFilename);
+  FileMySD checksumFile;
+  if (!createFile(checksumFilenameString, checksumFile)) {
+    ESP_LOGE(TAG, "Failed to create file: %s", checksumFilenameString.c_str());
+    return false;
+  }
+  checksumFile.write((uint8_t*)&checksum, sizeof(checksum));
+  checksumFile.close();
+
+  return true;
+}
+
+bool getChecksumFromFile(int fileNumber, uint32_t &checksum)
+{
+  char filename[20];
+  sprintf(filename, "%s/%d.sum", UPDATE_FOLDER, fileNumber);
+  std::string fileName = std::string(filename);
+  FileMySD checksumFile;
+  if (!openFile(fileName, checksumFile)) {
+    ESP_LOGE(TAG, "Failed to open file: %s", fileName.c_str());
+    return false;
+  }
+  checksumFile.read((uint8_t*)checksum, sizeof(checksum));
+  checksumFile.close();
   return true;
 }
 
@@ -35,54 +99,39 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   char filename[20];
   sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, fileNumber);
 
-  std::string fileName = std::string(filename);
-  File updateFile;
-  if (!openFile(fileName, updateFile)) {
-    ESP_LOGE(TAG, "Failed to open file: %s", fileName.c_str());
-    return false;
+  uint32_t checksum = 0;
+  if (!getChecksumFromFile(fileNumber, checksum)) {
+    ESP_LOGV(TAG, "Failed to get checksum from file, calculating");
+    if(!generateChecksumFile(fileNumber)) {
+      ESP_LOGE(TAG, "Failed to generate checksum file");
+      return false;
+    }
+    if (!getChecksumFromFile(fileNumber, checksum)) {
+      ESP_LOGE(TAG, "Failed to get checksum from generated file");
+      return false;
+    }
   }
-
-  char buff[2048];
-  size_t res = updateFile.readBytes(buff, sizeof(buff));
-  size_t fileSize = updateFile.size();
-  updateFile.close();
-
-  if (res <= 0) {
-    ESP_LOGE(TAG, "Failed to read file (empty): %s", fileName.c_str());
-    return false;
-  }
-
-  CRC32 crcFile;
-  crcFile.reset();
-
-  ESP_LOGV(TAG, "File size: %d", fileSize);
-  // Here we add each byte to the checksum, caclulating the checksum as we go.
-  for (size_t i = 0; i < fileSize; i++) {
-    crcFile.update(buff[i]);
-  }
-
-  // Once we have added all of the data, generate the final CRC32 checksum.
-  uint32_t checksum = crcFile.finalize();
 
   if (checksum != crc) {
     ESP_LOGW(TAG, "Update file CRC mismatch, FILE: %08x, EXPECTED CRC: %08x",
              checksum, crc);
     return false;
   }
+
   return true;
 }
 
 bool unifyUpdates(int parts) {
   char finalFilename[20];
-  sprintf(finalFilename, "%s/final.bin", UPDATE_FOLDER);
+  sprintf(finalFilename, "%s/final.gz", UPDATE_FOLDER);
 
-  File finalFile;
+  FileMySD finalFile;
   if (!createFile(finalFilename, finalFile)) {
     ESP_LOGE(TAG, "Failed to create final file");
     return false;
   }
   for (int i = 1; i <= parts; i++) {
-    File file;
+    FileMySD file;
     char filename[20];
     sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, i);
 
@@ -224,7 +273,7 @@ bool downloadUpdates(std::string index) {
   }
 }
 
-bool performUpdate(Stream &updateSource, size_t updateSize) {
+/*bool performUpdate(Stream &updateSource, size_t updateSize) {
   if (Update.begin(updateSize)) {
     size_t written = Update.writeStream(updateSource);
     if (written == updateSize) {
@@ -248,13 +297,47 @@ bool performUpdate(Stream &updateSource, size_t updateSize) {
     ESP_LOGW(TAG, "Not enough space to begin OTA");
   }
   return false;
+}*/
+
+bool uncompressFileAndFlash(std::string filename) {
+
+  FileMySD inputFile;
+  if (!openFile(filename, inputFile))
+  {
+    ESP_LOGE(TAG, "Failed to open file: %s", filename.c_str());
+    return false;
+  }
+
+  tarGzFS.begin();
+  GzUnpacker *GZUnpacker = new GzUnpacker();
+
+  GZUnpacker->haltOnError( true ); // stop on fail (manual restart/reset required)
+  GZUnpacker->setupFSCallbacks( targzTotalBytesFn, targzFreeBytesFn ); // prevent the partition from exploding, recommended
+  GZUnpacker->setGzProgressCallback( BaseUnpacker::defaultProgressCallback ); // targzNullProgressCallback or defaultProgressCallback
+  GZUnpacker->setLoggerCallback( BaseUnpacker::targzPrintLoggerCallback  );    // gz log verbosity
+
+  if( !GZUnpacker->gzStreamUpdater( (Stream *)&inputFile, UPDATE_SIZE_UNKNOWN ) ) {
+    Serial.printf("gzStreamUpdater failed with return code #%d\n", GZUnpacker->tarGzGetError() );
+    return false;
+  }
+
+  return true;
 }
 
 // check given FS for valid update.bin and perform update if available
 bool updateFromFS() {
   bool result = false;
-  char finalFilename[20];
-  sprintf(finalFilename, "%s/final.bin", UPDATE_FOLDER);
+
+  char compressedFilename[20];
+  sprintf(compressedFilename, "%s/final.gz", UPDATE_FOLDER);
+
+  if(!uncompressFileAndFlash(compressedFilename))
+  {
+    ESP_LOGE(TAG, "Failed to uncompress file");
+    return false;
+  }
+
+  /*
   File updateBin;
   if (!openFile(finalFilename, updateBin)) {
     ESP_LOGE(TAG, "Failed to open final update file");
@@ -281,6 +364,6 @@ bool updateFromFS() {
     updateBin.close();
   } else {
     ESP_LOGW(TAG, "Could not load update.bin from sd root");
-  }
-  return result;
+  }*/
+  return true;
 }

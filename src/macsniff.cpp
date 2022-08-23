@@ -88,8 +88,8 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
      * Smartphone, Tablet, u otro dispositivo personal con funcionalidad WiFi
      */
 
-    bool *isDev = false;
-    // metis_is_device((char *)in, isDev);
+    // bool isDev = false;
+    // metis_is_device((char *)in, &isDev);
     // metis_digest_mac_salt(in, salt, out); // Last version
     #ifdef DEBUG_METIS
     ESP_LOGI(TAG, "Content of buff is: %s", buff);

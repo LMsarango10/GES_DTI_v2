@@ -134,8 +134,9 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
   doc["fPort"] = message->MessagePort;
 
   unsigned int base64_length;
-  unsigned char *base64 = base64_encode((const unsigned char *)message->Message,
-                                        message->MessageSize, &base64_length);
+  unsigned char base64[64];
+
+  int res = mbedtls_base64_encode(base64, sizeof(base64), &base64_length, message->Message, message->MessageSize);
   if (base64[base64_length - 1] == 10) {
     base64[base64_length - 1] = 0;
   }
@@ -310,6 +311,11 @@ void NbIotManager::loop() {
         {
           ESP_LOGD(TAG, "Updates installed");
         }
+        sdcardInit();
+      }
+      else {
+        ESP_LOGD(TAG, "Updates not downloaded, set to retry");
+        this->lastUpdateCheck = millis() - UPDATES_CHECK_RETRY_INTERVAL;
       }
     }
   }
@@ -359,10 +365,13 @@ void NbIotManager::nb_readMessages() {
         return;
       }
       const char *data = doc["data"]; // "ZWcBCg=="
+      const unsigned char* dataPtr = reinterpret_cast<const unsigned char *>(data);
 
       ESP_LOGD(TAG, "MQTT message data: %s", data);
       unsigned int base64_length;
-      unsigned char *base64Decoded = base64_decode((const unsigned char *)data, strlen(data), &base64_length);
+      unsigned char base64Decoded[64];
+      int res = mbedtls_base64_decode(base64Decoded, sizeof(base64Decoded), &base64_length, dataPtr, strlen(data));
+
       if (base64Decoded == NULL) {
         ESP_LOGE(TAG, "base64_decode() failed");
         return;

@@ -10,30 +10,30 @@ static const char TAG[] = __FILE__;
 static bool useSDCard;
 
 static void createFile(void);
-void createTempFile(File &tempFileSDCard, char* filename);
+void createTempFile(FileMySD &tempFileSDCard, char* filename);
 void replaceCurrentFile(char* newFilename);
 
-File fileSDCard;
+FileMySD fileSDCard;
 int fileIndex;
 
 bool sdcardInit() {
   ESP_LOGD(TAG, "looking for SD-card...");
-  useSDCard = SD.begin(SDCARD_CS, SDCARD_MOSI, SDCARD_MISO, SDCARD_SCLK);
+  useSDCard = mySD.begin(SDCARD_CS, SDCARD_MOSI, SDCARD_MISO, SDCARD_SCLK);
   if (useSDCard)
     createFile();
   return useSDCard;
 }
 
-bool createFile(std::string filename, File &file)
+bool createFile(std::string filename, FileMySD &file)
 {
   if (!useSDCard)
     return false;
 
   char* path_c = (char*)filename.c_str();
-  if (SD.exists(path_c)) {
-    SD.remove(path_c);
+  if (mySD.exists(path_c)) {
+    mySD.remove(path_c);
   }
-  file = SD.open(filename.c_str(), FILE_WRITE);
+  file = mySD.open(filename.c_str(), FILE_WRITE);
   if (!fileSDCard) {
     ESP_LOGE(TAG, "Failed to open file for writing");
     return false;
@@ -41,11 +41,11 @@ bool createFile(std::string filename, File &file)
   return true;
 }
 
-bool openFile(std::string filename, File &file)
+bool openFile(std::string filename, FileMySD &file)
 {
   if (!useSDCard)
     return false;
-  file = SD.open(filename.c_str());
+  file = mySD.open(filename.c_str());
   if (!fileSDCard) {
     ESP_LOGE(TAG, "Failed to open file for reading");
     return false;
@@ -58,7 +58,7 @@ bool createFolder(std::string path)
   if (!useSDCard)
     return false;
   char* path_c = (char*)path.c_str();
-  return SD.mkdir(path_c);
+  return mySD.mkdir(path_c);
 }
 
 bool folderExists(std::string path)
@@ -66,7 +66,7 @@ bool folderExists(std::string path)
   if (!useSDCard)
     return false;
   char* path_c = (char*)path.c_str();
-  return SD.exists(path_c);
+  return mySD.exists(path_c);
 }
 
 void sdcardWriteData(uint16_t noWifi, uint16_t noBle) {
@@ -92,7 +92,7 @@ void sdcardWriteData(uint16_t noWifi, uint16_t noBle) {
   }
 }
 
-void printFile(File file)
+void printFile(FileMySD file)
 {
   ESP_LOGD(TAG, "Print file contents");
   ESP_LOGD(TAG, "------START-----");
@@ -140,7 +140,7 @@ void sdcardWriteFrame(MessageBuffer_t *message) {
   //printFile(fileSDCard);
 }
 
-int sdReadLine(File file, int lineNumber, char* outBuffer)
+int sdReadLine(FileMySD file, int lineNumber, char* outBuffer)
 {
   file.seek(0);
   int recNum = 0;
@@ -158,14 +158,14 @@ int sdReadLine(File file, int lineNumber, char* outBuffer)
   return 0;
 }
 
-int sdRemoveFirstLines(File file, int N)
+int sdRemoveFirstLines(FileMySD file, int N)
 {
   ESP_LOGV(TAG, "removing %d lines from sd file", N);
   char newFilename[16];
   int newFileIndex = fileIndex + 1;
   if(newFileIndex >= 100) newFileIndex = 0;
   sprintf(newFilename, SDCARD_FILE_NAME, newFileIndex);
-  File tempFile;
+  FileMySD tempFile;
   createTempFile(tempFile, newFilename);
   char outBuffer[128];
 
@@ -229,16 +229,16 @@ int sdcardReadFrame(MessageBuffer_t *message, int N)
   return 0;
 }
 
-void createTempFile(File &tempFileSDCard, char* filename) {
-  bool fileExists = SD.exists(filename);
+void createTempFile(FileMySD &tempFileSDCard, char* filename) {
+  bool fileExists = mySD.exists(filename);
   if (fileExists)
   {
     ESP_LOGV(TAG, "SD: temp file exists: removing");
-    SD.remove(filename);
+    mySD.remove(filename);
   }
 
   ESP_LOGV(TAG, "SD: creating temp file");
-  tempFileSDCard = SD.open(filename, FILE_WRITE);
+  tempFileSDCard = mySD.open(filename, FILE_WRITE);
   if (!tempFileSDCard) {
     ESP_LOGW(TAG, "SD: could not create temp sd file %s", filename);
   }
@@ -252,13 +252,13 @@ void createFile(void) {
   sprintf(bufferFilename, SDCARD_FILE_NAME, 0);
   fileIndex = 0;
   ESP_LOGV(TAG, "SD: looking for file <%s>", bufferFilename);
-  bool fileExists = SD.exists(bufferFilename);
+  bool fileExists = mySD.exists(bufferFilename);
   if (fileExists)
   {
-    SD.remove(bufferFilename);
+    mySD.remove(bufferFilename);
   }
   ESP_LOGV(TAG, "SD: file does not exist: opening");
-  fileSDCard = SD.open(bufferFilename, FILE_WRITE);
+  fileSDCard = mySD.open(bufferFilename, FILE_WRITE);
   if (fileSDCard) {
     ESP_LOGV(TAG, "SD: name opended: <%s>", bufferFilename);
     //fileSDCard.println(SDCARD_FILE_HEADER);
@@ -274,10 +274,10 @@ void replaceCurrentFile(char* newFilename)
   sprintf(bufferFilename, SDCARD_FILE_NAME, fileIndex);
   fileSDCard.close();
   ESP_LOGV(TAG, "SD: removing file: %s", bufferFilename);
-  SD.remove(bufferFilename);
+  mySD.remove(bufferFilename);
 
   // load new file
-  fileSDCard = SD.open(newFilename, FILE_WRITE);
+  fileSDCard = mySD.open(newFilename, FILE_WRITE);
   if (fileSDCard) {
     ESP_LOGV(TAG, "SD: name opened: <%s>", newFilename);
     //fileSDCard.println(SDCARD_FILE_HEADER);
@@ -286,10 +286,10 @@ void replaceCurrentFile(char* newFilename)
 }
 
 void sdSaveNbConfig(ConfigBuffer_t *config){
-  if(SD.exists("nb.cnf")) {
-    SD.remove("nb.cnf");
+  if(mySD.exists("nb.cnf")) {
+    mySD.remove("nb.cnf");
   }
-  File f = SD.open("nb.cnf", FILE_WRITE);
+  FileMySD f = mySD.open("nb.cnf", FILE_WRITE);
   const size_t capacity = JSON_OBJECT_SIZE(32);
   DynamicJsonDocument doc(capacity);
 
@@ -325,12 +325,12 @@ void saveDefaultNbConfig() {
 
 int sdLoadNbConfig(ConfigBuffer_t *config){
   // Use this to return to default SD.remove("nb.cnf");
-  if(!SD.exists("nb.cnf")) {
+  if(!mySD.exists("nb.cnf")) {
     ESP_LOGI(TAG, "nb.cnf file does not exists, creating");
     saveDefaultNbConfig();
   }
 
-  File f = SD.open("nb.cnf", FILE_READ);
+  FileMySD f = mySD.open("nb.cnf", FILE_READ);
   const size_t capacity = JSON_OBJECT_SIZE(12) + 512;
   StaticJsonDocument<512> doc;
 

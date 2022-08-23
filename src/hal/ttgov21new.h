@@ -6,6 +6,7 @@
 #define _TTGOV21NEW_H
 
 #include <stdint.h>
+#include "soc/adc_channel.h"
 
 /*  Hardware related definitions for TTGO V2.1 Board
 // ATTENTION: check your board version!

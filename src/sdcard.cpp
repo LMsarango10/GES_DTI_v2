@@ -58,8 +58,11 @@ bool openFile(std::string filename, FileMySD &file)
 {
   if (!useSDCard)
     return false;
-  if (!mySD.exists(filename.c_str()))
+  char* filename_c = (char*)filename.c_str();
+  if (!mySD.exists(filename_c))
+  {
     return false;
+  }
   file = mySD.open(filename.c_str());
   if (!fileSDCard) {
     ESP_LOGE(TAG, "Failed to open file for reading");

@@ -144,7 +144,10 @@ bool unifyUpdates(int parts) {
     ESP_LOGE(TAG, "Failed to create final file");
     return false;
   }
+  uint8_t buff[2048];
+
   for (int i = 1; i <= parts; i++) {
+    int cursor = 0;
     FileMySD file;
     char filename[20];
     sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, i);
@@ -154,10 +157,11 @@ bool unifyUpdates(int parts) {
       return false;
     }
     ESP_LOGD(TAG, "Reading file number: %d", i);
-    while (file.available()) {
-      finalFile.write(file.read());
-    }
+    uint32_t filesize = file.size();
+    file.read(buff, filesize);
     file.close();
+
+    finalFile.write(buff, filesize);
   }
   finalFile.close();
   return true;

@@ -60,6 +60,8 @@ bool generateChecksumFile(int fileNumber)
   // Once we have added all of the data, generate the final CRC32 checksum.
   uint32_t checksum = crcFile.finalize();
 
+  ESP_LOGV(TAG, "calculated checksum for file %s is %08x", filename, checksum);
+
   std::string checksumFilenameString = std::string(checksumFilename);
   FileMySD checksumFile;
   if (!createFile(checksumFilenameString, checksumFile)) {

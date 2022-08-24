@@ -87,6 +87,15 @@ bool getChecksumFromFile(int fileNumber, uint32_t &checksum)
   return true;
 }
 
+bool deleteChecksumFile(int fileNumber)
+{
+  char filename[20];
+  sprintf(filename, "%s/%d.sum", UPDATE_FOLDER, fileNumber);
+  std::string fileName = std::string(filename);
+
+  return deleteFile(fileName);
+}
+
 bool checkUpdateFile(int fileNumber, uint32_t crc) {
   ESP_LOGV(TAG, "Checking update file");
 
@@ -115,6 +124,8 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   if (checksum != crc) {
     ESP_LOGW(TAG, "Update file CRC mismatch, FILE: %08x, EXPECTED CRC: %08x",
              checksum, crc);
+
+    deleteChecksumFile(fileNumber);
     return false;
   }
 

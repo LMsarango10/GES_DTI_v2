@@ -41,6 +41,18 @@ bool createFile(std::string filename, FileMySD &file)
   return true;
 }
 
+bool deleteFile(std::string filename)
+{
+  if (!useSDCard)
+    return false;
+
+  char* path_c = (char*)filename.c_str();
+  if (mySD.exists(path_c)) {
+    mySD.remove(path_c);
+  }
+  return true;
+}
+
 bool openFile(std::string filename, FileMySD &file)
 {
   if (!useSDCard)

@@ -72,7 +72,7 @@ bool generateChecksumFile(int fileNumber)
   return true;
 }
 
-bool getChecksumFromFile(int fileNumber, uint32_t &checksum)
+bool getChecksumFromFile(int fileNumber, uint32_t* checksum)
 {
   char filename[20];
   sprintf(filename, "%s/%d.sum", UPDATE_FOLDER, fileNumber);
@@ -109,13 +109,13 @@ bool checkUpdateFile(int fileNumber, uint32_t crc) {
   sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, fileNumber);
 
   uint32_t checksum = 0;
-  if (!getChecksumFromFile(fileNumber, checksum)) {
+  if (!getChecksumFromFile(fileNumber, &checksum)) {
     ESP_LOGV(TAG, "Failed to get checksum from file, calculating");
     if(!generateChecksumFile(fileNumber)) {
       ESP_LOGE(TAG, "Failed to generate checksum file");
       return false;
     }
-    if (!getChecksumFromFile(fileNumber, checksum)) {
+    if (!getChecksumFromFile(fileNumber, &checksum)) {
       ESP_LOGE(TAG, "Failed to get checksum from generated file");
       return false;
     }

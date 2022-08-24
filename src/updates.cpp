@@ -86,7 +86,7 @@ bool getChecksumFromFile(int fileNumber, uint32_t* checksum)
   }
   checksumFile.read((uint8_t*)checksum, sizeof(checksum));
   checksumFile.close();
-  ESP_LOGV(TAG, "Value read from checksum file: %08X", checksum);
+  ESP_LOGV(TAG, "Value read from checksum file: %08X", *checksum);
   return true;
 }
 

@@ -326,11 +326,6 @@ int readResponseData(std::string response, char *buffer, int bufferSize) {
     ESP_LOGD(TAG, "Cannot find data index in response");
     return -1;
   }
-  int endIndex = response.find("\r\n", dataIndex + 1);
-  if (endIndex == std::string::npos) {
-    ESP_LOGD(TAG, "Cannot find end index in response");
-    return -1;
-  }
 
   std::string socketString = response.substr(0, socketIndex);
   std::string lenString = response.substr(socketIndex + 1, lenIndex - socketIndex - 1);

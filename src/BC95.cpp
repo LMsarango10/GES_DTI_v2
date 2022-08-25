@@ -333,8 +333,7 @@ int readResponseData(std::string response, char *buffer, int bufferSize) {
     return -2;
   }
 
-  char *tempBuff = new char[strLen + 1];
-  memcpy(tempBuff, dataString.c_str(), strLen + 1);
+  char* tempBuff = (char*)dataString.c_str();
   for (int i = 0; i < strLen; i += 2) {
     char tmp[3];
     memcpy(tmp, tempBuff + i, 2);
@@ -342,7 +341,6 @@ int readResponseData(std::string response, char *buffer, int bufferSize) {
     buffer[i / 2] = strtoul(tmp, NULL, 16);
   }
   buffer[strLen/2] = 0;
-  delete tempBuff;
   return dataLen;
 }
 

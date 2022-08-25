@@ -368,6 +368,7 @@ bool uncompressFileAndFlash(std::string filename) {
     return false;
   }
 
+  I2C_MUTEX_LOCK();
   tarGzFS.begin();
   GzUnpacker *GZUnpacker = new GzUnpacker();
 
@@ -378,9 +379,11 @@ bool uncompressFileAndFlash(std::string filename) {
 
   if( !GZUnpacker->gzStreamUpdater( (Stream *)&inputFile, UPDATE_SIZE_UNKNOWN ) ) {
     Serial.printf("gzStreamUpdater failed with return code #%d\n", GZUnpacker->tarGzGetError() );
+    I2C_MUTEX_UNLOCK();
     return false;
   }
 
+  I2C_MUTEX_UNLOCK();
   return true;
 }
 

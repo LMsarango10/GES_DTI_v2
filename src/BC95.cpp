@@ -59,10 +59,7 @@ bool assertResponseBC(const char *expected, char *received, int bytesRead) {
 
 bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command,
                              char *buffer, int bufferSize) {
-  // ESP_LOGV(TAG, "Command: %s", command);
-#ifdef DEBUG_MODEM
   ESP_LOGV(TAG, "Command: %s", command);
-#endif
   port->println(command);
   int bytesRead = readResponseBC(port, buffer, bufferSize);
   return assertResponseBC("OK\r", buffer, bytesRead);

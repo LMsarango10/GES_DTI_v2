@@ -111,6 +111,8 @@ void NbIotManager::nb_init() {
   }
   this->initializeFailures = 0;
   initialized = true;
+  this->lastUpdateCheck = millis() - UPDATES_CHECK_INTERVAL;
+  this->updateReadyToInstall = false;
 }
 
 void getSentiloTimestamp(char *buffer, uint32_t timestamp) {
@@ -306,18 +308,28 @@ void NbIotManager::loop() {
     if(this->nb_checkLastSoftwareVersion()) {
       if(downloadUpdates(std::string(updatesServerResponse)))
       {
-        ESP_LOGD(TAG, "Updates downloaded");
-        if(updateFromFS())
-        {
-          ESP_LOGD(TAG, "Updates installed");
-        }
-        sdcardInit();
+        this->updateReadyToInstall = true;
       }
       else {
         ESP_LOGD(TAG, "Updates not downloaded, set to retry");
+        this->updateReadyToInstall = false;
         this->lastUpdateCheck = millis() - UPDATES_CHECK_RETRY_INTERVAL;
       }
     }
+  }
+
+  if (this->updateReadyToInstall) {
+    ESP_LOGD(TAG, "Updates downloaded");
+    if(updateFromFS())
+    {
+      ESP_LOGD(TAG, "Updates installed");
+    }
+    else
+    {
+      ESP_LOGE(TAG, "Updates installation failed");
+      removeUpdateFiles(std::string(updatesServerResponse));
+    }
+    sdcardInit();
   }
 
   this->nb_readMessages();

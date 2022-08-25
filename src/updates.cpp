@@ -221,7 +221,44 @@ bool downloadFile(int i, uint32_t crc) {
   return true;
 }
 
+bool removeUpdateFiles(std::string index)
+{
+  std::size_t found = index.find("\r\n");
+  if (found != std::string::npos) {
+    std::string version = index.substr(0, found);
+
+    const char *partsStr = index.substr(found + 2).c_str();
+    char *end;
+    long parts = strtol(partsStr, &end, 10);
+
+    if (end == partsStr || errno == ERANGE) {
+      ESP_LOGE(TAG, "Invalid number of parts: %s", partsStr);
+      return false;
+    }
+    ESP_LOGD(TAG, "Number of parts to remove: %d", parts);
+    for (int i = 1; i <= parts; i++) {
+      ESP_LOGD(TAG, "Removing part: %d/%d", i, parts);
+      char filename[20];
+      sprintf(filename, "%s/%d.bin", UPDATE_FOLDER, i);
+      ESP_LOGV(TAG, "Removing file: %s", filename);
+      if (!deleteFile(filename)) {
+        ESP_LOGE(TAG, "Failed to remove file: %s", filename);
+        return false;
+      }
+      char checksumFilename[20];
+      sprintf(checksumFilename, "%s/%d.sum", UPDATE_FOLDER, i);
+      ESP_LOGV(TAG, "Removing file: %s", checksumFilename);
+      if (!deleteFile(checksumFilename)) {
+        ESP_LOGE(TAG, "Failed to remove file: %s", checksumFilename);
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 bool downloadUpdates(std::string index) {
+  unsigned long startTime = millis();
   std::size_t found = index.find("\r\n");
   if (found != std::string::npos) {
     std::string version = index.substr(0, found);
@@ -285,6 +322,11 @@ bool downloadUpdates(std::string index) {
         delete crcBuffer;
         return false;
       }
+      if (startTime + MAX_DOWNLOAD_TIME < millis()) {
+        ESP_LOGI(TAG, "Download time exceeded, continuing normal operation and retrying");
+        delete crcBuffer;
+        return false;
+      }
     }
     delete crcBuffer;
     return unifyUpdates(parts);
@@ -342,6 +384,7 @@ bool uncompressFileAndFlash(std::string filename) {
   return true;
 }
 
+
 // check given FS for valid update.bin and perform update if available
 bool updateFromFS() {
   bool result = false;
@@ -351,7 +394,7 @@ bool updateFromFS() {
 
   if(!uncompressFileAndFlash(compressedFilename))
   {
-    ESP_LOGE(TAG, "Failed to uncompress file");
+    ESP_LOGE(TAG, "Failed to uncompress file and flash");
     return false;
   }
 

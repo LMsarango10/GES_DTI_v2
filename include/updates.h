@@ -12,9 +12,10 @@
 
 #define UPDATE_FOLDER "update"
 #define MAX_DOWNLOAD_RETRIES 3
-
+#define MAX_DOWNLOAD_TIME 900*1000
 
 bool checkUpdateFile(char * filename, uint32_t crc);
 bool downloadUpdates(std::string index);
 bool updateFromFS(void);
+bool removeUpdateFiles(std::string index);
 #endif

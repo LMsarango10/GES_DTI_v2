@@ -49,6 +49,7 @@ class NbIotManager {
 
     char updatesServerResponse[1600];
     long lastUpdateCheck;
+    bool updateReadyToInstall;
 
     public:
         void loop();

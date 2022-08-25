@@ -134,7 +134,7 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
   doc["fPort"] = message->MessagePort;
 
   unsigned int base64_length;
-  unsigned char base64[64];
+  unsigned char base64[128];
 
   int res = mbedtls_base64_encode(base64, sizeof(base64), &base64_length, message->Message, message->MessageSize);
   if (base64[base64_length - 1] == 10) {

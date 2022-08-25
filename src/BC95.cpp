@@ -312,9 +312,25 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
 
 int readResponseData(std::string response, char *buffer, int bufferSize) {
   int socketIndex = response.find(",");
+  if (socketIndex == std::string::npos) {
+    ESP_LOGD(TAG, "Cannot find socket index in response");
+    return -1;
+  }
   int lenIndex = response.find(",", socketIndex + 1);
+  if (lenIndex == std::string::npos) {
+    ESP_LOGD(TAG, "Cannot find length index in response");
+    return -1;
+  }
   int dataIndex = response.find("\r\n", lenIndex + 1);
+  if (dataIndex == std::string::npos) {
+    ESP_LOGD(TAG, "Cannot find data index in response");
+    return -1;
+  }
   int endIndex = response.find("\r\n", dataIndex + 1);
+  if (endIndex == std::string::npos) {
+    ESP_LOGD(TAG, "Cannot find end index in response");
+    return -1;
+  }
 
   std::string socketString = response.substr(0, socketIndex);
   std::string lenString = response.substr(socketIndex + 1, lenIndex - socketIndex - 1);

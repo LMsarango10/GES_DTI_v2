@@ -136,20 +136,16 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
   unsigned int base64_length;
   unsigned char base64[64];
 
-  ESP_LOGV(TAG, "Message length: %d", message->MessageSize);
   int res = mbedtls_base64_encode(base64, sizeof(base64), &base64_length, message->Message, message->MessageSize);
   if (base64[base64_length - 1] == 10) {
     base64[base64_length - 1] = 0;
   }
 
-  ESP_LOGV(TAG, "Base64 length: %d", base64_length);
-  ESP_LOGV(TAG, "Base64: %s", base64);
   doc["data"] = base64;
   doc["deviceName"] = devEui;
   doc["devEUI"] = devEui;
 
   serializeJson(doc, messageBuffer);
-  free(base64);
   return publishMqtt(topic, messageBuffer, 0);
 }
 

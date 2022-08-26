@@ -304,6 +304,7 @@ void NbIotManager::loop() {
     return;
   }
 
+#ifdef UPDATES_ENABLED
   if (this->lastUpdateCheck + UPDATES_CHECK_INTERVAL < millis()) {
     if(this->nb_checkLastSoftwareVersion()) {
       if(downloadUpdates(std::string(updatesServerResponse)))
@@ -331,7 +332,7 @@ void NbIotManager::loop() {
     }
     sdcardInit();
   }
-
+#endif
   this->nb_readMessages();
   this->nb_sendMessages();
   this->consecutiveFailures = 0;

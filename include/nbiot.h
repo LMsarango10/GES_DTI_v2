@@ -12,6 +12,7 @@
 #include "updates.h"
 #include "mbedtls/base64.h"
 
+#define UPDATES_ENABLED
 #define UPDATES_SERVER_IP "82.223.84.231"
 #define UPDATES_SERVER_PORT 8000
 #define UPDATES_SERVER_INDEX "/index.txt"

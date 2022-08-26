@@ -7,9 +7,9 @@ static const char TAG[] = __FILE__;
 
 void i2c_init(void) {
 #ifdef HAS_DISPLAY
-  Wire.begin(MY_DISPLAY_SDA, MY_DISPLAY_SCL, 400000);
+  Wire.begin((int)MY_DISPLAY_SDA, (int)MY_DISPLAY_SCL, (uint32_t)400000);
 #else
-  Wire.begin(SDA, SCL, 400000);
+  Wire.begin((int)SDA, (int)SCL, (uint32_t)400000);
 #endif
 }
 

@@ -19,4 +19,10 @@ void sdSaveNbConfig(ConfigBuffer_t *config);
 int sdLoadNbConfig(ConfigBuffer_t *config);
 void printSdFile();
 
+bool createFile(std::string filename, FileMySD &file);
+bool deleteFile(std::string filename);
+bool openFile(std::string filename, FileMySD &file);
+bool createFolder(std::string path);
+bool folderExists(std::string path);
+
 #endif

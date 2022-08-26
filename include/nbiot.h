@@ -9,10 +9,15 @@
 #include <Ticker.h>
 #include <TimeLib.h>
 #include "lorawan.h"
+#include "updates.h"
+#include "mbedtls/base64.h"
 
-extern "C" {
-#include "crypto/base64.h"
-}
+#define UPDATES_ENABLED
+#define UPDATES_SERVER_IP "82.223.84.231"
+#define UPDATES_SERVER_PORT 8000
+#define UPDATES_SERVER_INDEX "/index.txt"
+#define UPDATES_CHECK_INTERVAL 7200*1000
+#define UPDATES_CHECK_RETRY_INTERVAL 10*1000
 
 #define MAX_CONSECUTIVE_FAILURES 10
 #define MAX_INITIALIZE_FAILURES 10
@@ -43,6 +48,10 @@ class NbIotManager {
 
     long nbLastStatusCheck;
 
+    char updatesServerResponse[1600];
+    long lastUpdateCheck;
+    bool updateReadyToInstall;
+
     public:
         void loop();
     private:
@@ -60,6 +69,7 @@ class NbIotManager {
         bool nb_checkNetworkRegister();
         bool nb_checkNetworkConnected();
         bool nb_checkMqttConnected();
+        bool nb_checkLastSoftwareVersion();
 };
 
 extern TaskHandle_t nbIotTask;
@@ -69,7 +79,7 @@ void nb_queuereset(void);
 esp_err_t nb_iot_init();
 
 #define MIN_SEND_TIME_THRESHOLD 1000
-#define MIN_SEND_MESSAGES_THRESHOLD 5
+#define MIN_SEND_MESSAGES_THRESHOLD 1
 #define MQTT_PUB_RETRIES 2
 #define MQTT_RETRY_TIME 1000
 #define MQTT_CONN_RETRIES 5

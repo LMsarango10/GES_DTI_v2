@@ -100,8 +100,8 @@ if (macAllowed) {
      * Smartphone, Tablet, u otro dispositivo personal con funcionalidad WiFi
      */
 
-    bool *isDev = false;
-    // metis_is_device((char *)in, isDev);
+    // bool isDev = false;
+    // metis_is_device((char *)in, &isDev);
     // metis_digest_mac_salt(in, salt, out); // Last version
     #ifdef DEBUG_METIS
     ESP_LOGI(TAG, "Content of buff is: %s", buff);

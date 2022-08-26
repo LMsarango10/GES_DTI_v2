@@ -22,6 +22,8 @@
 #include "BintrayClient.h"
 #include "BintrayCertificates.h"
 
+static const char TAG[] = "bintray";
+
 BintrayClient::BintrayClient(const String &user, const String &repository, const String &package)
     : m_user(user), m_repo(repository), m_package(package),
       m_storage_host("dl.bintray.com"),

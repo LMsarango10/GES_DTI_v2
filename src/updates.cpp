@@ -170,7 +170,7 @@ bool unifyUpdates(int parts) {
 bool downloadChecksumFile(int i, uint32_t *crcBuffer, int bufferSize,
                           int checksumsPerFile) {
   char filename[20];
-  sprintf(filename, "%d.chk", i);
+  sprintf(filename, "/%d.chk", i);
   ESP_LOGD(TAG, "Downloading %s", filename);
 
   char buff[2048];
@@ -199,7 +199,7 @@ bool downloadChecksumFile(int i, uint32_t *crcBuffer, int bufferSize,
 
 bool downloadFile(int i, uint32_t crc) {
   char filename[20];
-  sprintf(filename, "%d.bin", i);
+  sprintf(filename, "/%d.bin", i);
   ESP_LOGI(TAG, "Downloading %s", filename);
 
   char buff[2048];

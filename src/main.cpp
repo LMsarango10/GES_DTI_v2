@@ -106,7 +106,7 @@ Timezone myTZ(myDST, mySTD);
 
 // local Tag for logging
 static const char TAG[] = __FILE__;
-u1_t __DEVEUI[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; //2079e129d522e140
+u1_t __DEVEUI[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; //3079e129d522e14f
 u1_t covnertChar(char s);
 
 void convert(const char *s) {
@@ -128,7 +128,6 @@ u1_t covnertChar(char s) {
   case '1':
     return 1;
   case '2':
-  Serial.println(" covnertChar 2");
     return 2;
   case '3':
     return 3;
@@ -178,9 +177,6 @@ void setup() {
       character = Serial.read();
       devEui.concat(character);
       devEui.trim();
-      Serial.print("devEui ");
-      Serial.println(devEui);
-      Serial.print("\n");
       }
     }
       convert(devEui.c_str());
@@ -192,7 +188,10 @@ void setup() {
       Serial.print(__DEVEUI[5], HEX);
       Serial.print(__DEVEUI[6], HEX);
       Serial.println(__DEVEUI[7], HEX);
-      memcpy((char *) DEVEUI,__DEVEUI,8);
+      for(int i = 0; i<8;i++){
+        DEVEUI[i] = __DEVEUI[i];
+      }
+
       Serial.println("CONVERTED: ");
 
       Serial.print(DEVEUI[0], HEX);
@@ -204,8 +203,7 @@ void setup() {
       Serial.print(DEVEUI[6], HEX);
       Serial.print(DEVEUI[7], HEX);
       Serial.print("\n");
-  while (true) {
-  }
+      Serial.print("DEVEUI OK");
 #endif
   char features[100] = "";
 
@@ -222,7 +220,9 @@ void setup() {
 
   // setup debug output or silence device
 #if (VERBOSE)
+#ifndef (initWithSerialGuide)
   Serial.begin(115200);
+#endif
   esp_log_level_set("*", ESP_LOG_VERBOSE);
 #else
   // mute logs completely by redirecting them to silence function

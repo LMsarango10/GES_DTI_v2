@@ -106,9 +106,107 @@ Timezone myTZ(myDST, mySTD);
 
 // local Tag for logging
 static const char TAG[] = __FILE__;
+u1_t __DEVEUI[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; //2079e129d522e140
+u1_t covnertChar(char s);
 
+void convert(const char *s) {
+  for (int j = 0, i= 0; j < strlen(s); j++) {
+    i=round((j-0.01)/2);
+    if (j % 2 == 0 or j == 0) {
+      __DEVEUI[i] =   __DEVEUI[i] + 16 * covnertChar(s[j]);
+    }
+    else {
+      __DEVEUI[i] =  __DEVEUI[i] + covnertChar(s[j]);
+    }
+  }
+}
+
+u1_t covnertChar(char s) {
+  switch (s) {
+  case '0':
+    return 0;
+  case '1':
+    return 1;
+  case '2':
+  Serial.println(" covnertChar 2");
+    return 2;
+  case '3':
+    return 3;
+  case '4':
+    return 4;
+  case '5':
+    return 5;
+  case '6':
+    return 6;
+  case '7':
+    return 7;
+  case '8':
+    return 8;
+  case '9':
+    return 9;
+  case 'a':
+    return 10;
+  case 'b':
+    return 11;
+  case 'c':
+    return 12;
+  case 'd':
+    return 13;
+  case 'e':
+    return 14;
+  case 'f':
+    return 15;
+
+  default:
+    Serial.print("NOT VALID HEX");
+    break;
+  }
+}
 void setup() {
 
+#ifdef initWithSerialGuide
+  Serial.begin(115200);
+
+  printf("Bienvenido a la guía de STA\n");
+  printf("Introduzca la deveui: ");
+  String devEui = "";
+  char character;
+
+
+    while (strlen(devEui.c_str() )< 16) {
+      if(Serial.available()){
+      character = Serial.read();
+      devEui.concat(character);
+      devEui.trim();
+      Serial.print("devEui ");
+      Serial.println(devEui);
+      Serial.print("\n");
+      }
+    }
+      convert(devEui.c_str());
+      Serial.print(__DEVEUI[0], HEX);
+      Serial.print(__DEVEUI[1], HEX);
+      Serial.print(__DEVEUI[2], HEX);
+      Serial.print(__DEVEUI[3], HEX);
+      Serial.print(__DEVEUI[4], HEX);
+      Serial.print(__DEVEUI[5], HEX);
+      Serial.print(__DEVEUI[6], HEX);
+      Serial.println(__DEVEUI[7], HEX);
+      memcpy((char *) DEVEUI,__DEVEUI,8);
+      Serial.println("CONVERTED: ");
+
+      Serial.print(DEVEUI[0], HEX);
+      Serial.print(DEVEUI[1], HEX);
+      Serial.print(DEVEUI[2], HEX);
+      Serial.print(DEVEUI[3], HEX);
+      Serial.print(DEVEUI[4], HEX);
+      Serial.print(DEVEUI[5], HEX);
+      Serial.print(DEVEUI[6], HEX);
+      Serial.print(DEVEUI[7], HEX);
+      Serial.print("\n");
+  while (true) {
+  }
+#endif
   char features[100] = "";
 
   // create some semaphores for syncing / mutexing tasks
@@ -280,25 +378,25 @@ void setup() {
   strcat_P(features, " BLE");
   if (cfg.blescan) {
     ESP_LOGI(TAG, "Starting Bluetooth LE...");
-    //initBLE();
-    //BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
+    // initBLE();
+    // BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
   }
   strcat_P(features, " BT");
   if (cfg.btscan) {
     ESP_LOGI(TAG, "Starting Bluetooth...");
-    //initBT();
-    //BTCycler.attach(BTLE_SCAN_TIME, BTCycle);
+    // initBT();
+    // BTCycler.attach(BTLE_SCAN_TIME, BTCycle);
   }
   xTaskCreatePinnedToCore(btHandler,      // task function
                           "bthandler",    // name of task
-                          4096,            // stack size of task
-                          (void *)1,       // parameter of the task
-                          0,               // priority of the task
+                          4096,           // stack size of task
+                          (void *)1,      // parameter of the task
+                          0,              // priority of the task
                           &btHandlerTask, // task handle
-                          1);              // CPU core
+                          1);             // CPU core
 #endif
-ESP_ERROR_CHECK(esp_coex_preference_set(
-    ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
+  ESP_ERROR_CHECK(esp_coex_preference_set(
+      ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
 
 // initialize gps
 #if (HAS_GPS)

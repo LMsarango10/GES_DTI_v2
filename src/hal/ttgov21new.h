@@ -51,4 +51,6 @@
 #define LORA_IO1  (33)
 #define LORA_IO2  (32)
 
+//Define si tiene guia de instalación o si no 
+#define initWithSerialGuide 1
 #endif

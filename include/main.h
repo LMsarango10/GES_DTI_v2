@@ -27,3 +27,7 @@
 #endif
 #include "timekeeper.h"
 #endif
+
+#if (initWithSerialGuide)
+#include "serialGuideInit.h"
+#endif

@@ -14,11 +14,11 @@ int readResponseBC(HardwareSerial *port, char *buff, int b_size,
                    uint32_t timeout = 500) {
   port->setTimeout(timeout);
   buff[0] = 0;
-  int bytesRead = port->readBytes(buff, b_size-1);
+  int bytesRead = port->readBytes(buff, b_size - 1);
   if (bytesRead > 0) {
     buff[bytesRead] = 0;
-    ESP_LOGI(TAG, "%d bytes read", bytesRead);
-    ESP_LOGI(TAG, "Message: %s", buff);
+    ESP_LOGV(TAG, "%d bytes read", bytesRead);
+    ESP_LOGV(TAG, "Message: %s", buff);
     return bytesRead;
   } else if (bytesRead < 0)
     return -1;
@@ -41,9 +41,9 @@ int readResponseWithStop(HardwareSerial *port, char *buff, int b_size,
       }
     }
     if (strstr(buff, stopWord)) {
-      ESP_LOGI(TAG, "Stopword %s found", stopWord);
-      ESP_LOGI(TAG, "%d bytes read", p);
-      ESP_LOGI(TAG, "Message: %s", buff);
+      ESP_LOGV(TAG, "Stopword %s found", stopWord);
+      ESP_LOGV(TAG, "%d bytes read", p);
+      ESP_LOGV(TAG, "Message: %s", buff);
       return p;
     }
   }
@@ -59,10 +59,7 @@ bool assertResponseBC(const char *expected, char *received, int bytesRead) {
 
 bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command,
                              char *buffer, int bufferSize) {
-  // ESP_LOGV(TAG, "Command: %s", command);
-#ifdef DEBUG_MODEM
-  ESP_LOGD(TAG, "Command: %s", command);
-#endif
+  ESP_LOGV(TAG, "Command: %s", command);
   port->println(command);
   int bytesRead = readResponseBC(port, buffer, bufferSize);
   return assertResponseBC("OK\r", buffer, bytesRead);
@@ -70,6 +67,7 @@ bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command,
 
 void initModem() {
   bc95serial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
+  bc95serial.setRxBufferSize(4096);
   // pinMode(RESET_PIN, OUTPUT);
   //  digitalWrite(RESET_PIN, HIGH);
 
@@ -105,7 +103,7 @@ void resetModem() {
   delay(2000);
   int bytesRead = readResponseBC(&bc95serial, globalBuff, sizeof(globalBuff));
   assertResponseBC("REBOOTING", globalBuff, bytesRead);
-  delay(5000);
+  delay(7000);
   while (bc95serial.available() > 0)
     bc95serial.read();
   sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff));
@@ -113,19 +111,25 @@ void resetModem() {
 
 bool configModem() {
   ESP_LOGI(TAG, "Config NBIOT modem");
-  return sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0", globalBuff, sizeof(globalBuff)) &&
-#ifdef VODAFONE_VERSION
-        sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=0", globalBuff, sizeof(globalBuff)) &&
-        sendAndReadOkResponseBC(&bc95serial, "AT+NPSMR=0", globalBuff, sizeof(globalBuff)) &&
-        sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff, sizeof(globalBuff)) &&
-        sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
+  return sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0", globalBuff,
                                  sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+COPS=1,2,\"21401\"", globalBuff,
-                                 sizeof(globalBuff));
+         sendAndReadOkResponseBC(&bc95serial, "AT+NSONMI=3", globalBuff,
+                                 sizeof(globalBuff)) &&
+#ifdef VODAFONE_VERSION
+         sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=0", globalBuff,
+                                 sizeof(globalBuff)) &&
+         sendAndReadOkResponseBC(&bc95serial, "AT+NPSMR=0", globalBuff,
+                                 sizeof(globalBuff)) &&
+         sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff,
+                                 sizeof(globalBuff)) &&
+         sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
+                                 sizeof(globalBuff)) &&
+         sendAndReadOkResponseBC(&bc95serial, "AT+COPS=1,2,\"21401\"",
+                                 globalBuff, sizeof(globalBuff));
 #endif
 #ifdef AUTO_VERSION
-      sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
-                              globalBuff, sizeof(globalBuff));
+  sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
+                          globalBuff, sizeof(globalBuff));
 #endif
 }
 
@@ -134,11 +138,15 @@ bool attachNetwork()
 {
   return
 #ifdef VODAFONE_VERSION
-  sendAndReadOkResponseBC(&bc95serial,"AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",globalBuff, sizeof(globalBuff));// &&
+      sendAndReadOkResponseBC(&bc95serial,
+                              "AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",
+                              globalBuff, sizeof(globalBuff)); // &&
 #endif
 #ifdef AUTO_VERSION
-         sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,sizeof(globalBuff));
+  sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,
+                          sizeof(globalBuff)) &&
+      sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,
+                              sizeof(globalBuff));
 #endif
 }
 
@@ -203,110 +211,207 @@ bool receiveData(char *data, int bytesRead, int bufferLen) {
 }
 enum sendStatus { INIT, DATAOK, SENTOK, RECOK };
 
-int sendData(char *data, int datalen, char *responseBuff,
+int openSocket() {
+  ESP_LOGV(TAG, "Openning socket");
+  if (!sendAndReadOkResponseBC(&bc95serial, "AT+NSOCR=STREAM,6,0,1", globalBuff,
+                               sizeof(globalBuff))) {
+    return -1;
+  }
+
+  char *socketPtr = strtok(globalBuff, "\r\n");
+  ESP_LOGV(TAG, "Open Socket: %s", socketPtr);
+  int socket = atoi(socketPtr);
+  return socket;
+}
+
+bool connectSocket(int socket, char *ip, int port) {
+  ESP_LOGV(TAG, "Connecting socket");
+  char outBuffer[64];
+  sprintf(outBuffer, "AT+NSOCO=%d,%s,%d", socket, ip, port);
+  return sendAndReadOkResponseBC(&bc95serial, outBuffer, globalBuff,
+                                 sizeof(globalBuff));
+}
+
+int sendData(int socket, char *data, int datalen, char *responseBuff,
              int responseBuffSize) // returns bytes read
 {
-#define sendSerial bc95serial
-#ifdef DEBUG_MODEM
-  ESP_LOGD(TAG, "Data string: %s", data);
-#endif
-  sendSerial.print("AT+NSOSD=1,");
-  sendSerial.print(datalen);
-  sendSerial.print(",");
+  char outBuffer[256];
+  sprintf(outBuffer, "AT+NSOSD=%d,%d,", socket, datalen);
   for (int i = 0; i < datalen; i++) {
     char b2[3];
     sprintf(b2, "%02X", data[i]);
-    sendSerial.print(b2);
+    strcat(outBuffer, b2);
   }
-  sendSerial.println(",0x100,101");
+  strcat(outBuffer, ",0x100,101");
+  responseBuff[0] = 0;
+  if (!sendAndReadOkResponseBC(&bc95serial, outBuffer, responseBuff,
+                               responseBuffSize)) {
+    return -1;
+  }
+
   bool timeout = false;
   unsigned long startTime = millis();
-  int buffPtr = 0;
+  int buffPtr = strlen(responseBuff);
+  char* scanPtr = responseBuff;
   responseBuff[buffPtr] = 0;
   sendStatus status = INIT;
   while (!timeout) {
     timeout = (millis() - startTime > NBSENDTIMEOUT);
-    delay(100);
-    while (sendSerial.available()) {
-      char value = sendSerial.read();
-      if (value != '\r' && value != '\n') {
-        responseBuff[buffPtr++] = value;
-        if (buffPtr == responseBuffSize) {
-          return -10;
-        }
-        responseBuff[buffPtr] = 0;
+    //delay(100);
+    while (bc95serial.available()) {
+      responseBuff[buffPtr++] = bc95serial.read();
+      if (buffPtr == responseBuffSize) {
+        return -10;
       }
+      responseBuff[buffPtr] = 0;
     }
     char expected[18];
     switch (status) {
     case INIT: {
-      sprintf(expected, "1,%d", datalen);
-      if (strlen(responseBuff) == strlen(expected)) {
-        char *val = strstr(responseBuff, expected);
-        if (val != nullptr) {
-          buffPtr = 0;
-          responseBuff[buffPtr] = 0;
-          status = DATAOK;
-          continue;
-        }
-        return -1;
+      sprintf(expected, "%d,%d\r\n", socket, datalen);
+
+      char *val = strstr(responseBuff, expected);
+      if (val != nullptr) {
+        scanPtr = val + strlen(expected);
+        status = DATAOK;
+        continue;
       }
       break;
     }
     case DATAOK: {
-      sprintf(expected, "OK");
-      if (strlen(responseBuff) == strlen(expected)) {
-        char *val = strstr(responseBuff, expected);
-        if (val != nullptr) {
-          buffPtr = 0;
-          responseBuff[buffPtr] = 0;
-          status = SENTOK;
-          continue;
-        }
-        return -2;
+      sprintf(expected, "OK\r\n");
+
+      char *val = strstr(responseBuff, expected);
+      if (val != nullptr) {
+        scanPtr = val + strlen(expected);
+        status = SENTOK;
+        continue;
       }
       break;
     }
     case SENTOK: {
-      sprintf(expected, "+NSOSTR:1,101,1");
-      if (strlen(responseBuff) == strlen(expected)) {
-        char *val = strstr(responseBuff, expected);
-        if (val != nullptr) {
-          buffPtr = 0;
-          responseBuff[buffPtr] = 0;
-          status = RECOK;
-          continue;
-        }
-        return -3;
+      sprintf(expected, "+NSOSTR:%d,101,1",socket);
+      char *val = strstr(responseBuff, expected);
+      if (val != nullptr) {
+        scanPtr = val + strlen(expected);
+        status = RECOK;
+        continue;
       }
       break;
     }
     case RECOK: {
-      sprintf(expected, "+NSONMI:1,");
-      if (strlen(responseBuff) == strlen(expected)) {
-        char *val = strstr(responseBuff, expected);
-        if (val != nullptr) {
-          delay(100);
-          while (bc95serial.available()) {
-            responseBuff[buffPtr++] = bc95serial.read();
-            if (buffPtr == responseBuffSize) {
-              return -10;
-            }
-            responseBuff[buffPtr] = 0;
-          }
-          char *pch = val + sizeof("+NSONMI:1,") - 1;
-          int bytesReceived = strtoul(pch, NULL, 10);
-          if (bytesReceived == 0)
-            return -5;
-          return bytesReceived;
-        }
-        return -4;
-      }
+      strcpy(responseBuff, scanPtr);
+      return strlen(responseBuff);
       break;
     }
     }
   }
+
   return 0;
+}
+
+int readResponseData(std::string response, char *buffer, int bufferSize) {
+  int socketIndex = response.find(",");
+  if (socketIndex == std::string::npos) {
+    ESP_LOGD(TAG, "Cannot find socket index in response");
+    return -1;
+  }
+  int lenIndex = response.find(",", socketIndex + 1);
+  if (lenIndex == std::string::npos) {
+    ESP_LOGD(TAG, "Cannot find length index in response");
+    return -1;
+  }
+  int dataIndex = response.find("\r\n", lenIndex + 1);
+  if (dataIndex == std::string::npos) {
+    ESP_LOGD(TAG, "Cannot find data index in response");
+    return -1;
+  }
+
+  std::string socketString = response.substr(0, socketIndex);
+  std::string lenString = response.substr(socketIndex + 1, lenIndex - socketIndex - 1);
+  std::string dataString = response.substr(lenIndex + 1, dataIndex - lenIndex - 1);
+
+  int dataLen = strtoul(lenString.c_str(), NULL, 10);
+  int strLen = strlen(dataString.c_str());
+
+  if (dataLen != strLen / 2) {
+    ESP_LOGE(TAG, "Size mismatch");
+    return -1;
+  }
+
+  if (bufferSize < dataLen + 1) {
+    ESP_LOGE(TAG, "Buffer too small");
+    return -2;
+  }
+
+  char* tempBuff = (char*)dataString.c_str();
+  for (int i = 0; i < strLen; i += 2) {
+    char tmp[3];
+    memcpy(tmp, tempBuff + i, 2);
+    tmp[2] = 0;
+    buffer[i / 2] = strtoul(tmp, NULL, 16);
+  }
+  buffer[strLen/2] = 0;
+  return dataLen;
+}
+
+int getReceivedBytes(int socket, char *buffer, int bufferSize) {
+  char responseBuffer[2048];
+  responseBuffer[0] = 0;
+  size_t responseBufferPos = 0;
+  ESP_LOGV(TAG, "Getting received bytes");
+  int readBytes = strlen(buffer);
+  int buffPtr = readBytes;
+  char* scanPtr = buffer;
+
+  unsigned long startT = millis();
+  while (millis() < startT + HTTP_READ_TIMEOUT) {
+    while (bc95serial.available()) {
+      buffer[buffPtr++] =  bc95serial.read();
+      readBytes+=1;
+      if (buffPtr == bufferSize) {
+        return -10;
+      }
+      buffer[buffPtr] = 0;
+    }
+    std::string current = std::string(scanPtr);
+    char expected[32];
+
+    sprintf(expected, "\r\n");
+
+    size_t pos = current.find(expected);
+    if (pos == std::string::npos) {
+      continue;
+    }
+
+    std::string line = current.substr(0, pos + 2);
+
+    scanPtr += line.length();
+
+    sprintf(expected, "+NSONMI:%d", socket);
+    if (line.find(expected) != std::string::npos) {
+      char dataBuffer[2048];
+      int len = readResponseData(line, dataBuffer, sizeof(dataBuffer));
+      if (len < 0) {
+        return len;
+      }
+
+      memcpy(responseBuffer + responseBufferPos, dataBuffer, len);
+      responseBufferPos += len;
+      continue;
+    }
+
+    sprintf(expected, "+NSOCLI: %d", socket);
+    if (line.find(expected) != std::string::npos) {
+      ESP_LOGV(TAG, "Socket closed");
+      memcpy(buffer, responseBuffer, responseBufferPos);
+      buffer[responseBufferPos] = 0;
+      return responseBufferPos;
+    }
+  };
+
+  memcpy(buffer, responseBuffer, responseBufferPos);
+  return -2;
 }
 
 int parseResponse(char *buff, int bytesReceived, int *responseCode) {
@@ -343,6 +448,139 @@ int parseResponse(char *buff, int bytesReceived, int *responseCode) {
   return bodyLen;
 }
 
+int parseResponseCode(char* buff, int buffSize)
+{
+  std::string inputString = std::string(buff);
+  size_t pos = inputString.find("\r\n");
+  if(pos == std::string::npos)
+  {
+    return -1;
+  }
+
+  std::string httpResponseLine = inputString.substr(0, pos+2);
+  ESP_LOGV(TAG, "Response line: %s", httpResponseLine.c_str());
+
+  size_t responseCodePos = httpResponseLine.find(" ");
+  size_t responseCodePosEnd = httpResponseLine.find(" ", responseCodePos+1);
+
+  std::string responseCodeStr = httpResponseLine.substr(responseCodePos+1, responseCodePosEnd-responseCodePos-1);
+  ESP_LOGV(TAG, "Response code: %s", responseCodeStr.c_str());
+  return strtoul(responseCodeStr.c_str(), NULL, 10);
+}
+
+int parseContentLength(char* buff, int buffSize)
+{
+  std::string inputString = std::string(buff);
+  size_t pos = inputString.find("\r\n\r\n");
+  if(pos == std::string::npos)
+  {
+    return -1;
+  }
+
+  std::string httpString = inputString.substr(0, pos+4);
+
+  std::for_each(httpString.begin(), httpString.end(), [](char & c) {
+        c = ::tolower(c);
+    });
+
+  size_t contentLengthPos = httpString.find("content-length:");
+  size_t contentLengthPosEnd = httpString.find("\r\n", contentLengthPos+1);
+  std::string contentLengthStr = httpString.substr(contentLengthPos+15, contentLengthPosEnd-contentLengthPos-15);
+
+  ESP_LOGV(TAG, "Content Length str: %s", contentLengthStr.c_str());
+
+  unsigned long contentLength = strtoul(contentLengthStr.c_str(), NULL, 10);
+  return contentLength;
+}
+
+int parseData(char* buff, int dataSize, char* outBuff, int outBuffSize)
+{
+  std::string inputString = std::string(buff);
+  size_t pos = inputString.find("\r\n\r\n");
+  if(pos == std::string::npos)
+  {
+    return -1;
+  }
+
+  char* dataPos = buff + pos + 4;
+  //ESP_LOGV(TAG, "Data: %s", dataPos);
+  memcpy(outBuff, dataPos, dataSize);
+  return dataSize;
+}
+
+int getData(char *ip, int port, char *page, char *responseBuffer, int responseBufferSize, int *responseSizePtr) {
+  char devEui[32];
+  sprintf(devEui, "%02x%02x%02x%02x%02x%02x%02x%02x", DEVEUI[0],
+          DEVEUI[1], DEVEUI[2], DEVEUI[3], DEVEUI[4], DEVEUI[5], DEVEUI[6],
+          DEVEUI[7]);
+
+  char outBuf[256];
+
+  int responseCode = 0;
+
+  // Open socket
+  int socketN = openSocket();
+
+  bool connected = connectSocket(socketN, ip, port);
+
+  char pageWithParams[256];
+  std::string version = std::string(PROGVERSION);
+  std::replace( version.begin(), version.end(), '.', '_'); // replace all '.' to '_'
+
+  sprintf(pageWithParams, "%s?deveui=%s&version=%s", page, devEui, version.c_str());
+  // send the header
+  globalBuff[0] = 0;
+  sprintf(outBuf, "GET %s HTTP/1.1\r\n", pageWithParams);
+  strcat(globalBuff, outBuf);
+  sprintf(outBuf, "Host: %s\r\n", ip);
+  strcat(globalBuff, outBuf);
+  strcat(globalBuff, "\r\n");
+
+  int sentOk = sendData(socketN, globalBuff, strlen(globalBuff), globalBuff,
+                        sizeof(globalBuff));
+
+  if (sentOk < 0) {
+    ESP_LOGE(TAG, "Error sending data");
+    return -1;
+  }
+
+  int bytesReceived = getReceivedBytes(socketN, globalBuff, sizeof(globalBuff));
+
+  //ESP_LOGV(TAG, "Data received: %s", globalBuff);
+
+  if (bytesReceived < 0) {
+    ESP_LOGE(TAG, "failed sending data with error code: %d", bytesReceived);
+    responseCode = bytesReceived;
+  } else if (bytesReceived > 0) {
+    ESP_LOGD(TAG, "Received %d bytes", bytesReceived);
+    responseCode = parseResponseCode(globalBuff, bytesReceived);
+    ESP_LOGD(TAG, "Response Code: %d", responseCode);
+
+    if (responseCode != 200) {
+      ESP_LOGE(TAG, "Error code: %d", responseCode);
+      return responseCode;
+    }
+
+    char* inputBuffer = new char[bytesReceived + 1];
+    memcpy(inputBuffer, globalBuff, bytesReceived);
+    inputBuffer[bytesReceived] = 0;
+    int contentLength = parseContentLength(inputBuffer, bytesReceived);
+    int parsedData = parseData(inputBuffer, contentLength, globalBuff, sizeof(globalBuff));
+    if (parsedData >= 0) {
+      memcpy(responseBuffer, globalBuff, parsedData);
+      *responseSizePtr = parsedData;
+      responseBuffer[parsedData] = 0;
+      return responseCode;
+    }
+  } else {
+    ESP_LOGE(TAG, "Timeout");
+    responseCode = 0;
+  }
+
+  ESP_LOGI(TAG, "Return code %d", responseCode);
+  return responseCode;
+}
+
 int postPage(char *domainBuffer, int thisPort, char *page, char *thisData,
              char *identityKey) {
   char outBuf[256];
@@ -368,7 +606,7 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData,
     // send the body (variables)
     strcat(globalBuff, thisData);
     int responseCode = 0;
-    int bytesReceived = sendData(globalBuff, strlen(globalBuff), globalBuff,
+    int bytesReceived = sendData(1, globalBuff, strlen(globalBuff), globalBuff,
                                  sizeof(globalBuff));
     if (bytesReceived < 0) {
       cleanbuffer();
@@ -418,7 +656,7 @@ bool checkMqttConnection() {
   return false;
 }
 
-int readMqttSubData(char* buff, int bufflen) {
+int readMqttSubData(char *buff, int bufflen) {
   char data[2048];
   int bytesRead = readResponseBC(&bc95serial, data, sizeof(data));
 
@@ -446,8 +684,10 @@ int readMqttSubData(char* buff, int bufflen) {
   }
 
   // extract message between quotes
-  std::string topic = response.substr(topicFirstQuote + 1, topicSecondQuote - topicFirstQuote - 1);
-  std::string message = response.substr(messageComma + 1, messageEnd - messageComma - 1);
+  std::string topic = response.substr(topicFirstQuote + 1,
+                                      topicSecondQuote - topicFirstQuote - 1);
+  std::string message =
+      response.substr(messageComma + 1, messageEnd - messageComma - 1);
   ESP_LOGD(TAG, "Message in Topic: %s", topic.c_str());
   ESP_LOGD(TAG, "Message: %s", message.c_str());
 
@@ -479,11 +719,12 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
   int responseBytes = 0;
   if (!assertResponseBC("+QMTOPEN: 0,0", data, bytesRead)) {
     for (int i = 0; i < 30; i++) {
-      responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
+      responseBytes = readResponseBC(&bc95serial, data, 128, 1000);
       if (responseBytes != 0) {
         break;
       }
       ESP_LOGI(TAG, "Wait for conn");
+      delay(1000);
     }
     if (!assertResponseBC("+QMTOPEN: 0,0", data, responseBytes)) {
       return -1;
@@ -506,12 +747,13 @@ int connectMqtt(char *url, int port, char *password, char *clientId) {
   }
 
   for (int i = 0; i < 30; i++) {
-      responseBytes = readResponseBC(&bc95serial, data, 128, 2000);
-      if (responseBytes != 0) {
-        break;
-      }
-      ESP_LOGI(TAG, "Wait for conn");
+    responseBytes = readResponseBC(&bc95serial, data, 128, 1000);
+    if (responseBytes != 0) {
+      break;
     }
+    ESP_LOGI(TAG, "Wait for conn");
+    delay(1000);
+  }
   if (!assertResponseBC("+QMTCONN: 0,0,0", data, responseBytes)) {
     return -2;
   }

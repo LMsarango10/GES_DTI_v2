@@ -6,6 +6,7 @@
 #define _TTGOV21NEW_H
 
 #include <stdint.h>
+#include "soc/adc_channel.h"
 
 /*  Hardware related definitions for TTGO V2.1 Board
 // ATTENTION: check your board version!
@@ -51,6 +52,4 @@
 #define LORA_IO1  (33)
 #define LORA_IO2  (32)
 
-//Define si tiene guia de instalación o si no 
-#define initWithSerialGuide 1
 #endif

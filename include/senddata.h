@@ -3,6 +3,7 @@
 
 #include "spislave.h"
 #include "cyclic.h"
+#include <vector>
 
 #if(HAS_LORA)
 #include "lorawan.h"

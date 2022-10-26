@@ -289,23 +289,25 @@ void setup() {
     ESP_LOGI(TAG, "Starting Bluetooth LE...");
     // initBLE();
     // BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
+    //initBLE();
+    //BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
   }
   strcat_P(features, " BT");
   if (cfg.btscan) {
     ESP_LOGI(TAG, "Starting Bluetooth...");
-    // initBT();
-    // BTCycler.attach(BTLE_SCAN_TIME, BTCycle);
+    //initBT();
+    //BTCycler.attach(BTLE_SCAN_TIME, BTCycle);
   }
   xTaskCreatePinnedToCore(btHandler,      // task function
                           "bthandler",    // name of task
-                          4096,           // stack size of task
-                          (void *)1,      // parameter of the task
-                          0,              // priority of the task
+                          4096,            // stack size of task
+                          (void *)1,       // parameter of the task
+                          0,               // priority of the task
                           &btHandlerTask, // task handle
-                          1);             // CPU core
+                          1);              // CPU core
 #endif
-  ESP_ERROR_CHECK(esp_coex_preference_set(
-      ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
+ESP_ERROR_CHECK(esp_coex_preference_set(
+    ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
 
 // initialize gps
 #if (HAS_GPS)

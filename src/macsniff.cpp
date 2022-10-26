@@ -50,16 +50,31 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
   int8_t beaconID;    // beacon number in test monitor mode
   uint32_t hashedmac; // temporary buffer for generated hash value
 
+  // if it is NOT a locally administered ("random") mac, we don't count it  
+  bool globalRandomAddr = false;
+  bool macAllowed = false;
+  bool vendorAllowed = false;
+#if (GLOBALFILTER)
+  globalRandomAddr = (paddr[0] & 0b10);
+  macAllowed = macAllowed || globalRandomAddr;
+#endif
+
 #if (VENDORFILTER)
   uint32_t *oui; // temporary buffer for vendor OUI
   oui = (uint32_t *)paddr;
 
   // use OUI vendor filter list only on Wifi, not on BLE
-  if ((sniff_type == MAC_SNIFF_BLE) || (sniff_type == MAC_SNIFF_BT) ||
+  vendorAllowed = ((sniff_type == MAC_SNIFF_BLE) || (sniff_type == MAC_SNIFF_BT) ||
       std::find(vendors_list.begin(), vendors_list.end(),
-                __builtin_bswap32(*oui) >> 8) != vendors_list.end()) {
+                __builtin_bswap32(*oui) >> 8) != vendors_list.end());
+  macAllowed = macAllowed || vendorAllowed;
 #endif
 
+#if (!GLOBALFILTER && !VENDORFILTER)
+  macAllowed = true;
+#endif
+
+if (macAllowed) {
     // salt and hash MAC, and if new unique one, store identifier in container
     // and increment counter on display
     // https://en.wikipedia.org/wiki/MAC_Address_Anonymization
@@ -85,8 +100,8 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
      * Smartphone, Tablet, u otro dispositivo personal con funcionalidad WiFi
      */
 
-    bool *isDev = false;
-    // metis_is_device((char *)in, isDev);
+    // bool isDev = false;
+    // metis_is_device((char *)in, &isDev);
     // metis_digest_mac_salt(in, salt, out); // Last version
     #ifdef DEBUG_METIS
     ESP_LOGI(TAG, "Content of buff is: %s", buff);
@@ -185,15 +200,17 @@ bool mac_add(uint8_t *paddr, int8_t rssi, uint8_t sniff_type) {
                                              : "BLTH",
                rssi, out, hashedmacbuff, macs_wifi, macs_ble, macs_bt,
                getFreeRAM());
+      //ESP_LOGV(TAG, "MAC is: %02X%02X%02X%02X%02X%02X",
+      ESP_LOGE(TAG, "MAC is: %02X%02X%02X%02X%02X%02X",   //para ver solo las lineas de macs
+      paddr[0],paddr[1],paddr[2],paddr[3],paddr[4],paddr[5]);
     }
 
-#if (VENDORFILTER)
+
   } else {
     // Very noisy
-    // ESP_LOGD(TAG, "Filtered MAC %02X:%02X:%02X:%02X:%02X:%02X",
-    // paddr[0],paddr[1],paddr[2],paddr[3],paddr[5],paddr[5]);
+    //ESP_LOGE(TAG, "Filtered MAC %02X:%02X:%02X:%02X:%02X:%02X vendor: %s global: %s",
+    //paddr[0],paddr[1],paddr[2],paddr[3],paddr[5],paddr[5], vendorAllowed? "allowed": "filtered", globalRandomAddr ? "allowed": "filtered");
   }
-#endif
 
   // True if MAC WiFi/BLE was new
   return added; // function returns bool if a new and unique Wifi or BLE mac was

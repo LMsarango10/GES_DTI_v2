@@ -17,6 +17,8 @@ int readResponse(HardwareSerial* port, char* buff, int b_size, uint32_t timeout=
   if(bytesRead > 0)
   {
     buff[bytesRead] = 0;
+    ESP_LOGV(TAG, "%d bytes read", bytesRead);
+    ESP_LOGV(TAG, "Message: %s", buff);
     return bytesRead;
   }
   else if (bytesRead < 0) return -1;
@@ -103,6 +105,7 @@ int getMacsFromBT(char* buff, int bytesRead)
   return 0;
 }
 
+#ifdef OLD_BLE_METHOD
 int getMacsFromBLE(int totalMacs)
 {
   if (totalMacs <= 0 )
@@ -138,6 +141,35 @@ int getMacsFromBLE(int totalMacs)
   }
   return 0;
 }
+#else
+int getMacsFromBLE(char* buffer, int bytesRead)
+{
+  if (!assertResponse("+INQ:", buffer, bytesRead)) return 0;
+
+  char* endPtr = nullptr;
+
+  std::string response = std::string(buffer);
+
+  int startPos = response.find(" 0x") + 3;
+  std::string macStr = response.substr(startPos);
+
+  if (macStr.length() < 13)
+  {
+    ESP_LOGE(TAG, "error reading mac, ignoring");
+    return 0;
+  }
+
+  ESP_LOGV(TAG, "MAC: %s", macStr.c_str());
+
+  uint8_t macBytes[6];
+  for (int i = 0; i < 6; i++)
+  {
+    macBytes[i] = strtoul(macStr.substr(i * 2, 2).c_str(), nullptr, 16);
+  }
+  mac_add((uint8_t *)macBytes, 0, MAC_SNIFF_BLE);
+  return 1;
+}
+#endif
 
 bool reinitBLE()
 {
@@ -215,7 +247,7 @@ bool initBLE()
   return reinitBLE();
 }
 
-
+#ifdef OLD_BLE_METHOD
 void BLECycle(void)
 {
   if(!cfg.blescan) return;
@@ -256,6 +288,74 @@ void BLECycle(void)
   }
   return;
 }
+#else
+void BLECycle(void)
+{
+  if(!cfg.blescan) return;
+  ESP_LOGV(TAG, "cycling ble scan");
+  ESP_LOGV(TAG, "Set BLE inquiry mode");
+  char buffer[512];
+  BLESerial.println("AT+INQ");
+
+  //ENTER INQ MODE
+  ESP_LOGV(TAG, "start INQ mode ");
+  buffer[0] = 0;
+  int bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
+#ifdef BLE_RETURNS_OK_ON_INIT
+  if(! assertResponse("OK", buffer, bytesRead))
+  {
+    ESP_LOGD(TAG, "Error setting BLE INQ mode");
+    return;
+  }
+  bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
+#endif
+  if(! assertResponse("+INQS\r", buffer, bytesRead))
+  {
+    ESP_LOGD(TAG, "Error setting BLE INQ mode");
+    return;
+  }
+  delay(1000);
+  buffer[0] = 0;
+#ifdef BLE_RETURNS_SCANNING
+  bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
+  if(! assertResponse("Scanning...", buffer, bytesRead))
+  {
+    ESP_LOGD(TAG, "Error setting BLE INQ scanning mode");
+    return;
+  }
+#endif
+  delay(5000);
+  long start_time = millis();
+  int devicesDetected = 0;
+  while(bytesRead > 0 || (millis() - start_time < (BTLE_SCAN_TIME/2) * 1000) )
+  {
+    buffer[0] = 0;
+    bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 5000);
+    if(bytesRead <= 0)
+    {
+      break;
+    }
+    ESP_LOGV(TAG, "Response: %s", buffer);
+    if(assertResponse("+INQE\r", buffer, bytesRead))
+    {
+      ESP_LOGV(TAG, "finish INQ mode ");
+
+      if(devicesDetected == 0) {
+        ESP_LOGV(TAG, "No devices detected");
+      } else {
+        ESP_LOGV(TAG, "%d devices detected", devicesDetected);
+      }
+      return;
+    }
+    if(assertResponse("+INQ:", buffer, bytesRead))
+    {
+      devicesDetected += getMacsFromBLE(buffer, bytesRead);
+    }
+  }
+  return;
+}
+#endif
+
 bool reinitBT()
 {
   if (!(
@@ -279,8 +379,8 @@ bool reinitBT()
   delay(5000);
   if (!(
     sendAndReadOkResponse(&BTSerial,"AT+CMODE=1") &&
-#ifdef BT_OLD_MODULE
-    //sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
+#ifdef BT_REQUIRES_INIT
+    sendAndReadOkResponse(&BTSerial,"AT+INIT") &&
 #endif
     sendAndReadOkResponse(&BTSerial, "AT+INQM=1,10000,7")))
     {

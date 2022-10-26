@@ -30,6 +30,8 @@
 //#define HAS_BME 1 // Enable BME sensors in general
 //#define HAS_BME280 GPIO_NUM_21, GPIO_NUM_22 // SDA, SCL
 
+#define initWithSerialGuide 1
+
 #define HAS_DISPLAY 1
 #define HAS_LED NOT_A_PIN //(25) // green on board LED
 #define BAT_MEASURE_ADC ADC1_GPIO35_CHANNEL // battery probe GPIO pin -> ADC1_CHANNEL_7

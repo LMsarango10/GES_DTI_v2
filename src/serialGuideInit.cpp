@@ -1,9 +1,9 @@
 #include "serialGuideInit.h"
 #include <EEPROM.h>
-u1_t __DEVEUI[8] = {0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00}; // 3079e129d522e14f
 
-u1_t convertChar(char s);
+
+uint8_t __DEVEUI[8] = {0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00}; // 3079e129d522e14f
 
 void convert(const char *s) {
   for (int j = 0, i = 0; j < strlen(s); j++) {
@@ -16,7 +16,7 @@ void convert(const char *s) {
   }
 }
 
-u1_t convertChar(char s) {
+uint8_t convertChar(char s) {
   switch (s) {
   case '0':
     return 0;

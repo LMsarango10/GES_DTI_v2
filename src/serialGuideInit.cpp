@@ -2,7 +2,7 @@
 #include <EEPROM.h>
 u1_t __DEVEUI[8] = {0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00}; // 3079e129d522e14f
-                    
+
 u1_t convertChar(char s);
 
 void convert(const char *s) {
@@ -93,11 +93,15 @@ bool readConfig() {
   if (configured == 7) {
     printf("SI existe Configuración Inicial... CONFIGURED: %d \n", configured);
   }
+  Serial.print("DEVEUI: ");
 
   for (int i = 0; i < 8; i++) {
     EEPROM.get(eepAddr, DEVEUI[i]);
     eepAddr += sizeof(DEVEUI[i]);
+    Serial.print(DEVEUI[i], HEX);
   }
+  Serial.println();
+
   return true;
 }
 
@@ -125,20 +129,12 @@ void initConfig() {
   Serial.print(__DEVEUI[6], HEX);
   Serial.println(__DEVEUI[7], HEX);
 
+  Serial.println("Nueva DevEUI Añadida: ");
   for (int i = 0; i < 8; i++) {
     DEVEUI[i] = __DEVEUI[i];
+    Serial.print(DEVEUI[i], HEX);
   }
 
-  Serial.println("Nueva DevEUI Añadida: ");
-
-  Serial.print(DEVEUI[0], HEX);
-  Serial.print(DEVEUI[1], HEX);
-  Serial.print(DEVEUI[2], HEX);
-  Serial.print(DEVEUI[3], HEX);
-  Serial.print(DEVEUI[4], HEX);
-  Serial.print(DEVEUI[5], HEX);
-  Serial.print(DEVEUI[6], HEX);
-  Serial.print(DEVEUI[7], HEX);
   Serial.print("\n");
   Serial.print("\n");
   Serial.print("DEVEUI OK");
@@ -147,6 +143,12 @@ void initConfig() {
   saveInitialConfig();
 }
 void checkConfig() {
+  Serial.print("APPKEY: ");
+
+  for (int i = 0; i < 16; i++) {
+    Serial.print(APPKEY[i], HEX);
+  }
+  Serial.println();
   initEeprom();
   // Si no hay configuración
   if (!readConfig()) {
@@ -174,4 +176,5 @@ void checkConfig() {
       }
     }
   }
+  delay(2000);
 }

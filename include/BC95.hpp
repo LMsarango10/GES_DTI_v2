@@ -1,6 +1,7 @@
 #ifndef _BC95_H
 #define _BC95_H
 #include <Arduino.h>
+#include "globals.h"
 #include "lorawan.h"
 
 //#define bc95serial Serial1
@@ -12,8 +13,8 @@
 #define HTTP_READ_TIMEOUT 10000
 #define HTTP_SOCKET_TIMEOUT 2000
 
-#define VODAFONE_VERSION
-//#define AUTO_VERSION
+//#define VODAFONE_VERSION
+#define AUTO_VERSION
 
 #define DEBUG_MODEM
 

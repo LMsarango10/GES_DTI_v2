@@ -1,6 +1,7 @@
 #include "serialGuideInit.h"
 #include <EEPROM.h>
 
+static const char TAG[] = __FILE__;
 
 uint8_t __DEVEUI[8] = {0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00}; // 3079e129d522e14f
@@ -78,7 +79,7 @@ void saveInitialConfig() {
 }
 
 bool readConfig() {
-  Serial.println("Leyendo la configuración existente");
+  ESP_LOGI(TAG, "Leyendo la configuración existente");
 
   uint32_t eepAddr = 200;
   uint8_t configured = 0;

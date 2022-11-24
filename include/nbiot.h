@@ -79,7 +79,7 @@ void nb_queuereset(void);
 esp_err_t nb_iot_init();
 
 #define MIN_SEND_TIME_THRESHOLD 1000
-#define MIN_SEND_MESSAGES_THRESHOLD 2000
+#define MIN_SEND_MESSAGES_THRESHOLD 1
 #define MQTT_PUB_RETRIES 2
 #define MQTT_RETRY_TIME 1000
 #define MQTT_CONN_RETRIES 5

@@ -79,4 +79,7 @@
     * TODO: ?¿ modificar ventana de detección 
     * TODO: mensaje para saber tiempo de escaneo , version salt, tamaño buffer, 4h o lora
     
+    * TODO: Al activar #define initWithSerialGuide desde el archivo ttgov21new.h llama a las funciones de serialGuideInit.cpp, encargadas de obtener la deveui 
+    a traves del serial. Despues en el codigo obtiene la dev eui como idClient de Mqtt, no he llegado a ver de donde la obtiene, lo ideal serial que también 
+    afecte a las demas deveuis guardadas. Tarea a realizar: al obtener los datos en serialGuideInit.cpp actualizar todas las deveui guardadas.
  https://docs.iotcreators.com/docs/quectel-bc95-g-1#receive-hello-device

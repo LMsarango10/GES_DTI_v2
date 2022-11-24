@@ -148,6 +148,10 @@ extern Timezone myTZ;
 extern time_t userUTCTime;
 extern RTC_DATA_ATTR runmode_t RTC_runmode;
 
+#ifdef initWithSerialGuide
+extern uint8_t DEVEUI[8];
+#endif 
+
 // application includes
 #include "led.h"
 #include "payload.h"

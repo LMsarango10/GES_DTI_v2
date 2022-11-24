@@ -96,6 +96,8 @@ std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_wifi;
 std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_ble;
 std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_bt;
 
+uint8_t DEVEUI[8];
+
 // initialize payload encoder
 PayloadConvert payload(PAYLOAD_BUFFER_SIZE);
 
@@ -109,6 +111,11 @@ static const char TAG[] = __FILE__;
 
 void setup() {
 
+#ifdef initWithSerialGuide
+  Serial.begin(115200);
+
+  checkConfig();
+#endif
   char features[100] = "";
 
   // create some semaphores for syncing / mutexing tasks
@@ -124,7 +131,9 @@ void setup() {
 
   // setup debug output or silence device
 #if (VERBOSE)
+#ifndef(initWithSerialGuide)
   Serial.begin(115200);
+#endif
   esp_log_level_set("*", ESP_LOG_VERBOSE);
 #else
   // mute logs completely by redirecting them to silence function
@@ -280,6 +289,8 @@ void setup() {
   strcat_P(features, " BLE");
   if (cfg.blescan) {
     ESP_LOGI(TAG, "Starting Bluetooth LE...");
+    // initBLE();
+    // BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
     //initBLE();
     //BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
   }

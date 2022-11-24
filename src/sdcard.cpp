@@ -334,13 +334,13 @@ void saveDefaultNbConfig() {
   conf.port = 0;
   conf.GatewayId[0] = 0;
 
-  strcat(conf.ServerAddress, "gesinen.es");
-  strcat(conf.ServerUsername, "gesinen");
-  strcat(conf.ServerPassword, "gesinen2110");
-  strcat(conf.ApplicationId, "1");
-  strcat(conf.ApplicationName, "app");
-  conf.port = 1882;
-  strcat(conf.GatewayId, "TESTGATE");
+  strcat(conf.ServerAddress, DEFAULT_URL);
+  strcat(conf.ServerUsername, DEFAULT_USERNAME);
+  strcat(conf.ServerPassword, DEFAULT_PASS);
+  strcat(conf.ApplicationId, DEFAULT_APPID);
+  strcat(conf.ApplicationName, DEFAULT_APPNAME);
+  conf.port = DEFAULT_PORT;
+  strcat(conf.GatewayId, DEFAULT_GATEWAY_ID);
   sdSaveNbConfig(&conf);
 }
 

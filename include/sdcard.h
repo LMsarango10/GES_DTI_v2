@@ -7,6 +7,29 @@
 #include <SPI.h>
 #include <mySD.h>
 
+#define DEFAULT_GESINEN 1
+//#define DEFAULT_DIPUTACION 1
+
+#ifdef DEFAULT_GESINEN
+#define DEFAULT_URL "gesinen.es"
+#define DEFAULT_USERNAME "gesinen"
+#define DEFAULT_PASS "gesinen2110"
+#define DEFAULT_APPID "1"
+#define DEFAULT_APPNAME "app"
+#define DEFAULT_PORT 1882
+#define DEFAULT_GATEWAY_ID "TESTGATE"
+#endif
+
+#ifdef DEFAULT_DIPUTACION
+#define DEFAULT_URL "connecta.dival.es"
+#define DEFAULT_USERNAME "gesinen_app"
+#define DEFAULT_PASS "gesinen2110_app"
+#define DEFAULT_APPID "1"
+#define DEFAULT_APPNAME "app"
+#define DEFAULT_PORT 1883
+#define DEFAULT_GATEWAY_ID "REMOTE"
+#endif
+
 #define SDCARD_FILE_NAME       "paxcount.%02d"
 #define SDCARD_FILE_HEADER     "date, time, wifi, bluet"
 

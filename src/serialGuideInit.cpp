@@ -99,7 +99,7 @@ bool readConfig() {
   for (int i = 0; i < 8; i++) {
     EEPROM.get(eepAddr, DEVEUI[i]);
     eepAddr += sizeof(DEVEUI[i]);
-    Serial.print(DEVEUI[i], HEX);
+    Serial.printf("%02X", DEVEUI[i]);
   }
   Serial.println();
 
@@ -115,10 +115,12 @@ void initConfig() {
   while (strlen(devEui.c_str()) < 16) {
     if (Serial.available()) {
       character = Serial.read();
+      Serial.print(character);
       devEui.concat(character);
       devEui.trim();
     }
   }
+  Serial.println();
 
   convert(devEui.c_str());
   Serial.print(__DEVEUI[0], HEX);
@@ -165,13 +167,13 @@ void checkConfig() {
     while (millis() - lastMillis < 10000) {
       if (Serial.available()) {
         char character = Serial.read();
-        if (character == 'Y') {
+        if (character == 'Y' || character =='y') {
           EEPROM.put(200, 5);
           EEPROM.commit();
           Serial.print("Reiniciando...");
           ESP.restart();
         }
-        if (character == 'N') {
+        if (character == 'N' || character == 'n') {
           break;
         }
       }

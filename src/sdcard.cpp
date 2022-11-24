@@ -312,6 +312,7 @@ void sdSaveNbConfig(ConfigBuffer_t *config){
   DynamicJsonDocument doc(capacity);
 
   doc["serverAddress"] = config->ServerAddress;
+  doc["serverUsername"] = config->ServerUsername;
   doc["serverPassword"] = config->ServerPassword;
   doc["applicationId"] = config->ApplicationId;
   doc["applicationName"] = config->ApplicationName;
@@ -327,12 +328,14 @@ void saveDefaultNbConfig() {
   ConfigBuffer_t conf;
   conf.ServerAddress[0] = 0;
   conf.ServerPassword[0] = 0;
+  conf.ServerUsername[0] = 0;
   conf.ApplicationId[0] = 0;
   conf.ApplicationName[0] = 0;
   conf.port = 0;
   conf.GatewayId[0] = 0;
 
   strcat(conf.ServerAddress, "gesinen.es");
+  strcat(conf.ServerUsername, "gesinen");
   strcat(conf.ServerPassword, "gesinen2110");
   strcat(conf.ApplicationId, "1");
   strcat(conf.ApplicationName, "app");
@@ -376,6 +379,7 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
 
   const char* serverAddress = doc["serverAddress"]; // "12345678912345678912345678912345678912345678"
   const char* serverPassword = doc["serverPassword"];
+  const char* serverUsername = doc["serverUsername"];
   config->port = doc["port"];
 
   const char* applicationId = doc["applicationId"];
@@ -385,6 +389,10 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
   int serverAddressLen = strlen(serverAddress);
   strncpy(config->ServerAddress, serverAddress, serverAddressLen);
   config->ServerAddress[serverAddressLen] = '\0';
+
+  int serverUsernameLen = strlen(serverUsername);
+  strncpy(config->ServerUsername, serverUsername, serverUsernameLen);
+  config->ServerUsername[serverUsernameLen] = '\0';
 
   int serverPasswordLen = strlen(serverPassword);
   strncpy(config->ServerPassword, serverPassword, serverPasswordLen);

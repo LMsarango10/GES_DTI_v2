@@ -13,8 +13,8 @@
 #define HTTP_READ_TIMEOUT 10000
 #define HTTP_SOCKET_TIMEOUT 2000
 
-//#define VODAFONE_VERSION
-#define AUTO_VERSION
+#define VODAFONE_VERSION
+//#define AUTO_VERSION
 
 #define DEBUG_MODEM
 
@@ -30,7 +30,7 @@ bool attachNetwork();
 bool networkAttached();
 bool connectModem(char *ip, int port);
 void disconnectModem();
-int connectMqtt(char *url, int port, char *password, char *clientId);
+int connectMqtt(char *url, int port, char *username, char *password, char *clientId);
 bool subscribeMqtt(char *topic);
 bool checkMqttConnection();
 int readMqttSubData(char* buffer, int bufferLen);

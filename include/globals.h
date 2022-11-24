@@ -99,6 +99,7 @@ typedef struct {
 typedef struct {
   char ServerAddress[46];
   uint16_t port;
+  char ServerUsername[46];
   char ServerPassword[46];
   char ApplicationId[6];
   char ApplicationName[32];

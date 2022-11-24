@@ -395,6 +395,26 @@ void set_nb_server(uint8_t val[]) {
   sdSaveNbConfig(&conf);
 };
 
+void set_nb_username(uint8_t val[]) {
+  ESP_LOGI(TAG, "Remote command: set_nb_username");
+  ConfigBuffer_t conf;
+  sdLoadNbConfig(&conf);
+
+  for(int i = 0; i < 45; i++)
+  {
+    conf.ServerUsername[i] = val[i];
+    if (val[i] == 0) {
+      break;
+    }
+    if(i == 44) {
+      val[45] = 0;
+    }
+  }
+
+  ESP_LOGI(TAG, "Setting NB username to: %s", conf.ServerUsername);
+  sdSaveNbConfig(&conf);
+};
+
 void set_nb_password(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set_nb_password");
   ConfigBuffer_t conf;
@@ -506,6 +526,7 @@ static cmd_t table[] = {
     {0x1B, set_nb_password, 45, true},  {0x1C, set_nb_app_id, 5, true},
     {0x1D, set_nb_app_name, 31, true},  {0x1E, set_nb_port, 2, true},
     {0x1F, set_nb_gateway_id, 45, true},{0x20, set_rtc_timestamp, 4, true},
+    {0x21, set_nb_username, 45, true},
     {0x80, get_config, 0, false},
     {0x81, get_status, 0, false},       {0x83, get_batt, 0, false},
     {0x84, get_gps, 0, false},          {0x85, get_bme, 0, false},

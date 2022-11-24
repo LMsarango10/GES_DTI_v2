@@ -164,7 +164,7 @@ void NbIotManager::nb_connectMqtt() {
           DEVEUI[1], DEVEUI[2], DEVEUI[3], DEVEUI[4], DEVEUI[5], DEVEUI[6],
           DEVEUI[7]);
   int conn_result = connectMqtt(nbConfig.ServerAddress, nbConfig.port,
-                                nbConfig.ServerPassword, this->devEui);
+                                nbConfig.ServerUsername, nbConfig.ServerPassword, this->devEui);
   if (conn_result == 0) {
     ESP_LOGD(TAG, "MQTT CONNECTED");
     mqttConnected = true;

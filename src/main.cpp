@@ -96,6 +96,8 @@ std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_wifi;
 std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_ble;
 std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>> macs_list_bt;
 
+unsigned long lastConfirmedSendTime = 0;
+
 uint8_t DEVEUI[8];
 
 // initialize payload encoder

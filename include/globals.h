@@ -134,6 +134,8 @@ extern std::set<uint32_t, std::less<uint32_t>, Mallocator<uint32_t>>
 extern std::array<uint64_t, 0xff>::iterator it;
 extern std::array<uint64_t, 0xff> beacons;
 
+extern unsigned long lastConfirmedSendTime;
+
 extern configData_t cfg;                       // current device configuration
 extern char lmic_event_msg[LMIC_EVENTMSG_LEN]; // display buffer
 extern uint8_t volatile channel;               // wifi channel rotation counter
@@ -151,7 +153,7 @@ extern RTC_DATA_ATTR runmode_t RTC_runmode;
 
 #ifdef initWithSerialGuide
 extern uint8_t DEVEUI[8];
-#endif 
+#endif
 
 // application includes
 #include "led.h"

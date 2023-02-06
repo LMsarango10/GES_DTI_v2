@@ -270,12 +270,20 @@ void lora_send(void *pvParameters) {
 
     // attempt to transmit payload
     else {
-
+      #ifdef CONFIRMED_SEND_THRESHOLD
+      bool sendConfirmed = (millis() - lastConfirmedSendTime) > CONFIRMED_SEND_THRESHOLD * 60 * 1000;
+      #else
+      bool sendConfirmed = false;
+      #endif
       // switch (LMIC_sendWithCallback_strict(
       switch (LMIC_sendWithCallback(
           SendBuffer.MessagePort, SendBuffer.Message, SendBuffer.MessageSize,
-          (cfg.countermode & 0x02), myTxCallback, NULL)) {
+          (cfg.countermode & 0x02) || sendConfirmed, myTxCallback, NULL)) {
 
+      if (sendConfirmed) {
+        ESP_LOGD(TAG, "Sending confirmed lora message");
+        lastConfirmedSendTime = millis();
+      }
       case LMIC_ERROR_SUCCESS:
         ESP_LOGI(TAG, "%d byte(s) sent to LORA", SendBuffer.MessageSize);
         break;

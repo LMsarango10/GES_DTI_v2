@@ -279,13 +279,12 @@ void lora_send(void *pvParameters) {
       switch (LMIC_sendWithCallback(
           SendBuffer.MessagePort, SendBuffer.Message, SendBuffer.MessageSize,
           (cfg.countermode & 0x02) || sendConfirmed, myTxCallback, NULL)) {
-
-      if (sendConfirmed) {
-        ESP_LOGD(TAG, "Sending confirmed lora message");
-        lastConfirmedSendTime = millis();
-      }
       case LMIC_ERROR_SUCCESS:
         ESP_LOGI(TAG, "%d byte(s) sent to LORA", SendBuffer.MessageSize);
+        if (sendConfirmed) {
+          ESP_LOGD(TAG, "Sending confirmed lora message");
+          lastConfirmedSendTime = millis();
+        }
         break;
       case LMIC_ERROR_TX_BUSY:   // LMIC already has a tx message pending
       case LMIC_ERROR_TX_FAILED: // message was not sent

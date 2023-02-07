@@ -282,8 +282,7 @@ void lora_send(void *pvParameters) {
       case LMIC_ERROR_SUCCESS:
         ESP_LOGI(TAG, "%d byte(s) sent to LORA", SendBuffer.MessageSize);
         if (sendConfirmed) {
-          ESP_LOGD(TAG, "Sending confirmed lora message");
-          ESP_LOGD(TAG, "LAST TIME %d, now %d", lastConfirmedSendTime, millis());
+          ESP_LOGD(TAG, "Sending confirmed lora message");          
           lastConfirmedSendTime = millis();
         }
         break;

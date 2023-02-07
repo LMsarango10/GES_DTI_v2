@@ -271,7 +271,7 @@ void lora_send(void *pvParameters) {
     // attempt to transmit payload
     else {
       #ifdef CONFIRMED_SEND_THRESHOLD
-      bool sendConfirmed = (millis() - lastConfirmedSendTime) > CONFIRMED_SEND_THRESHOLD * 60 * 1000;
+      bool sendConfirmed = (millis() - lastConfirmedSendTime) > (CONFIRMED_SEND_THRESHOLD * 60 * 1000);
       #else
       bool sendConfirmed = false;
       #endif
@@ -283,6 +283,7 @@ void lora_send(void *pvParameters) {
         ESP_LOGI(TAG, "%d byte(s) sent to LORA", SendBuffer.MessageSize);
         if (sendConfirmed) {
           ESP_LOGD(TAG, "Sending confirmed lora message");
+          ESP_LOGD(TAG, "LAST TIME %d, now %d", lastConfirmedSendTime, millis());
           lastConfirmedSendTime = millis();
         }
         break;

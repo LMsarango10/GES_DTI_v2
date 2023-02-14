@@ -29,6 +29,7 @@ typedef struct {
   const char cmdname[20];
   const uint8_t params;
 } mac_t;
+extern unsigned long lastConfirmedSendTime;
 
 esp_err_t lora_stack_init(bool do_join);
 void lora_setupForNetwork(bool preJoin);

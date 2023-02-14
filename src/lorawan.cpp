@@ -5,6 +5,7 @@
 
 // Local logging Tag
 static const char TAG[] = "lora";
+unsigned long lastConfirmedSendTime = 0;
 
 #if (HAS_LORA)
 
@@ -310,7 +311,7 @@ void lora_send(void *pvParameters) {
 
 esp_err_t lora_stack_init(bool do_join) {
   assert(SEND_QUEUE_SIZE);
-  LoraSendQueue = xQueueCreate(SEND_QUEUE_SIZE, sizeof(MessageBuffer_t));
+  LoraSendQueue = xQueueCreate(SEND_QUEUE_SIZE, sizeof(MessageBuffer_t));  
   if (LoraSendQueue == 0) {
     ESP_LOGE(TAG, "Could not create LORA send queue. Aborting.");
     return ESP_FAIL;

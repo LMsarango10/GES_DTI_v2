@@ -30,6 +30,7 @@
 
 class NbIotManager {
     ConfigBuffer_t nbConfig;
+    bool enabled;
     char devEui[17];
     bool initialized;
     bool registered;
@@ -54,6 +55,7 @@ class NbIotManager {
 
     public:
         void loop();
+        void set_enabled(int control);
     private:
         void nb_init();
         void nb_loop();
@@ -76,6 +78,8 @@ extern TaskHandle_t nbIotTask;
 
 bool nb_enqueuedata(MessageBuffer_t *message);
 void nb_queuereset(void);
+void nb_enable(void);
+void nb_disable(void);
 esp_err_t nb_iot_init();
 
 #define MIN_SEND_TIME_THRESHOLD 1000

@@ -15,6 +15,7 @@
 #include <SPI.h>
 #include <arduino_lmic_hal_boards.h>
 #include "loraconf.h"
+#include "nbiot.h"
 
 // Needed for 24AA02E64, does not hurt anything if included and not used
 #ifdef MCP_24AA02E64_I2C_ADDRESS

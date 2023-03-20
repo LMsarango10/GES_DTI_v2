@@ -505,6 +505,12 @@ void myEventCallback(void *pUserData, ev_t ev) {
   case EV_JOINED:
     // do the after join network-specific setup.
     lora_setupForNetwork(false);
+    nb_disable(); // disable NB-IoT
+    break;
+  case EV_JOIN_FAILED:
+    // replace descriptor from library with more descriptive term
+    snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "JOIN_FAILED");
+    nb_enable(); // enable NB-IoT
     break;
 
   case EV_TXCOMPLETE:
@@ -518,6 +524,11 @@ void myEventCallback(void *pUserData, ev_t ev) {
     snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "JOIN_WAIT");
     break;
 
+  case EV_LINK_DEAD:
+    snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "LINK_DEAD");
+    nb_enable(); // enable NB-IoT
+    LMIC_startJoining(); // restart join procedure
+    break;
   default:
     break;
   }

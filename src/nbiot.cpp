@@ -4,6 +4,7 @@
 static const char TAG[] = "nbiot";
 
 QueueHandle_t NbSendQueue;
+QueueHandle_t NbControlQueue;
 TaskHandle_t nbIotTask = NULL;
 
 unsigned long lastMessage;
@@ -85,7 +86,25 @@ void nb_send(void *pvParameters) {
   NbIotManager manager = NbIotManager();
   while (1) {
     manager.loop();
+    if(uxQueueMessagesWaiting(NbControlQueue) > 0)
+    {
+      int controlMessage;
+      xQueueReceive(NbControlQueue, &controlMessage, portMAX_DELAY);
+      manager.set_enabled(controlMessage);
+    }
     delay(100);
+  }
+}
+
+void NbIotManager::set_enabled(int controlMessage)
+{
+  if(controlMessage == 1)
+  {
+    this->enabled = true;
+  }
+  else
+  {
+    this->enabled = false;
   }
 }
 
@@ -279,30 +298,34 @@ void NbIotManager::loop() {
     return;
   }
 
-  if (!this->registered) {
+  if (this-> enabled)
+  {
+    if (!this->registered) {
     this->nb_registerNetwork();
     return;
+    }
+
+    if (!this->connected) {
+      this->nb_connectNetwork();
+      return;
+    }
+
+    if (!this->mqttConnected) {
+      this->nb_connectMqtt();
+      return;
+    }
+
+    if (!this->subscribed) {
+      this->nb_subscribeMqtt();
+      return;
+    }
+
+    if (!this->nb_checkStatus()) {
+      ESP_LOGD(TAG, "NB status changed");
+      return;
+    }
   }
 
-  if (!this->connected) {
-    this->nb_connectNetwork();
-    return;
-  }
-
-  if (!this->mqttConnected) {
-    this->nb_connectMqtt();
-    return;
-  }
-
-  if (!this->subscribed) {
-    this->nb_subscribeMqtt();
-    return;
-  }
-
-  if (!this->nb_checkStatus()) {
-    ESP_LOGD(TAG, "NB status changed");
-    return;
-  }
 
 #ifdef UPDATES_ENABLED
   if (this->lastUpdateCheck + UPDATES_CHECK_INTERVAL < millis()) {
@@ -333,9 +356,14 @@ void NbIotManager::loop() {
     sdcardInit();
   }
 #endif
-  this->nb_readMessages();
-  this->nb_sendMessages();
-  this->consecutiveFailures = 0;
+
+  if (this->enabled)
+  {
+    this->nb_readMessages();
+    this->nb_sendMessages();
+    this->consecutiveFailures = 0;
+
+  }
 }
 
 void NbIotManager::nb_sendMessages() {
@@ -403,6 +431,7 @@ void NbIotManager::nb_readMessages() {
 esp_err_t nb_iot_init() {
   assert(NB_QUEUE_SIZE);
   NbSendQueue = xQueueCreate(NB_QUEUE_SIZE, sizeof(MessageBuffer_t));
+  NbControlQueue = xQueueCreate(2, sizeof(int));
   if (NbSendQueue == 0) {
     ESP_LOGE(TAG, "Could not create NBIOT send queue. Aborting.");
     return ESP_FAIL;
@@ -423,10 +452,19 @@ esp_err_t nb_iot_init() {
                           &nbIotTask, // task handle
                           1);         // CPU core
 
-  // Start join procedure if not already joined,
-  // lora_setupForNetwork(true) is called by eventhandler when joined
-  // else continue current session
   return ESP_OK;
+}
+
+void nb_enable() {
+  ESP_LOGD(TAG, "Enabling NBIOT");
+  int nb_enable = 1;
+  xQueueSend(NbControlQueue, &nb_enable, 1);
+}
+
+void nb_disable() {
+  ESP_LOGD(TAG, "Disabling NBIOT");
+  int nb_disable = 0;
+  xQueueSend(NbControlQueue, &nb_disable, 1);
 }
 
 void nb_queuereset() { xQueueReset(NbSendQueue); }

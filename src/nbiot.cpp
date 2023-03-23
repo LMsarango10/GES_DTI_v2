@@ -48,13 +48,12 @@ uint16_t getCount(uint8_t *buffer) {
   return ((buffer[0] << 8) & 0xFF00) + (buffer[1] & 0x00FF);
 }
 
-bool NbIotManager::nb_checkLastSoftwareVersion()
-{
+bool NbIotManager::nb_checkLastSoftwareVersion() {
   char buff[2048];
   int responseSize = 0;
   lastUpdateCheck = millis();
-  if(getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT,UPDATES_SERVER_INDEX, buff, sizeof(buff), &responseSize) >= 0)
-  {
+  if (getData(UPDATES_SERVER_IP, UPDATES_SERVER_PORT, UPDATES_SERVER_INDEX,
+              buff, sizeof(buff), &responseSize) >= 0) {
     ESP_LOGD(TAG, "INDEX: %s", buff);
     ESP_LOGD(TAG, "DATALEN: %d", responseSize);
     strcpy(updatesServerResponse, buff);
@@ -67,12 +66,10 @@ bool NbIotManager::nb_checkLastSoftwareVersion()
     ESP_LOGD(TAG, "Current Version: %s", PROGVERSION);
     std::string bufferString = std::string(updatesServerResponse);
     std::size_t found = bufferString.find("\r\n");
-    if (found != std::string::npos)
-    {
+    if (found != std::string::npos) {
       std::string version = bufferString.substr(0, found);
       ESP_LOGD(TAG, "Latest Version: %s", version.c_str());
-      if(strcmp(version.c_str(), PROGVERSION) != 0)
-      {
+      if (strcmp(version.c_str(), PROGVERSION) != 0) {
         ESP_LOGI(TAG, "New Version available: %s", version.c_str());
         return true;
       }
@@ -86,8 +83,7 @@ void nb_send(void *pvParameters) {
   NbIotManager manager = NbIotManager();
   while (1) {
     manager.loop();
-    if(uxQueueMessagesWaiting(NbControlQueue) > 0)
-    {
+    if (uxQueueMessagesWaiting(NbControlQueue) > 0) {
       int controlMessage;
       xQueueReceive(NbControlQueue, &controlMessage, portMAX_DELAY);
       manager.set_enabled(controlMessage);
@@ -96,14 +92,10 @@ void nb_send(void *pvParameters) {
   }
 }
 
-void NbIotManager::set_enabled(int controlMessage)
-{
-  if(controlMessage == 1)
-  {
+void NbIotManager::set_enabled(int controlMessage) {
+  if (controlMessage == 1) {
     this->enabled = true;
-  }
-  else
-  {
+  } else {
     this->enabled = false;
   }
 }
@@ -157,7 +149,8 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
   unsigned int base64_length;
   unsigned char base64[128];
 
-  int res = mbedtls_base64_encode(base64, sizeof(base64), &base64_length, message->Message, message->MessageSize);
+  int res = mbedtls_base64_encode(base64, sizeof(base64), &base64_length,
+                                  message->Message, message->MessageSize);
   if (base64[base64_length - 1] == 10) {
     base64[base64_length - 1] = 0;
   }
@@ -183,7 +176,8 @@ void NbIotManager::nb_connectMqtt() {
           DEVEUI[1], DEVEUI[2], DEVEUI[3], DEVEUI[4], DEVEUI[5], DEVEUI[6],
           DEVEUI[7]);
   int conn_result = connectMqtt(nbConfig.ServerAddress, nbConfig.port,
-                                nbConfig.ServerUsername, nbConfig.ServerPassword, this->devEui);
+                                nbConfig.ServerUsername,
+                                nbConfig.ServerPassword, this->devEui);
   if (conn_result == 0) {
     ESP_LOGD(TAG, "MQTT CONNECTED");
     mqttConnected = true;
@@ -298,11 +292,15 @@ void NbIotManager::loop() {
     return;
   }
 
-  if (this-> enabled)
-  {
+#ifdef UPDATES_ENABLED
+  bool shouldCheckForUpdates =
+      this->lastUpdateCheck + UPDATES_CHECK_INTERVAL < millis();
+#endif
+
+  if (shouldCheckForUpdates || this->enabled) {
     if (!this->registered) {
-    this->nb_registerNetwork();
-    return;
+      this->nb_registerNetwork();
+      return;
     }
 
     if (!this->connected) {
@@ -310,14 +308,16 @@ void NbIotManager::loop() {
       return;
     }
 
-    if (!this->mqttConnected) {
-      this->nb_connectMqtt();
-      return;
-    }
+    if (this->enabled) {
+      if (!this->mqttConnected) {
+        this->nb_connectMqtt();
+        return;
+      }
 
-    if (!this->subscribed) {
-      this->nb_subscribeMqtt();
-      return;
+      if (!this->subscribed) {
+        this->nb_subscribeMqtt();
+        return;
+      }
     }
 
     if (!this->nb_checkStatus()) {
@@ -326,30 +326,21 @@ void NbIotManager::loop() {
     }
   }
 
-
 #ifdef UPDATES_ENABLED
-  if (this->lastUpdateCheck + UPDATES_CHECK_INTERVAL < millis()) {
-    if(this->nb_checkLastSoftwareVersion()) {
-      if(downloadUpdates(std::string(updatesServerResponse)))
-      {
-        this->updateReadyToInstall = true;
-      }
-      else {
-        ESP_LOGD(TAG, "Updates not downloaded, set to retry");
-        this->updateReadyToInstall = false;
-        this->lastUpdateCheck = millis() - UPDATES_CHECK_RETRY_INTERVAL;
-      }
+  if (shouldCheckForUpdates && this->nb_checkLastSoftwareVersion()) {
+    if (downloadUpdates(std::string(updatesServerResponse))) {
+      this->updateReadyToInstall = true;
+    } else {
+      ESP_LOGD(TAG, "Updates not downloaded, set to retry");
+      this->updateReadyToInstall = false;
+      this->lastUpdateCheck = millis() - UPDATES_CHECK_RETRY_INTERVAL;
     }
   }
-
   if (this->updateReadyToInstall) {
     ESP_LOGD(TAG, "Updates downloaded");
-    if(updateFromFS())
-    {
+    if (updateFromFS()) {
       ESP_LOGD(TAG, "Updates installed");
-    }
-    else
-    {
+    } else {
       ESP_LOGE(TAG, "Updates installation failed");
       removeUpdateFiles(std::string(updatesServerResponse));
     }
@@ -357,12 +348,10 @@ void NbIotManager::loop() {
   }
 #endif
 
-  if (this->enabled)
-  {
+  if (this->enabled) {
     this->nb_readMessages();
     this->nb_sendMessages();
     this->consecutiveFailures = 0;
-
   }
 }
 
@@ -406,12 +395,14 @@ void NbIotManager::nb_readMessages() {
         return;
       }
       const char *data = doc["data"]; // "ZWcBCg=="
-      const unsigned char* dataPtr = reinterpret_cast<const unsigned char *>(data);
+      const unsigned char *dataPtr =
+          reinterpret_cast<const unsigned char *>(data);
 
       ESP_LOGD(TAG, "MQTT message data: %s", data);
       unsigned int base64_length;
       unsigned char base64Decoded[64];
-      int res = mbedtls_base64_decode(base64Decoded, sizeof(base64Decoded), &base64_length, dataPtr, strlen(data));
+      int res = mbedtls_base64_decode(base64Decoded, sizeof(base64Decoded),
+                                      &base64_length, dataPtr, strlen(data));
 
       if (base64Decoded == NULL) {
         ESP_LOGE(TAG, "base64_decode() failed");
@@ -421,8 +412,7 @@ void NbIotManager::nb_readMessages() {
       if (bytesRead > 0) {
         rcommand((uint8_t *)base64Decoded, base64_length);
       }
-    }
-    else {
+    } else {
       ESP_LOGE(TAG, "MQTT message read failed with code %d", bytesRead);
     }
   }

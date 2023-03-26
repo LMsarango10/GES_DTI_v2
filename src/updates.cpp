@@ -370,6 +370,8 @@ bool uncompressFileAndFlash(std::string filename) {
 
   I2C_MUTEX_LOCK();
   SPIFFS.begin(true);
+  SPIFFS.format();
+  SPIFFS.end();
   tarGzFS.begin();
   GzUnpacker *GZUnpacker = new GzUnpacker();
 

@@ -162,6 +162,7 @@ void checkConfig() {
   else {
     Serial.print("Quieres resetear la configuración? Teclee Y = SI / N = NO "
                  "...( Tienes 10 segundos para contestar )\n");
+    Serial.flush();
     double lastMillis = 0;
     lastMillis = millis();
     while (millis() - lastMillis < 10000) {

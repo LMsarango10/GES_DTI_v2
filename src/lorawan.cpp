@@ -283,7 +283,7 @@ void lora_send(void *pvParameters) {
       case LMIC_ERROR_SUCCESS:
         ESP_LOGI(TAG, "%d byte(s) sent to LORA", SendBuffer.MessageSize);
         if (sendConfirmed) {
-          ESP_LOGD(TAG, "Sending confirmed lora message");          
+          ESP_LOGD(TAG, "Sending confirmed lora message");
           lastConfirmedSendTime = millis();
         }
         break;
@@ -311,7 +311,7 @@ void lora_send(void *pvParameters) {
 
 esp_err_t lora_stack_init(bool do_join) {
   assert(SEND_QUEUE_SIZE);
-  LoraSendQueue = xQueueCreate(SEND_QUEUE_SIZE, sizeof(MessageBuffer_t));  
+  LoraSendQueue = xQueueCreate(SEND_QUEUE_SIZE, sizeof(MessageBuffer_t));
   if (LoraSendQueue == 0) {
     ESP_LOGE(TAG, "Could not create LORA send queue. Aborting.");
     return ESP_FAIL;
@@ -505,12 +505,16 @@ void myEventCallback(void *pUserData, ev_t ev) {
   case EV_JOINED:
     // do the after join network-specific setup.
     lora_setupForNetwork(false);
+#if (HAS_NBIOT)
     nb_disable(); // disable NB-IoT
+  #endif
     break;
   case EV_JOIN_FAILED:
     // replace descriptor from library with more descriptive term
     snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "JOIN_FAILED");
+#if (HAS_NBIOT)
     nb_enable(); // enable NB-IoT
+#endif
     break;
 
   case EV_TXCOMPLETE:

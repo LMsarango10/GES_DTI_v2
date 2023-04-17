@@ -111,6 +111,7 @@ void lora_setupForNetwork(bool preJoin) {
              getCrName(updr2rps(LMIC.datarate)));
     // store LMIC keys and counters in RTC memory
     LMIC_getSessionKeys(&RTCnetid, &RTCdevaddr, RTCnwkKey, RTCartKey);
+    LMIC_setLinkCheckMode(true);
   }
 }
 

@@ -308,7 +308,7 @@ void checkQueue() {
   long loraMessages = get_lora_queue_pending_messages();
   MessageBuffer_t SendBuffer;
   auto loraQueueHandle = lora_get_queue_handle();
-  if (loraMessages >= MIN_SEND_MESSAGES_THRESHOLD){
+  if (nb_isEnabled() && loraMessages >= MIN_SEND_MESSAGES_THRESHOLD){
     ESP_LOGI(TAG, "Lora queue threshold reached, sending %d messages through NB", loraMessages);
     // Transfer queue
     while (uxQueueMessagesWaitingFromISR(loraQueueHandle) > 0) {

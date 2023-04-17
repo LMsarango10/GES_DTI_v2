@@ -8,6 +8,7 @@ QueueHandle_t NbControlQueue;
 TaskHandle_t nbIotTask = NULL;
 
 unsigned long lastMessage;
+bool nbIotEnabled = false;
 
 bool nb_enqueuedata(MessageBuffer_t *message) {
   // enqueue message in LORA send queue
@@ -447,14 +448,18 @@ esp_err_t nb_iot_init() {
 
 void nb_enable() {
   ESP_LOGD(TAG, "Enabling NBIOT");
+  nbIotEnabled = true;
   int nb_enable = 1;
   xQueueSend(NbControlQueue, &nb_enable, 1);
 }
 
 void nb_disable() {
   ESP_LOGD(TAG, "Disabling NBIOT");
+  nbIotEnabled = false;
   int nb_disable = 0;
   xQueueSend(NbControlQueue, &nb_disable, 1);
 }
+
+bool nb_isEnabled() { return nbIotEnabled; }
 
 void nb_queuereset() { xQueueReset(NbSendQueue); }

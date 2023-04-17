@@ -80,6 +80,7 @@ bool nb_enqueuedata(MessageBuffer_t *message);
 void nb_queuereset(void);
 void nb_enable(void);
 void nb_disable(void);
+bool nb_isEnabled(void);
 esp_err_t nb_iot_init();
 
 #define MIN_SEND_TIME_THRESHOLD 1000

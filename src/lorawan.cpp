@@ -547,7 +547,10 @@ void myEventCallback(void *pUserData, ev_t ev) {
   case EV_JOIN_TXCOMPLETE:
     // replace descriptor from library with more descriptive term
     snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "JOIN_WAIT");
-    joinStartedTime = millis();
+    if (joinStartedTime == 0)
+    {
+      joinStartedTime = millis();
+    }
     break;
 
   case EV_LINK_DEAD:

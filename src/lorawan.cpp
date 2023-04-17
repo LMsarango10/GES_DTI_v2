@@ -452,6 +452,20 @@ finish:
 } // user_request_network_time_callback
 #endif // TIME_SYNC_LORAWAN
 
+#if (HAS_NBIOT)
+void checkJoinProcedure()
+{
+  if (firstJoin && joinStartedTime > 0)
+  {
+    if (millis() - joinStartedTime > NB_LORA_JOIN_GRACE_TIME * 1000 * 60)
+    {
+      ESP_LOGI(TAG, "Join procedure time exceeded, enabling NBIOT");
+      nb_enable();
+      firstJoin = false;
+    }
+  }
+}
+
 // LMIC lorawan stack task
 void lmictask(void *pvParameters) {
   configASSERT(((uint32_t)pvParameters) == 1);
@@ -697,19 +711,7 @@ const char *getCrName(rps_t rps) {
   return t[getCr(rps)];
 }
 
-#if (HAS_NBIOT)
-void checkJoinProcedure()
-{
-  if (firstJoin && joinStartedTime > 0)
-  {
-    if (millis() - joinStartedTime > NB_LORA_JOIN_GRACE_TIME * 1000 * 60)
-    {
-      ESP_LOGI(TAG, "Join procedure time exceeded, enabling NBIOT");
-      nb_enable();
-      firstJoin = false;
-    }
-  }
-}
+
 #endif
 
 #endif // HAS_LORA

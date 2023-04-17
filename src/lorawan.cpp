@@ -6,6 +6,8 @@
 // Local logging Tag
 static const char TAG[] = "lora";
 unsigned long lastConfirmedSendTime = 0;
+unsigned long joinStartedTime = 0;
+bool firstJoin = true;
 
 #if (HAS_LORA)
 
@@ -477,6 +479,9 @@ void lmictask(void *pvParameters) {
   while (1) {
     os_runloop_once(); // execute lmic scheduled jobs and events
     delay(2);          // yield to CPU
+#if (HAS_NBIOT)
+    checkJoinProcedure();
+#endif
   }
 } // lmictask
 
@@ -506,6 +511,7 @@ void myEventCallback(void *pUserData, ev_t ev) {
     // do the after join network-specific setup.
     lora_setupForNetwork(false);
 #if (HAS_NBIOT)
+    firstJoin = false;
     nb_disable(); // disable NB-IoT
   #endif
     break;
@@ -526,6 +532,7 @@ void myEventCallback(void *pUserData, ev_t ev) {
   case EV_JOIN_TXCOMPLETE:
     // replace descriptor from library with more descriptive term
     snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "JOIN_WAIT");
+    joinStartedTime = millis();
     break;
 
   case EV_LINK_DEAD:
@@ -688,5 +695,20 @@ const char *getCrName(rps_t rps) {
   const char *const t[] = {"CR 4/5", "CR 4/6", "CR 4/7", "CR 4/8"};
   return t[getCr(rps)];
 }
+
+#if (HAS_NBIOT)
+void checkJoinProcedure()
+{
+  if (firstJoin && joinStartedTime > 0)
+  {
+    if (millis() - joinStartedTime > NB_LORA_JOIN_GRACE_TIME * 1000 * 60)
+    {
+      ESP_LOGI(TAG, "Join procedure time exceeded, enabling NBIOT");
+      nb_enable();
+      firstJoin = false;
+    }
+  }
+}
+#endif
 
 #endif // HAS_LORA

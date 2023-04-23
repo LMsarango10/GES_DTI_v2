@@ -109,10 +109,15 @@ bool readConfig() {
 void initConfig() {
   Serial.println("Bienvenido a la guía de STA\n");
 
-  Serial.println("Introduzca la deveui: ");
+  Serial.print("Introduzca la deveui: ...( Tienes 10 segundos para contestar antes de que se use el valor DEFAULT:  )");
+  for (int i = 0; i < 8; i++) {
+    Serial.printf("%02X", DEVEUI_DEF[i]);
+  }
+  Serial.flush();
   String devEui = "";
   char character;
-  while (strlen(devEui.c_str()) < 16) {
+  double lastMillis = millis();
+  while (strlen(devEui.c_str()) < 16|| millis() - lastMillis < 10000) {
     if (Serial.available()) {
       character = Serial.read();
       Serial.print(character);
@@ -121,6 +126,14 @@ void initConfig() {
     }
   }
   Serial.println();
+
+  if (strlen(devEui.c_str()) < 16) {
+    Serial.println("No se ha introducido una deveui válida, se usará la deveui por defecto");
+    devEui = "";
+    for (int i = 0; i < 8; i++) {
+      devEui.concat(String(DEVEUI_DEF[i], HEX));
+    }
+  }
 
   convert(devEui.c_str());
   Serial.print(__DEVEUI[0], HEX);

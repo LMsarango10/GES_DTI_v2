@@ -372,6 +372,7 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
   DeserializationError err = deserializeJson(doc, buff);
   if(err) {
     ESP_LOGI(TAG, "deserialization error: %s", err.c_str());
+    deleteFile("nb.cnf");
     return -2;
   }
 

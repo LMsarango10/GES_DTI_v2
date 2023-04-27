@@ -109,20 +109,22 @@ bool readConfig() {
 void initConfig() {
   Serial.println("Bienvenido a la guía de STA\n");
 
-  Serial.print("Introduzca la deveui: ...( Tienes 10 segundos para contestar antes de que se use el valor DEFAULT:  )");
+  Serial.print("Introduzca la deveui: ...( Tienes 10 segundos para contestar antes de que se use el valor DEFAULT: ");
   for (int i = 0; i < 8; i++) {
     Serial.printf("%02X", DEVEUI_DEF[i]);
   }
+  Serial.println(" )");
   Serial.flush();
   String devEui = "";
   char character;
   double lastMillis = millis();
-  while (strlen(devEui.c_str()) < 16|| millis() - lastMillis < 10000) {
+  while (strlen(devEui.c_str()) < 16 && millis() - lastMillis < 10000) {
     if (Serial.available()) {
       character = Serial.read();
       Serial.print(character);
       devEui.concat(character);
       devEui.trim();
+      lastMillis = millis();
     }
   }
   Serial.println();

@@ -369,9 +369,10 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
     return -1;
   }
   ESP_LOGD(TAG, "File content: %s", buff);
-  DeserializationError err = deserializeJson(doc, buff);
-  if(err) {
+  DeserializationError err = deserializeJson(doc, buff);  
+  if(err) {    
     ESP_LOGI(TAG, "deserialization error: %s", err.c_str());
+    f.close();
     deleteFile("nb.cnf");
     return -2;
   }
@@ -386,6 +387,17 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
   const char* applicationId = doc["applicationId"];
   const char* applicationName = doc["applicationName"];
   const char* gatewayId = doc["gatewayId"];
+
+  if (serverAddress == nullptr || 
+      serverPassword == nullptr || 
+      serverUsername == nullptr ||
+      applicationId == nullptr ||
+      applicationName == nullptr ||
+      gatewayId == nullptr)
+      {
+        deleteFile("nb.cnf");
+        return -3;
+      }
 
   int serverAddressLen = strlen(serverAddress);
   strncpy(config->ServerAddress, serverAddress, serverAddressLen);

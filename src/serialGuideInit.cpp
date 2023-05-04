@@ -99,7 +99,7 @@ bool readConfig() {
   for (int i = 0; i < 8; i++) {
     EEPROM.get(eepAddr, DEVEUI[i]);
     eepAddr += sizeof(DEVEUI[i]);
-    Serial.printf("%02X", DEVEUI[i]);
+    Serial.printf("%02x", DEVEUI[i]);
   }
   Serial.println();
 
@@ -111,7 +111,7 @@ void initConfig() {
 
   Serial.print("Introduzca la deveui: ...( Tienes 10 segundos para contestar antes de que se use el valor DEFAULT: ");
   for (int i = 0; i < 8; i++) {
-    Serial.printf("%02X", DEVEUI_DEF[i]);
+    Serial.printf("%02x", DEVEUI_DEF[i]);
   }
   Serial.println(" )");
   Serial.flush();
@@ -133,24 +133,19 @@ void initConfig() {
     Serial.println("No se ha introducido una deveui válida, se usará la deveui por defecto");
     devEui = "";
     for (int i = 0; i < 8; i++) {
-      devEui.concat(String(DEVEUI_DEF[i], HEX));
+      char tempBuffer[3];
+      sprintf(tempBuffer, "%02x", DEVEUI_DEF[i]);
+      devEui.concat(String(tempBuffer));
     }
+    Serial.println(devEui);
   }
 
-  convert(devEui.c_str());
-  Serial.print(__DEVEUI[0], HEX);
-  Serial.print(__DEVEUI[1], HEX);
-  Serial.print(__DEVEUI[2], HEX);
-  Serial.print(__DEVEUI[3], HEX);
-  Serial.print(__DEVEUI[4], HEX);
-  Serial.print(__DEVEUI[5], HEX);
-  Serial.print(__DEVEUI[6], HEX);
-  Serial.println(__DEVEUI[7], HEX);
+  convert(devEui.c_str()); 
 
   Serial.println("Nueva DevEUI Añadida: ");
   for (int i = 0; i < 8; i++) {
     DEVEUI[i] = __DEVEUI[i];
-    Serial.print(DEVEUI[i], HEX);
+    Serial.printf("%02x",DEVEUI[i]);
   }
 
   Serial.print("\n");

@@ -28,6 +28,8 @@
 
 #define NB_STATUS_CHECK_TIME_MS 60000
 
+#define NB_LORA_JOIN_RETRY_TIME_MINUTES 30
+
 class NbIotManager {
     ConfigBuffer_t nbConfig;
     bool enabled;

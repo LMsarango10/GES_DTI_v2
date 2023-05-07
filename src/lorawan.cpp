@@ -5,6 +5,7 @@
 
 // Local logging Tag
 static const char TAG[] = "lora";
+unsigned long lastJoinAttemptTime = 0;
 unsigned long lastConfirmedSendTime = 0;
 unsigned long joinStartedTime = 0;
 bool firstJoin = true;
@@ -336,6 +337,7 @@ esp_err_t lora_stack_init(bool do_join) {
   // lora_setupForNetwork(true) is called by eventhandler when joined
   // else continue current session
   if (do_join) {
+    lastJoinAttemptTime = millis();
     if (!LMIC_startJoining())
       ESP_LOGI(TAG, "Already joined");
   } else {
@@ -464,6 +466,15 @@ void checkJoinProcedure()
       firstJoin = false;
     }
   }
+  if(!nb_isEnabled())
+  {
+    lastJoinAttemptTime = millis();
+  }
+  if (millis() - lastJoinAttemptTime > NB_LORA_JOIN_RETRY_TIME_MINUTES * 1000 * 60)
+  {
+    ESP_LOGI(TAG, "Retry join procedure");
+    LMIC_startJoining();
+  }
 }
 
 // LMIC lorawan stack task
@@ -556,6 +567,7 @@ void myEventCallback(void *pUserData, ev_t ev) {
   case EV_LINK_DEAD:
     snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "LINK_DEAD");
     nb_enable(); // enable NB-IoT
+    lastJoinAttemptTime = millis();
     LMIC_startJoining(); // restart join procedure
     break;
   default:

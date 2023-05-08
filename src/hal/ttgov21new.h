@@ -19,6 +19,7 @@
 
 #define CONFIRMED_SEND_THRESHOLD 1440 // minutes
 #define NB_LORA_JOIN_GRACE_TIME 2 // minutes
+#define NB_LORA_JOIN_RETRY_TIME_MINUTES 60
 
 // enable only if you want to store a local paxcount table on the device
 #define HAS_SDCARD  1      // this board has an SD-card-reader/writer

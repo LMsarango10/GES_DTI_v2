@@ -473,6 +473,7 @@ void checkJoinProcedure()
   if (millis() - lastJoinAttemptTime > NB_LORA_JOIN_RETRY_TIME_MINUTES * 1000 * 60)
   {
     ESP_LOGI(TAG, "Retry join procedure");
+    lastJoinAttemptTime = millis();
     LMIC_startJoining();
   }
 }

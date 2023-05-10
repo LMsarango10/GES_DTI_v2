@@ -449,6 +449,13 @@ esp_err_t nb_iot_init() {
 void nb_enable() {
   ESP_LOGD(TAG, "Enabling NBIOT");
   nbIotEnabled = true;
+
+  MessageBuffer_t SendBuffer;
+  while (uxQueueMessagesWaitingFromISR(lora_get_queue_handle()) > 0) {
+      if(xQueueReceive(lora_get_queue_handle(), &SendBuffer, portMAX_DELAY) == pdTRUE)
+        nb_enqueuedata(&SendBuffer);
+    }
+
   int nb_enable = 1;
   xQueueSend(NbControlQueue, &nb_enable, 1);
 }
@@ -456,6 +463,13 @@ void nb_enable() {
 void nb_disable() {
   ESP_LOGD(TAG, "Disabling NBIOT");
   nbIotEnabled = false;
+
+  MessageBuffer_t SendBuffer;
+  while (uxQueueMessagesWaitingFromISR(NbSendQueue) > 0) {
+      if(xQueueReceive(NbSendQueue, &SendBuffer, portMAX_DELAY) == pdTRUE)
+        lora_enqueuedata(&SendBuffer);
+    }
+
   int nb_disable = 0;
   xQueueSend(NbControlQueue, &nb_disable, 1);
 }

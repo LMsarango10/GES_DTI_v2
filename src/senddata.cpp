@@ -60,8 +60,8 @@ void SendPayload(uint8_t port, sendprio_t prio) {
 // write data to sdcard, if present
 #ifdef HAS_SDCARD
 //enqueued = false; //DEBUG
-if (!enqueued)
-  sdcardWriteFrame(&SendBuffer);
+/*if (!enqueued)
+  sdcardWriteFrame(&SendBuffer);*/
 #endif
 
 } // SendPayload

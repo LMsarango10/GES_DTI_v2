@@ -20,7 +20,7 @@ void doHousekeeping() {
   uptime();
 
   #ifdef HAS_SDCARD
-MessageBuffer_t message;
+/*MessageBuffer_t message;
 int nSent = 0;
 while(check_queue_available() > 0 && sdcardReadFrame(&message, nSent + 1) >= 0)
 {
@@ -42,7 +42,6 @@ if(nSent > 0)
 }
 /*if (msent)
   printSdFile();*/
-
 #endif
 
   // check if update mode trigger switch was set

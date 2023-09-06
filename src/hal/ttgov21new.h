@@ -17,7 +17,7 @@
 #define HAS_NBIOT 1
 #define CFG_sx1276_radio 1 // HPD13A LoRa SoC
 
-#define CONFIRMED_SEND_THRESHOLD 1440 // minutes
+#define CONFIRMED_SEND_THRESHOLD 120 // minutes
 #define NB_LORA_JOIN_GRACE_TIME 2 // minutes
 #define NB_LORA_JOIN_RETRY_TIME_MINUTES 60
 

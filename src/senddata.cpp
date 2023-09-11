@@ -316,6 +316,15 @@ void checkQueue() {
         nb_enqueuedata(&SendBuffer);
     }
   }
+  else if (loraMessages >= NB_FAILOVER_MESSAGES_THRESHOLD){
+    ESP_LOGI(TAG, "Lora queue threshold reached, sending %d messages through NB", loraMessages);
+    nb_enable(true);
+    // Transfer queue
+    while (uxQueueMessagesWaitingFromISR(loraQueueHandle) > 0) {
+      if(xQueueReceive(loraQueueHandle, &SendBuffer, portMAX_DELAY) == pdTRUE)
+        nb_enqueuedata(&SendBuffer);
+    }
+  }
 
 #endif
 }

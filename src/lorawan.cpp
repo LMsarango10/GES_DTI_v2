@@ -462,7 +462,7 @@ void checkJoinProcedure()
     if (millis() - joinStartedTime > NB_LORA_JOIN_GRACE_TIME * 1000 * 60)
     {
       ESP_LOGI(TAG, "Join procedure time exceeded, enabling NBIOT");
-      nb_enable();
+      nb_enable(false);
       firstJoin = false;
     }
   }
@@ -546,7 +546,7 @@ void myEventCallback(void *pUserData, ev_t ev) {
     // replace descriptor from library with more descriptive term
     snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "JOIN_FAILED");
 #if (HAS_NBIOT)
-    nb_enable(); // enable NB-IoT
+    nb_enable(false); // enable NB-IoT
 #endif
     break;
 
@@ -567,7 +567,7 @@ void myEventCallback(void *pUserData, ev_t ev) {
 
   case EV_LINK_DEAD:
     snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "LINK_DEAD");
-    nb_enable(); // enable NB-IoT
+    nb_enable(false); // enable NB-IoT
     lastJoinAttemptTime = millis();
     LMIC_startJoining(); // restart join procedure
     break;

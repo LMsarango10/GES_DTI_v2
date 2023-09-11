@@ -96,7 +96,13 @@ void nb_send(void *pvParameters) {
 void NbIotManager::set_enabled(int controlMessage) {
   if (controlMessage == 1) {
     this->enabled = true;
-  } else {
+    this->temporaryEnabled = false;
+  }
+  else if (controlMessage == 2){
+    this->enabled = true;
+    this->temporaryEnabled = true;
+  }
+  else {
     this->enabled = false;
   }
 }
@@ -378,6 +384,11 @@ void NbIotManager::nb_sendMessages() {
       break;
     }
   }
+  if (this->temporaryEnabled && uxQueueMessagesWaiting(NbSendQueue) == 0 ) {
+    this->temporaryEnabled = false;
+    ESP_LOGI(TAG, "NBIOT temporary mode disabled");
+    nb_disable();
+  }
 }
 
 void NbIotManager::nb_readMessages() {
@@ -446,8 +457,9 @@ esp_err_t nb_iot_init() {
   return ESP_OK;
 }
 
-void nb_enable() {
+void nb_enable(bool temporary) {
   ESP_LOGD(TAG, "Enabling NBIOT");
+
   nbIotEnabled = true;
 
   MessageBuffer_t SendBuffer;
@@ -457,6 +469,10 @@ void nb_enable() {
     }
 
   int nb_enable = 1;
+  if (temporary) {
+    nb_enable = 2;
+    ESP_LOGI(TAG, "NBIOT temporary mode enabled");
+  }
   xQueueSend(NbControlQueue, &nb_enable, 1);
 }
 

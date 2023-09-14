@@ -554,6 +554,16 @@ void myEventCallback(void *pUserData, ev_t ev) {
     // save current Fcnt to RTC RAM
     RTCseqnoUp = LMIC.seqnoUp;
     RTCseqnoDn = LMIC.seqnoDn;
+
+    if (LMIC.txrxFlags & TXRX_ACK)
+    {
+      ESP_LOGI(TAG, "Received ack");
+#if (HAS_NBIOT)
+      if (nb_isEnabled())
+        nb_disable(); // disable NB-IoT
+#endif
+    }
+
     break;
 
   case EV_JOIN_TXCOMPLETE:

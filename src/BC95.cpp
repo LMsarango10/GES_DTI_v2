@@ -527,24 +527,25 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
   std::string version = std::string(PROGVERSION);
   std::replace( version.begin(), version.end(), '.', '_'); // replace all '.' to '_'
 
+  char localBuff[4096];
   sprintf(pageWithParams, "%s?deveui=%s&version=%s", page, devEui, version.c_str());
   // send the header
-  globalBuff[0] = 0;
+  localBuff[0] = 0;
   sprintf(outBuf, "GET %s HTTP/1.1\r\n", pageWithParams);
-  strcat(globalBuff, outBuf);
+  strcat(localBuff, outBuf);
   sprintf(outBuf, "Host: %s\r\n", ip);
-  strcat(globalBuff, outBuf);
-  strcat(globalBuff, "\r\n");
+  strcat(localBuff, outBuf);
+  strcat(localBuff, "\r\n");
 
-  int sentOk = sendData(socketN, globalBuff, strlen(globalBuff), globalBuff,
-                        sizeof(globalBuff));
+  int sentOk = sendData(socketN, localBuff, strlen(localBuff), localBuff,
+                        sizeof(localBuff));
 
   if (sentOk < 0) {
     ESP_LOGE(TAG, "Error sending data");
     return -1;
   }
 
-  int bytesReceived = getReceivedBytes(socketN, globalBuff, sizeof(globalBuff));
+  int bytesReceived = getReceivedBytes(socketN, localBuff, sizeof(localBuff));
 
   //ESP_LOGV(TAG, "Data received: %s", globalBuff);
 
@@ -553,7 +554,7 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
     responseCode = bytesReceived;
   } else if (bytesReceived > 0) {
     ESP_LOGD(TAG, "Received %d bytes", bytesReceived);
-    responseCode = parseResponseCode(globalBuff, bytesReceived);
+    responseCode = parseResponseCode(localBuff, bytesReceived);
     ESP_LOGD(TAG, "Response Code: %d", responseCode);
 
     if (responseCode != 200) {
@@ -562,12 +563,13 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
     }
 
     char* inputBuffer = new char[bytesReceived + 1];
-    memcpy(inputBuffer, globalBuff, bytesReceived);
+    memcpy(inputBuffer, localBuff, bytesReceived);
     inputBuffer[bytesReceived] = 0;
     int contentLength = parseContentLength(inputBuffer, bytesReceived);
-    int parsedData = parseData(inputBuffer, contentLength, globalBuff, sizeof(globalBuff));
+    int parsedData = parseData(inputBuffer, contentLength, localBuff, sizeof(localBuff));
+    delete inputBuffer;
     if (parsedData >= 0) {
-      memcpy(responseBuffer, globalBuff, parsedData);
+      memcpy(responseBuffer, localBuff, parsedData);
       *responseSizePtr = parsedData;
       responseBuffer[parsedData] = 0;
       return responseCode;

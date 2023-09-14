@@ -17,7 +17,7 @@
 #define UPDATES_SERVER_PORT 8000
 #define UPDATES_SERVER_INDEX "/index.txt"
 #define UPDATES_CHECK_INTERVAL 3600*1000 // 1 hours for checking for updates
-#define UPDATES_CHECK_RETRY_INTERVAL 10*1000 // 10 seconds for retrying to check for updates
+#define UPDATES_CHECK_RETRY_INTERVAL 30*1000 // 10 seconds for retrying to check for updates
 
 #define MAX_CONSECUTIVE_FAILURES 10 // MAX NB Failures before restarting
 #define MAX_INITIALIZE_FAILURES 10 // MAX NB Init Failures before restarting

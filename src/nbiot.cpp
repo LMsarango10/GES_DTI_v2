@@ -340,7 +340,7 @@ void NbIotManager::loop() {
     } else {
       ESP_LOGD(TAG, "Updates not downloaded, set to retry");
       this->updateReadyToInstall = false;
-      this->lastUpdateCheck = millis() - UPDATES_CHECK_RETRY_INTERVAL;
+      this->lastUpdateCheck = millis() - UPDATES_CHECK_INTERVAL + UPDATES_CHECK_RETRY_INTERVAL;
     }
   }
   if (this->updateReadyToInstall) {

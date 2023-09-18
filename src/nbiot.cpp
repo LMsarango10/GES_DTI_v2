@@ -481,10 +481,12 @@ void nb_disable() {
   nbIotEnabled = false;
 
   MessageBuffer_t SendBuffer;
+#ifdef HAS_LORA
   while (uxQueueMessagesWaitingFromISR(NbSendQueue) > 0) {
       if(xQueueReceive(NbSendQueue, &SendBuffer, portMAX_DELAY) == pdTRUE)
         lora_enqueuedata(&SendBuffer);
     }
+#endif
 
   int nb_disable = 0;
   xQueueSend(NbControlQueue, &nb_disable, 1);

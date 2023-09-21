@@ -345,6 +345,10 @@ ESP_ERROR_CHECK(esp_coex_preference_set(
   assert(nb_iot_init() == ESP_OK);
 #endif
 
+#if (!HAS_LORA && HAS_NBIOT)
+  nb_enable(false);
+  ESP_LOGI(TAG, "Using NB-Only Mode");
+#endif
 // initialize SPI
 #ifdef HAS_SPI
   strcat_P(features, " SPI");

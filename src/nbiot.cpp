@@ -463,11 +463,12 @@ void nb_enable(bool temporary) {
   nbIotEnabled = true;
 
   MessageBuffer_t SendBuffer;
+#ifdef HAS_LORA
   while (uxQueueMessagesWaitingFromISR(lora_get_queue_handle()) > 0) {
       if(xQueueReceive(lora_get_queue_handle(), &SendBuffer, portMAX_DELAY) == pdTRUE)
         nb_enqueuedata(&SendBuffer);
     }
-
+#endif
   int nb_enable = 1;
   if (temporary) {
     nb_enable = 2;

@@ -19,12 +19,12 @@
 #define UPDATES_CHECK_INTERVAL 3600*1000 // 1 hours for checking for updates
 #define UPDATES_CHECK_RETRY_INTERVAL 30*1000 // 10 seconds for retrying to check for updates
 
-#define MAX_CONSECUTIVE_FAILURES 10 // MAX NB Failures before restarting
-#define MAX_INITIALIZE_FAILURES 10 // MAX NB Init Failures before restarting
-#define MAX_REGISTER_FAILURES 100  // MAX NB Register Failures before restarting
-#define MAX_CONNECT_FAILURES 10   // MAX NB Connect Failures before restarting
-#define MAX_MQTT_CONNECT_FAILURES 10  // MAX NB MQTT Connect Failures before restarting
-#define MAX_MQTT_SUBSCRIBE_FAILURES 10 // MAX NB MQTT Subscribe Failures before restarting
+#define MAX_CONSECUTIVE_FAILURES 5 // MAX NB Failures before restarting
+#define MAX_INITIALIZE_FAILURES 5 // MAX NB Init Failures before restarting
+#define MAX_REGISTER_FAILURES 50  // MAX NB Register Failures before restarting
+#define MAX_CONNECT_FAILURES 5   // MAX NB Connect Failures before restarting
+#define MAX_MQTT_CONNECT_FAILURES 5  // MAX NB MQTT Connect Failures before restarting
+#define MAX_MQTT_SUBSCRIBE_FAILURES 5 // MAX NB MQTT Subscribe Failures before restarting
 
 #define MIN_SEND_TIME_THRESHOLD 1000 // time (milliseconds) between message batches
 #define MIN_SEND_MESSAGES_THRESHOLD 1 // min size for message batches when nb is ON

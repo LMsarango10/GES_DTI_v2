@@ -98,6 +98,8 @@ void getCsq() {
 }
 
 void resetModem() {
+  bc95serial.write(26);
+  delay(1000);
   ESP_LOGI(TAG, "Reset NBIOT modem");
   bc95serial.println("AT+NRB");
   delay(2000);

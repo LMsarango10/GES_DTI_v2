@@ -738,8 +738,13 @@ int connectMqtt(char *url, int port, char* username, char *password, char *clien
   ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCONN=0,\"%s\",\"%s\",\"%s\"",
            clientId, username, password);
 
+  char mqttRandomSeed[16];
+  sprintf(mqttRandomSeed, "%d", random(1000000));
+
   bc95serial.print("AT+QMTCONN=0,\"");
   bc95serial.print(clientId);
+  bc95serial.print("-");
+  bc95serial.print(mqttRandomSeed);
   bc95serial.print("\",\"gesinen\",\"");
   bc95serial.print(password);
   bc95serial.println("\"");

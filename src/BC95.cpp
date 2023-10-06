@@ -17,8 +17,8 @@ int readResponseBC(HardwareSerial *port, char *buff, int b_size,
   int bytesRead = port->readBytes(buff, b_size - 1);
   if (bytesRead > 0) {
     buff[bytesRead] = 0;
-    ESP_LOGV(TAG, "%d bytes read", bytesRead);
-    ESP_LOGV(TAG, "Message: %s", buff);
+    ESP_LOGD(TAG, "%d bytes read", bytesRead);
+    ESP_LOGD(TAG, "Message: %s", buff);
     return bytesRead;
   } else if (bytesRead < 0)
     return -1;

@@ -19,6 +19,11 @@ void doHousekeeping() {
   // update uptime counter
   uptime();
 
+  if(cfg.resettimer != 0xFF && cfg.resettimer * 3600 < uptime() / 1000) {
+    ESP_LOGI(TAG, "Resetting device after %d hours", cfg.resettimer);
+    do_reset(true);
+  }
+
   #ifdef HAS_SDCARD
 /*MessageBuffer_t message;
 int nSent = 0;

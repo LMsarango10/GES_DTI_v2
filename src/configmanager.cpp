@@ -42,6 +42,7 @@ void defaultConfig() {
   cfg.bsecstate[BSEC_MAX_STATE_BLOB_SIZE] = {
       0}; // init BSEC state for BME680 sensor
   strncpy(cfg.version, PROGVERSION, sizeof(cfg.version) - 1);
+  cfg.resettimer = 0xFF; // reset timer, 0xFF = no timer set
 }
 
 void open_storage() {
@@ -184,6 +185,10 @@ void saveConfig() {
     if (nvs_get_i32(my_handle, "salttimestamp", &flash32) != ESP_OK ||
         flash32 != cfg.saltTimestamp)
       nvs_set_i32(my_handle, "salttimestamp", cfg.saltTimestamp);
+
+    if (nvs_get_i8(my_handle, "resettimer", &flash8) != ESP_OK ||
+        flash8 != cfg.resettimer)
+      nvs_set_i8(my_handle, "resettimer", cfg.resettimer);
 
     err = nvs_commit(my_handle);
     nvs_close(my_handle);
@@ -411,6 +416,14 @@ void loadConfig() {
     } else {
       cfg.saltTimestamp = 0x00;
       ESP_LOGI(TAG, "Salt timestamp set to default %d", cfg.saltTimestamp);
+      saveConfig();
+    }
+
+    if (nvs_get_i8(my_handle, "resettimer", &flash8) == ESP_OK) {
+      cfg.resettimer = flash8;
+      ESP_LOGI(TAG, "Reset Timer mode = %d", flash8);
+    } else {
+      ESP_LOGI(TAG, "Reset Timer mode set to default %d", cfg.resettimer);
       saveConfig();
     }
 

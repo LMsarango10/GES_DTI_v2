@@ -86,6 +86,7 @@ typedef struct {
   char version[10]; // Firmware version
   uint8_t
       bsecstate[BSEC_MAX_STATE_BLOB_SIZE + 1]; // BSEC state for BME680 sensor
+  uint8_t resettimer; // reset cycle counter
 } configData_t;
 
 // Struct holding payload for data send queue

@@ -504,6 +504,11 @@ void set_nb_port(uint8_t val[]) {
   sdSaveNbConfig(&conf);
 };
 
+void set_reset_time(uint8_t val[]) {
+  ESP_LOGI(TAG, "Remote command: set_reset_time");
+  cfg.resettimer = val[0];
+  ESP_LOGI(TAG, "Setting reset timer to: %d", cfg.resettimer);
+};
 
 // assign previously defined functions to set of numeric remote commands
 // format: opcode, function, #bytes params,
@@ -531,7 +536,7 @@ static cmd_t table[] = {
     {0x81, get_status, 0, false},       {0x83, get_batt, 0, false},
     {0x84, get_gps, 0, false},          {0x85, get_bme, 0, false},
     {0x86, get_time, 0, false},         {0x87, set_time, 0, false},
-    {0x88, get_userSalt, 0, false},
+    {0x88, get_userSalt, 0, false},     {0x89, set_reset_time, 1, true},
     {0x99, set_flush, 0, false}};
 
 static const uint8_t cmdtablesize =

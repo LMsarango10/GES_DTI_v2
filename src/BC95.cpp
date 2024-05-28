@@ -66,8 +66,8 @@ bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command,
 }
 
 void initModem() {
-  bc95serial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
   bc95serial.setRxBufferSize(4096);
+  bc95serial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
   // pinMode(RESET_PIN, OUTPUT);
   //  digitalWrite(RESET_PIN, HIGH);
 
@@ -701,7 +701,25 @@ bool dataAvailable() {
   return false;
 }
 
+void configureMqtt() {
+
+  bc95serial.println("AT+QMTCFG=\"version\",0,4");
+  char data[128];
+  int bytesRead = readResponseBC(&bc95serial, data, 128);
+  if (!assertResponseBC("OK\r", data, bytesRead)) {
+    ESP_LOGE(TAG, "Error configuring MQTT version");
+  }
+
+  bc95serial.println("AT+QMTCFG=\"keepalive\",0,60");
+  bytesRead = readResponseBC(&bc95serial, data, 128);
+  if (!assertResponseBC("OK\r", data, bytesRead)) {
+    ESP_LOGE(TAG, "Error configuring MQTT keepalive");
+  }
+}
+
 int connectMqtt(char *url, int port, char* username, char *password, char *clientId) {
+  disconnectMqtt();
+  configureMqtt();
   ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTOPEN=0,\"%s\",%d", url, port);
 
   bc95serial.print("AT+QMTOPEN=0,\"");

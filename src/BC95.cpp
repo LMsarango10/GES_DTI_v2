@@ -111,7 +111,7 @@ void resetModem() {
   sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff));
 }
 
-bool preConfigureModem() {
+bool preConfigModem() {
   ESP_LOGI(TAG, "Preconfiguring NBIOT modem");
   return sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff,
                                  sizeof(globalBuff)) &&

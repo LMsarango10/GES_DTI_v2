@@ -13,8 +13,7 @@
 #define HTTP_READ_TIMEOUT 10000
 #define HTTP_SOCKET_TIMEOUT 2000
 
-#define VODAFONE_VERSION
-//#define AUTO_VERSION
+#define APN "lpwa.vodafone.iot"
 
 #define DEBUG_MODEM
 

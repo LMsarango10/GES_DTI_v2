@@ -111,13 +111,20 @@ void resetModem() {
   sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff, sizeof(globalBuff));
 }
 
+bool preConfigureModem() {
+  ESP_LOGI(TAG, "Preconfiguring NBIOT modem");
+  return sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff,
+                                 sizeof(globalBuff)) &&
+         sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
+                                 globalBuff, sizeof(globalBuff));
+}
+
 bool configModem() {
   ESP_LOGI(TAG, "Config NBIOT modem");
   return sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+NSONMI=3", globalBuff,
                                  sizeof(globalBuff)) &&
-#ifdef VODAFONE_VERSION
          sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=0", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+NPSMR=0", globalBuff,
@@ -125,31 +132,18 @@ bool configModem() {
          sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
-                                 sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+COPS=1,2,\"21401\"",
-                                 globalBuff, sizeof(globalBuff));
-#endif
-#ifdef AUTO_VERSION
-  sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
-                          globalBuff, sizeof(globalBuff));
-#endif
+                                 sizeof(globalBuff));
 }
 
 bool attachNetwork()
-
 {
-  return
-#ifdef VODAFONE_VERSION
-      sendAndReadOkResponseBC(&bc95serial,
-                              "AT+CGDCONT=1,\"IP\",\"lpwa.vodafone.iot\"",
-                              globalBuff, sizeof(globalBuff)); // &&
-#endif
-#ifdef AUTO_VERSION
-  sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,
+  return sendAndReadOkResponseBC(&bc95serial,
+                              "AT+CGDCONT=1,\"IP\",\"" APN "\"",
+                              globalBuff, sizeof(globalBuff)) &&
+      sendAndReadOkResponseBC(&bc95serial, "AT+CGATT=1", globalBuff,
                           sizeof(globalBuff)) &&
       sendAndReadOkResponseBC(&bc95serial, "AT+CGATT?", globalBuff,
                               sizeof(globalBuff));
-#endif
 }
 
 bool networkAttached() {

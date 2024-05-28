@@ -23,6 +23,7 @@ bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command, char* bu
 void initModem();
 void resetModem();
 bool configModem();
+bool preConfigModem();
 bool networkReady();
 void getCsq();
 bool attachNetwork();

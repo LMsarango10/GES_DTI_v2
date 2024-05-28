@@ -115,6 +115,14 @@ void NbIotManager::nb_init() {
     return;
   }
 
+  if(!preConfigModem()) {
+    resetModem();
+    if (!preConfigModem()) {
+      ESP_LOGE(TAG, "Could not preconfig modem");
+      this->initializeFailures++;
+      return;
+    }
+  }
   resetModem();
 
   if (!configModem()) {

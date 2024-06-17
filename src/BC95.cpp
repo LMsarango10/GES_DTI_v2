@@ -58,10 +58,10 @@ bool assertResponseBC(const char *expected, char *received, int bytesRead) {
 }
 
 bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command,
-                             char *buffer, int bufferSize) {
+                             char *buffer, int bufferSize, uint32_t timeout = 500) {
   ESP_LOGV(TAG, "Command: %s", command);
   port->println(command);
-  int bytesRead = readResponseBC(port, buffer, bufferSize);
+  int bytesRead = readResponseBC(port, buffer, bufferSize, timeout);
   return assertResponseBC("OK\r", buffer, bytesRead);
 }
 
@@ -115,7 +115,7 @@ bool preConfigModem() {
   ESP_LOGI(TAG, "Preconfiguring NBIOT modem");
   return sendAndReadOkResponseBC(&bc95serial, "AT", globalBuff,
                                  sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,TRUE",
+         sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=AUTOCONNECT,FALSE",
                                  globalBuff, sizeof(globalBuff));
 }
 
@@ -123,14 +123,14 @@ bool configModem() {
   ESP_LOGI(TAG, "Config NBIOT modem");
   return sendAndReadOkResponseBC(&bc95serial, "AT+CEREG=0", globalBuff,
                                  sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+NSONMI=3", globalBuff,
+         sendAndReadOkResponseBC(&bc95serial, "AT+NBAND=8,20", globalBuff,
                                  sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=0", globalBuff,
+         sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=CELL_RESELECTION,TRUE", globalBuff,
                                  sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+NPSMR=0", globalBuff,
+         sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=1", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff,
-                                 sizeof(globalBuff)) &&
+                                 sizeof(globalBuff), 5000) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
                                  sizeof(globalBuff));
 }

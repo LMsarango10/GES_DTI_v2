@@ -19,7 +19,7 @@
 
 int readResponseBC(HardwareSerial *port, char *buff, int b_size, uint32_t timeout);
 bool assertResponseBC(const char *expected, char *received, int bytesRead);
-bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command, char* buffer, int bufferSize);
+bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command, char* buffer, int bufferSize, uint32_t timeout);
 void initModem();
 void resetModem();
 bool configModem();

@@ -127,7 +127,7 @@ bool configModem() {
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+NCONFIG=CELL_RESELECTION,TRUE", globalBuff,
                                  sizeof(globalBuff)) &&
-         sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=1", globalBuff,
+         sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=0", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff,
                                  sizeof(globalBuff), 5000) &&

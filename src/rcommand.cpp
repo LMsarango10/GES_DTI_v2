@@ -367,6 +367,7 @@ void set_rtc_timestamp(uint8_t val[]) {
   uint32_t epoch = (uint32_t)val[0] * 256 * 256 * 256 + (uint32_t)val[1] * 256 * 256 + (uint32_t)val[2] * 256 + (uint32_t)val[0];
   ESP_LOGI(TAG, "Force RTC timestamp to: %l", epoch);
   set_rtctime(epoch);
+  setMyTime(epoch, 0, _rtc);
 };
 
 void set_flush(uint8_t val[]) {

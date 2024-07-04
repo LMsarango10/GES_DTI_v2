@@ -14,6 +14,9 @@
 #include "timekeeper.h"
 #include "globals.h"
 #include "sdcard.h"
+#if(HAS_RTC)
+#include "rtctime.h"
+#endif
 #if(TIME_SYNC_LORASERVER)
 #include "timesync.h"
 #endif

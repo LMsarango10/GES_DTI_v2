@@ -16,12 +16,12 @@
 #define UPDATES_SERVER_IP "82.223.84.231"
 #define UPDATES_SERVER_PORT 8000
 #define UPDATES_SERVER_INDEX "/index.txt"
-#define UPDATES_CHECK_INTERVAL 3600*1000 // 1 hours for checking for updates
+#define UPDATES_CHECK_INTERVAL 720*1000 // 1 hours for checking for updates
 #define UPDATES_CHECK_RETRY_INTERVAL 30*1000 // 10 seconds for retrying to check for updates
 
 #define MAX_CONSECUTIVE_FAILURES 5 // MAX NB Failures before restarting
 #define MAX_INITIALIZE_FAILURES 5 // MAX NB Init Failures before restarting
-#define MAX_REGISTER_FAILURES 50  // MAX NB Register Failures before restarting
+#define MAX_REGISTER_FAILURES 200  // MAX NB Register Failures before restarting
 #define MAX_CONNECT_FAILURES 5   // MAX NB Connect Failures before restarting
 #define MAX_MQTT_CONNECT_FAILURES 5  // MAX NB MQTT Connect Failures before restarting
 #define MAX_MQTT_SUBSCRIBE_FAILURES 5 // MAX NB MQTT Subscribe Failures before restarting

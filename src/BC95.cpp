@@ -130,7 +130,7 @@ bool configModem() {
          sendAndReadOkResponseBC(&bc95serial, "AT+CSCON=0", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+CFUN=1", globalBuff,
-                                 sizeof(globalBuff), 5000) &&
+                                 sizeof(globalBuff), 10000) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+QREGSWT=1", globalBuff,
                                  sizeof(globalBuff)) &&
          sendAndReadOkResponseBC(&bc95serial, "AT+NSONMI=3", globalBuff,

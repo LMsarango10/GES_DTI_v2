@@ -5,3 +5,5 @@
 - Use default lora config as it should be stored internally
 1.10.17
 - Same than 1.10.16 but it is for identify between ota update and in situ update.
+1.10.18
+- Increase command time for nbiot

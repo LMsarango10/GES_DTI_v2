@@ -24,6 +24,11 @@ void doHousekeeping() {
     do_reset(true);
   }
 
+  if(MAX_UPTIME != 0 && MAX_UPTIME * 3600 < uptime() / 1000) {
+    ESP_LOGI(TAG, "Resetting device after %d hours because MAX UPTIME was triggered", cfg.resettimer);
+    do_reset(true);
+  }
+
   #ifdef HAS_SDCARD
 /*MessageBuffer_t message;
 int nSent = 0;

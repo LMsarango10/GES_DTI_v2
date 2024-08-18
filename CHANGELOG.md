@@ -7,3 +7,5 @@
 - Same than 1.10.16 but it is for identify between ota update and in situ update.
 1.10.18
 - Increase command time for nbiot
+1.10.19
+- Add MAX_UPTIME config and set to 1 week by default (7 days)

@@ -33,8 +33,13 @@
 #define SDCARD_FILE_NAME       "paxcount.%02d"
 #define SDCARD_FILE_HEADER     "date, time, wifi, bluet"
 
-bool sdcardInit( void );
-void sdcardWriteData( uint16_t, uint16_t);
+// ✅ Ruta por defecto para el archivo de configuración NB-IoT
+// ⚠️ IMPORTANTE: eliminar cualquier redefinición en el .cpp
+#define NB_CONF_PATH "/nb.cnf"
+
+// ---------- Funciones principales ----------
+bool sdcardInit(void);
+void sdcardWriteData(uint16_t, uint16_t);
 int sdcardReadFrame(MessageBuffer_t *message, int N);
 void sdcardWriteFrame(MessageBuffer_t *message);
 void sdRemoveFirstLines(int N);
@@ -42,10 +47,15 @@ void sdSaveNbConfig(ConfigBuffer_t *config);
 int sdLoadNbConfig(ConfigBuffer_t *config);
 void printSdFile();
 
+// ---------- Funciones auxiliares ----------
 bool createFile(std::string filename, FileMySD &file);
 bool deleteFile(std::string filename);
 bool openFile(std::string filename, FileMySD &file);
 bool createFolder(std::string path);
 bool folderExists(std::string path);
+
+// ✅ Soporte para inserción en caliente (hot-plug)
+bool reinitSDCard(void);     // Reintenta montar la SD manualmente tras inserción
+bool ensureSDMounted(void);  // Verifica si está montada o intenta montarla automáticamente
 
 #endif

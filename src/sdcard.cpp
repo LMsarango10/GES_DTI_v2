@@ -16,6 +16,21 @@ void replaceCurrentFile(char* newFilename);
 FileMySD fileSDCard;
 int fileIndex;
 
+// Nueva función auxiliar: intenta montar la SD si no está montada
+bool ensureSDMounted() {
+  if (!useSDCard) {
+    ESP_LOGW(TAG, "SD not mounted, trying to mount...");
+    useSDCard = mySD.begin(SDCARD_CS, SDCARD_MOSI, SDCARD_MISO, SDCARD_SCLK);
+    if (useSDCard) {
+      ESP_LOGI(TAG, "SD mounted successfully");
+      if (!fileSDCard) createFile(); // vuelve a crear archivo base si no existe
+    } else {
+      ESP_LOGE(TAG, "Failed to mount SD");
+    }
+  }
+  return useSDCard;
+}
+
 bool sdcardInit() {
   ESP_LOGD(TAG, "looking for SD-card...");
   useSDCard = mySD.begin(SDCARD_CS, SDCARD_MOSI, SDCARD_MISO, SDCARD_SCLK);
@@ -26,15 +41,14 @@ bool sdcardInit() {
 
 bool createFile(std::string filename, FileMySD &file)
 {
-  if (!useSDCard)
-    return false;
+  if (!ensureSDMounted()) return false;
 
   char* path_c = (char*)filename.c_str();
   if (mySD.exists(path_c)) {
     mySD.remove(path_c);
   }
   file = mySD.open(filename.c_str(), FILE_WRITE);
-  if (!fileSDCard) {
+  if (!file) {
     ESP_LOGE(TAG, "Failed to open file for writing");
     return false;
   }
@@ -43,28 +57,26 @@ bool createFile(std::string filename, FileMySD &file)
 
 bool deleteFile(std::string filename)
 {
-  if (!useSDCard)
-    return false;
+  if (!ensureSDMounted()) return false;
 
   char* path_c = (char*)filename.c_str();
   if (mySD.exists(path_c)) {
     mySD.remove(path_c);
-
   }
   return true;
 }
 
 bool openFile(std::string filename, FileMySD &file)
 {
-  if (!useSDCard)
-    return false;
+  if (!ensureSDMounted()) return false;
+
   char* filename_c = (char*)filename.c_str();
   if (!mySD.exists(filename_c))
   {
     return false;
   }
   file = mySD.open(filename.c_str());
-  if (!fileSDCard) {
+  if (!file) {
     ESP_LOGE(TAG, "Failed to open file for reading");
     return false;
   }
@@ -73,27 +85,24 @@ bool openFile(std::string filename, FileMySD &file)
 
 bool createFolder(std::string path)
 {
-  if (!useSDCard)
-    return false;
+  if (!ensureSDMounted()) return false;
   char* path_c = (char*)path.c_str();
   return mySD.mkdir(path_c);
 }
 
 bool folderExists(std::string path)
 {
-  if (!useSDCard)
-    return false;
+  if (!ensureSDMounted()) return false;
   char* path_c = (char*)path.c_str();
   return mySD.exists(path_c);
 }
 
 void sdcardWriteData(uint16_t noWifi, uint16_t noBle) {
+  if (!ensureSDMounted()) return;
+
   static int counterWrites = 0;
   char tempBuffer[12 + 1];
   time_t t = now();
-
-  if (!useSDCard)
-    return;
 
   sprintf(tempBuffer, "%02d.%02d.%4d,", day(t), month(t), year(t));
   fileSDCard.print(tempBuffer);
@@ -103,7 +112,6 @@ void sdcardWriteData(uint16_t noWifi, uint16_t noBle) {
   fileSDCard.println(tempBuffer);
 
   if (++counterWrites > 2) {
-    // force writing to SD-card
     ESP_LOGV(TAG, "flushing data to card");
     fileSDCard.flush();
     counterWrites = 0;
@@ -112,6 +120,8 @@ void sdcardWriteData(uint16_t noWifi, uint16_t noBle) {
 
 void printFile(FileMySD file)
 {
+  if (!ensureSDMounted()) return;
+
   ESP_LOGD(TAG, "Print file contents");
   ESP_LOGD(TAG, "------START-----");
   file.seek(0);
@@ -131,11 +141,10 @@ void printSdFile()
 }
 
 void sdcardWriteFrame(MessageBuffer_t *message) {
+  if (!ensureSDMounted()) return;
+
   static int counterWrites = 0;
   char tempBuffer[128];
-
-  if (!useSDCard)
-    return;
 
   int sz = message->MessageSize;
   int i = 1;
@@ -148,14 +157,7 @@ void sdcardWriteFrame(MessageBuffer_t *message) {
 
   ESP_LOGD(TAG, "writing BUFFER (lenght = %d) to SD-card: %s", i, tempBuffer);
   fileSDCard.println(tempBuffer);
-
-  /*if (++counterWrites > 2) {
-    // force writing to SD-card
-    ESP_LOGD(TAG, "flushing data to card");
-    counterWrites = 0;
-  }*/
   fileSDCard.flush();
-  //printFile(fileSDCard);
 }
 
 int sdReadLine(FileMySD file, int lineNumber, char* outBuffer)
@@ -165,8 +167,7 @@ int sdReadLine(FileMySD file, int lineNumber, char* outBuffer)
   while(file.available())
   {
     int lineLen = file.readBytesUntil('\r',outBuffer,128);
-    recNum++; // Count the record
-
+    recNum++;
     if(recNum == lineNumber && lineLen > 0)
     {
       outBuffer[lineLen] = 0;
@@ -178,6 +179,8 @@ int sdReadLine(FileMySD file, int lineNumber, char* outBuffer)
 
 int sdRemoveFirstLines(FileMySD file, int N)
 {
+  if (!ensureSDMounted()) return -1;
+
   ESP_LOGV(TAG, "removing %d lines from sd file", N);
   char newFilename[16];
   int newFileIndex = fileIndex + 1;
@@ -187,7 +190,6 @@ int sdRemoveFirstLines(FileMySD file, int N)
   createTempFile(tempFile, newFilename);
   char outBuffer[128];
 
-  // get position for second line
   file.seek(0);
   for ( int i =0; i < N && file.available(); i++)
   {
@@ -195,7 +197,7 @@ int sdRemoveFirstLines(FileMySD file, int N)
     outBuffer[len] = 0;
     ESP_LOGV(TAG, "remove line: %s", outBuffer);
   }
-  // set start position for both files
+
   tempFile.seek(0);
   uint8_t buf[64];
   int n;
@@ -232,8 +234,7 @@ void sdRemoveFirstLines(int N)
 
 int sdcardReadFrame(MessageBuffer_t *message, int N)
 {
-  if (!useSDCard)
-    return -1;
+  if (!ensureSDMounted()) return -1;
 
   char tempBuffer[128];
   int lineLen = sdReadLine(fileSDCard, N, tempBuffer);
@@ -248,6 +249,7 @@ int sdcardReadFrame(MessageBuffer_t *message, int N)
 }
 
 void createTempFile(FileMySD &tempFileSDCard, char* filename) {
+  if (!ensureSDMounted()) return;
   bool fileExists = mySD.exists(filename);
   if (fileExists)
   {
@@ -264,7 +266,6 @@ void createTempFile(FileMySD &tempFileSDCard, char* filename) {
 
 void createFile(void) {
   char bufferFilename[8 + 1 + 3 + 1];
-
   useSDCard = false;
 
   sprintf(bufferFilename, SDCARD_FILE_NAME, 0);
@@ -278,8 +279,7 @@ void createFile(void) {
   ESP_LOGV(TAG, "SD: file does not exist: opening");
   fileSDCard = mySD.open(bufferFilename, FILE_WRITE);
   if (fileSDCard) {
-    ESP_LOGV(TAG, "SD: name opended: <%s>", bufferFilename);
-    //fileSDCard.println(SDCARD_FILE_HEADER);
+    ESP_LOGV(TAG, "SD: name opened: <%s>", bufferFilename);
     useSDCard = true;
   }
 }
@@ -287,27 +287,29 @@ void createFile(void) {
 void replaceCurrentFile(char* newFilename)
 {
   char bufferFilename[8 + 1 + 3 + 1];
-
-  // remove previous file
   sprintf(bufferFilename, SDCARD_FILE_NAME, fileIndex);
   fileSDCard.close();
   ESP_LOGV(TAG, "SD: removing file: %s", bufferFilename);
   mySD.remove(bufferFilename);
 
-  // load new file
   fileSDCard = mySD.open(newFilename, FILE_WRITE);
   if (fileSDCard) {
     ESP_LOGV(TAG, "SD: name opened: <%s>", newFilename);
-    //fileSDCard.println(SDCARD_FILE_HEADER);
     useSDCard = true;
   }
 }
 
 void sdSaveNbConfig(ConfigBuffer_t *config){
+  if (!ensureSDMounted()) return;
   if(mySD.exists("nb.cnf")) {
     mySD.remove("nb.cnf");
   }
   FileMySD f = mySD.open("nb.cnf", FILE_WRITE);
+  if (!f) {
+    ESP_LOGE(TAG, "❌ Could not open nb.cnf for writing");
+    return;
+  }
+
   const size_t capacity = JSON_OBJECT_SIZE(32);
   DynamicJsonDocument doc(capacity);
 
@@ -345,13 +347,19 @@ void saveDefaultNbConfig() {
 }
 
 int sdLoadNbConfig(ConfigBuffer_t *config){
-  // Use this to return to default SD.remove("nb.cnf");
+  if (!ensureSDMounted()) return -4;
+
   if(!mySD.exists("nb.cnf")) {
     ESP_LOGI(TAG, "nb.cnf file does not exists, creating");
     saveDefaultNbConfig();
   }
 
   FileMySD f = mySD.open("nb.cnf", FILE_READ);
+  if (!f) {
+    ESP_LOGE(TAG, "❌ Cannot open nb.cnf for reading");
+    return -5;
+  }
+
   const size_t capacity = JSON_OBJECT_SIZE(12) + 512;
   StaticJsonDocument<512> doc;
 
@@ -379,7 +387,7 @@ int sdLoadNbConfig(ConfigBuffer_t *config){
 
   f.close();
 
-  const char* serverAddress = doc["serverAddress"]; // "12345678912345678912345678912345678912345678"
+  const char* serverAddress = doc["serverAddress"];
   const char* serverPassword = doc["serverPassword"];
   const char* serverUsername = doc["serverUsername"];
   config->port = doc["port"];

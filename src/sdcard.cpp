@@ -6,7 +6,14 @@
 static const char TAG[] = __FILE__;
 
 #include "sdcard.h"
-
+#include "esp_system.h"
+#if __has_include("esp_mac.h")
+  #include "esp_mac.h"
+#endif
+extern "C" {
+  #include "mbedtls/aes.h"
+  #include "mbedtls/sha256.h"
+}
 static bool useSDCard;
 
 static void createFile(void);
@@ -15,6 +22,147 @@ void replaceCurrentFile(char* newFilename);
 
 FileMySD fileSDCard;
 int fileIndex;
+
+// seccion agragada para guardar con nivel de cifrado
+// ====== Cripto: parámetros y utilidades ======
+static const uint32_t NB_MAGIC  = 0x4E424331; // "NBC1"
+static const size_t   NB_IV_LEN = 16;
+static const size_t   NB_TAG_LEN= 32;         // SHA-256
+static const size_t   NB_KEY_LEN= 32;         // AES-256
+
+static void trng_fill(uint8_t* out, size_t n) {
+  for (size_t i = 0; i < n; i += 4) {
+    uint32_t r = esp_random();
+    size_t c = (n - i) >= 4 ? 4 : (n - i);
+    memcpy(out + i, &r, c);
+  }
+}
+
+// Deriva una clave de 32B desde el eFuse/MAC del chip: key = SHA256("NBKDF"||MAC||"v1")
+static void derive_key_from_chip(uint8_t key[NB_KEY_LEN]) {
+  uint8_t mac6[6] = {0};
+  esp_efuse_mac_get_default(mac6);
+  const char* prefix = "NBKDF";
+  const char* suffix = "v1";
+  mbedtls_sha256_context ctx;
+  mbedtls_sha256_init(&ctx);
+  mbedtls_sha256_starts_ret(&ctx, 0);
+  mbedtls_sha256_update_ret(&ctx, (const unsigned char*)prefix, strlen(prefix));
+  mbedtls_sha256_update_ret(&ctx, mac6, sizeof(mac6));
+  mbedtls_sha256_update_ret(&ctx, (const unsigned char*)suffix, strlen(suffix));
+  mbedtls_sha256_finish_ret(&ctx, key);
+  mbedtls_sha256_free(&ctx);
+}
+
+// PKCS#7
+static size_t pkcs7_pad(const uint8_t* in, size_t len, uint8_t* out, size_t cap) {
+  const size_t blk = 16;
+  size_t pad = blk - (len % blk);
+  size_t need = len + pad;
+  if (need > cap) return 0;
+  memcpy(out, in, len);
+  memset(out + len, (int)pad, pad);
+  return need;
+}
+static size_t pkcs7_unpad(uint8_t* buf, size_t len) {
+  if (!len) return 0;
+  uint8_t pad = buf[len - 1];
+  if (!pad || pad > 16 || pad > len) return 0;
+  for (size_t i = 0; i < pad; ++i) if (buf[len - 1 - i] != pad) return 0;
+  return len - pad;
+}
+
+static void sha256(const uint8_t* in, size_t len, uint8_t out[32]) {
+  mbedtls_sha256_context ctx;
+  mbedtls_sha256_init(&ctx);
+  mbedtls_sha256_starts_ret(&ctx, 0);
+  mbedtls_sha256_update_ret(&ctx, in, len);
+  mbedtls_sha256_finish_ret(&ctx, out);
+  mbedtls_sha256_free(&ctx);
+}
+
+// Formato de archivo: [MAGIC(4)][IV(16)][LEN(4)][CIPHER(len)][TAG(32)]
+static bool nb_encrypt_and_write(const char* path, const uint8_t* plain, size_t plen) {
+  uint8_t key[NB_KEY_LEN]; derive_key_from_chip(key);
+
+  const size_t blk = 16;
+  size_t maxCipher = ((plen / blk) + 2) * blk;
+  std::unique_ptr<uint8_t[]> padded(new uint8_t[maxCipher]);
+  size_t encLen = pkcs7_pad(plain, plen, padded.get(), maxCipher);
+  if (!encLen) return false;
+
+  uint8_t iv[NB_IV_LEN]; trng_fill(iv, NB_IV_LEN);
+
+  mbedtls_aes_context aes; mbedtls_aes_init(&aes);
+  if (mbedtls_aes_setkey_enc(&aes, key, NB_KEY_LEN * 8) != 0) { mbedtls_aes_free(&aes); return false; }
+  std::unique_ptr<uint8_t[]> cipher(new uint8_t[encLen]);
+  uint8_t iv_cbc[NB_IV_LEN]; memcpy(iv_cbc, iv, NB_IV_LEN);
+  if (mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, encLen, iv_cbc, padded.get(), cipher.get()) != 0) {
+    mbedtls_aes_free(&aes); return false;
+  }
+  mbedtls_aes_free(&aes);
+
+  std::unique_ptr<uint8_t[]> iv_cipher(new uint8_t[NB_IV_LEN + encLen]);
+  memcpy(iv_cipher.get(), iv, NB_IV_LEN);
+  memcpy(iv_cipher.get() + NB_IV_LEN, cipher.get(), encLen);
+  uint8_t tag[NB_TAG_LEN]; sha256(iv_cipher.get(), NB_IV_LEN + encLen, tag);
+
+  FileMySD f = mySD.open(path, FILE_WRITE);
+  if (!f) return false;
+
+  uint32_t magic = NB_MAGIC, clen = (uint32_t)encLen;
+  bool ok = true;
+  ok &= f.write((uint8_t*)&magic, sizeof(magic)) == sizeof(magic);
+  ok &= f.write(iv, NB_IV_LEN) == NB_IV_LEN;
+  ok &= f.write((uint8_t*)&clen, sizeof(clen)) == sizeof(clen);
+  ok &= f.write(cipher.get(), encLen) == (int)encLen;
+  ok &= f.write(tag, NB_TAG_LEN) == NB_TAG_LEN;
+  f.flush(); f.close();
+  return ok;
+}
+
+static bool nb_read_and_decrypt(const char* path, std::string& outJson) {
+  FileMySD f = mySD.open(path, FILE_READ);
+  if (!f) return false;
+
+  uint32_t magic = 0, clen = 0;
+  uint8_t iv[NB_IV_LEN], tag[NB_TAG_LEN];
+  bool ok = true;
+  ok &= f.read((uint8_t*)&magic, sizeof(magic)) == sizeof(magic);
+  ok &= f.read(iv, NB_IV_LEN) == NB_IV_LEN;
+  ok &= f.read((uint8_t*)&clen, sizeof(clen)) == sizeof(clen);
+  if (!ok || magic != NB_MAGIC || clen == 0 || clen > 4096) { f.close(); return false; }
+
+  std::unique_ptr<uint8_t[]> cipher(new uint8_t[clen]);
+  ok &= f.read(cipher.get(), clen) == (int)clen;
+  ok &= f.read(tag, NB_TAG_LEN) == NB_TAG_LEN;
+  f.close();
+  if (!ok) return false;
+
+  std::unique_ptr<uint8_t[]> iv_cipher(new uint8_t[NB_IV_LEN + clen]);
+  memcpy(iv_cipher.get(), iv, NB_IV_LEN);
+  memcpy(iv_cipher.get() + NB_IV_LEN, cipher.get(), clen);
+  uint8_t calc[NB_TAG_LEN]; sha256(iv_cipher.get(), NB_IV_LEN + clen, calc);
+  if (memcmp(calc, tag, NB_TAG_LEN) != 0) return false;
+
+  uint8_t key[NB_KEY_LEN]; derive_key_from_chip(key);
+  mbedtls_aes_context aes; mbedtls_aes_init(&aes);
+  if (mbedtls_aes_setkey_dec(&aes, key, NB_KEY_LEN * 8) != 0) { mbedtls_aes_free(&aes); return false; }
+  std::unique_ptr<uint8_t[]> plain(new uint8_t[clen]);
+  uint8_t iv_cbc[NB_IV_LEN]; memcpy(iv_cbc, iv, NB_IV_LEN);
+  if (mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, clen, iv_cbc, cipher.get(), plain.get()) != 0) {
+    mbedtls_aes_free(&aes); return false;
+  }
+  mbedtls_aes_free(&aes);
+
+  size_t realLen = pkcs7_unpad(plain.get(), clen);
+  if (!realLen) return false;
+
+  outJson.assign((char*)plain.get(), (char*)plain.get() + realLen);
+  return true;
+}
+
+
 
 //funcion modificada para evitar bloqueo si no hay SD
 bool sdcardInit() {
@@ -311,25 +459,33 @@ void replaceCurrentFile(char* newFilename)
 }
 
 void sdSaveNbConfig(ConfigBuffer_t *config){
-  if(mySD.exists("nb.cnf")) {
-    mySD.remove("nb.cnf");
+  char path[] = "nb.cnf";
+  if (mySD.exists(path)) {
+      mySD.remove(path);
   }
-  FileMySD f = mySD.open("nb.cnf", FILE_WRITE);
-  const size_t capacity = JSON_OBJECT_SIZE(32);
-  DynamicJsonDocument doc(capacity);
 
-  doc["serverAddress"] = config->ServerAddress;
+  StaticJsonDocument<512> doc;
+  doc["serverAddress"]  = config->ServerAddress;
   doc["serverUsername"] = config->ServerUsername;
   doc["serverPassword"] = config->ServerPassword;
-  doc["applicationId"] = config->ApplicationId;
-  doc["applicationName"] = config->ApplicationName;
-  doc["gatewayId"] = config->GatewayId;
-  doc["port"] = config->port;
+  doc["applicationId"]  = config->ApplicationId;
+  doc["applicationName"]= config->ApplicationName;
+  doc["gatewayId"]      = config->GatewayId;
+  doc["port"]           = config->port;
 
-  serializeJson(doc, f);
-  f.flush();
-  f.close();
+  char buff[512];
+  size_t n = serializeJson(doc, buff, sizeof(buff));
+  if (!n) {
+    ESP_LOGE(TAG, "nb.cnf: serializeJson failed");
+    return;
+  }
+  if (!nb_encrypt_and_write(path, (const uint8_t*)buff, n)) {
+    ESP_LOGE(TAG, "nb.cnf: encrypted save failed");
+    return;
+  }
+  ESP_LOGI(TAG, "🔐 nb.cnf encrypted and saved.");
 }
+
 
 void saveDefaultNbConfig() {
   ConfigBuffer_t conf;
@@ -352,74 +508,61 @@ void saveDefaultNbConfig() {
 }
 
 int sdLoadNbConfig(ConfigBuffer_t *config){
-  // Si la SD no está presente, evitar el bucle infinito
   if (!useSDCard) {
     ESP_LOGW(TAG, "SD card not detected, cannot load nb.cnf");
-    return -10;  // <- devuelve código de error controlado
+    return -10;
   }
 
-  // Si el archivo no existe, crear configuración por defecto
-  if (!mySD.exists("nb.cnf")) {
-    ESP_LOGI(TAG, "nb.cnf file does not exist, creating default");
+char path[] = "nb.cnf";
+  if (!mySD.exists(path)) {
+    ESP_LOGI(TAG, "nb.cnf not found, creating default (encrypted)...");
+    saveDefaultNbConfig(); // crea cifrado con DEFAULT_*
+  }
+
+  std::string json;
+  if (!nb_read_and_decrypt(path, json)) {
+    ESP_LOGE(TAG, "nb.cnf: decrypt/verify failed, recreating defaults...");
+    deleteFile(path);
     saveDefaultNbConfig();
+    if (!nb_read_and_decrypt(path, json)) {
+      ESP_LOGE(TAG, "nb.cnf: decrypt failed after regeneration");
+      return -13;
+    }
   }
 
-  FileMySD f = mySD.open("nb.cnf", FILE_READ);
-  if (!f) {
-    ESP_LOGE(TAG, "Failed to open nb.cnf for reading");
-    return -11;
-  }
-
-  const size_t capacity = JSON_OBJECT_SIZE(12) + 512;
   StaticJsonDocument<512> doc;
-
-  char buff[512];
-  int i = 0;
-  while (f.available() && i < sizeof(buff) - 1) {
-    buff[i++] = f.read();
-  }
-  buff[i] = 0;
-
-  if (i == 0) {
-    ESP_LOGE(TAG, "nb.cnf is empty");
-    f.close();
-    return -12;
-  }
-
-  DeserializationError err = deserializeJson(doc, buff);
+  DeserializationError err = deserializeJson(doc, json);
   if (err) {
-    ESP_LOGE(TAG, "Deserialization error: %s", err.c_str());
-    f.close();
-    deleteFile("nb.cnf");
-    return -13;
-  }
-
-  f.close();
-
-  const char* serverAddress = doc["serverAddress"];
-  const char* serverPassword = doc["serverPassword"];
-  const char* serverUsername = doc["serverUsername"];
-  config->port = doc["port"];
-  const char* applicationId = doc["applicationId"];
-  const char* applicationName = doc["applicationName"];
-  const char* gatewayId = doc["gatewayId"];
-
-  if (!serverAddress || !serverPassword || !serverUsername ||
-      !applicationId || !applicationName || !gatewayId) {
-    deleteFile("nb.cnf");
+    ESP_LOGE(TAG, "nb.cnf: JSON parse error after decrypt: %s", err.c_str());
+    deleteFile(path);
     return -14;
   }
 
-  strncpy(config->ServerAddress, serverAddress, sizeof(config->ServerAddress));
-  strncpy(config->ServerUsername, serverUsername, sizeof(config->ServerUsername));
-  strncpy(config->ServerPassword, serverPassword, sizeof(config->ServerPassword));
-  strncpy(config->ApplicationId, applicationId, sizeof(config->ApplicationId));
-  strncpy(config->ApplicationName, applicationName, sizeof(config->ApplicationName));
-  strncpy(config->GatewayId, gatewayId, sizeof(config->GatewayId));
+  const char* serverAddress   = doc["serverAddress"];
+  const char* serverPassword  = doc["serverPassword"];
+  const char* serverUsername  = doc["serverUsername"];
+  const char* applicationId   = doc["applicationId"];
+  const char* applicationName = doc["applicationName"];
+  const char* gatewayId       = doc["gatewayId"];
+  config->port                = doc["port"] | 0;
 
-  ESP_LOGI(TAG, "✅ nb.cnf loaded successfully from SD.");
+  if (!serverAddress || !serverPassword || !serverUsername ||
+      !applicationId || !applicationName || !gatewayId) {
+    deleteFile(path);
+    return -15;
+  }
+
+  strncpy(config->ServerAddress,   serverAddress,   sizeof(config->ServerAddress));
+  strncpy(config->ServerUsername,  serverUsername,  sizeof(config->ServerUsername));
+  strncpy(config->ServerPassword,  serverPassword,  sizeof(config->ServerPassword));
+  strncpy(config->ApplicationId,   applicationId,   sizeof(config->ApplicationId));
+  strncpy(config->ApplicationName, applicationName, sizeof(config->ApplicationName));
+  strncpy(config->GatewayId,       gatewayId,       sizeof(config->GatewayId));
+
+  ESP_LOGI(TAG, "✅ nb.cnf loaded (encrypted at rest).");
   return 0;
 }
+
 
 bool isSDCardAvailable() {
   return useSDCard;

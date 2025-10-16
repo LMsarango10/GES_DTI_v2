@@ -355,10 +355,39 @@ ESP_ERROR_CHECK(esp_coex_preference_set(
   assert(spi_init() == ESP_OK);
 #endif
 
+// esta has_sdcard se modifica para evitar bloqueo si no hay SD
 #ifdef HAS_SDCARD
-  if (sdcardInit())
+  if (sdcardInit()) {
     strcat_P(features, " SD");
+  } else {
+    ESP_LOGW(TAG, "⚠️ No SD detected at startup. NB-IoT config will load when card is inserted.");
+
+    // 🔁 Tarea en segundo plano que detecta inserción de SD cada 5 segundos
+    xTaskCreatePinnedToCore(
+      [] (void *param) {
+        while (true) {
+          // Reintenta solo si no hay SD detectada
+          if (!isSDCardAvailable() && sdcardInit()) {
+            ESP_LOGI(TAG, "💾 SD card inserted — reloading NB-IoT config...");
+#if (HAS_NBIOT)
+            ConfigBuffer_t conf;
+            if (sdLoadNbConfig(&conf) == 0) {
+              ESP_LOGI(TAG, "✅ NB-IoT config reloaded successfully after SD insertion.");
+            } else {
+              ESP_LOGW(TAG, "⚠️ NB-IoT config not loaded correctly after SD insertion.");
+            }
 #endif
+            vTaskDelete(NULL);  // Detiene la tarea tras detectar e inicializar la SD
+          }
+          vTaskDelay(5000 / portTICK_PERIOD_MS);  // Espera 5 segundos antes de reintentar
+        }
+      },
+      "checkSDTask", 4096, NULL, 1, NULL, 1
+    );
+  }
+#endif
+
+
 
 #if (VENDORFILTER)
   strcat_P(features, " FILTER");

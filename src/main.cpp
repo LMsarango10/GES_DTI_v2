@@ -74,6 +74,7 @@ triggers pps 1 sec impulse
 */
 
 // Basic Config
+
 #include "main.h"
 
 configData_t cfg; // struct holds current device configuration
@@ -106,16 +107,61 @@ TimeChangeRule myDST = DAYLIGHT_TIME;
 TimeChangeRule mySTD = STANDARD_TIME;
 Timezone myTZ(myDST, mySTD);
 
+void startSDWatcher();
+void sdReinsertMonitor(void *param);
+
+
+// 🔁 Tarea que detecta inserción de SD en caliente
+void checkSDTask(void *param) {
+  while (true) {
+    if (!isSDCardAvailable() && sdcardInit()) {
+      ESP_LOGI("SD", "💾 SD card inserted — reloading NB-IoT config...");
+#if (HAS_NBIOT)
+      ConfigBuffer_t conf;
+      if (sdLoadNbConfig(&conf) == 0) {
+        ESP_LOGI("SD", "✅ NB-IoT config reloaded successfully after SD insertion.");
+      } else {
+        ESP_LOGW("SD", "⚠️ NB-IoT config not loaded correctly after SD insertion.");
+      }
+#endif
+      vTaskDelete(NULL);  // 🔚 se elimina tras detectar e inicializar la SD
+    }
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+  }
+}
+
+// 🔁 Arranca la tarea que espera inserción
+void startSDWatcher() {
+  xTaskCreatePinnedToCore(checkSDTask, "checkSDTask", 4096, NULL, 1, NULL, 1);
+}
+
+// 🔁 Monitor que reinicia el watcher si se extrae la SD
+void sdReinsertMonitor(void *param) {
+  bool wasAvailable = false;
+  while (true) {
+    bool isAvailable = isSDCardAvailable();
+    if (wasAvailable && !isAvailable) {
+      ESP_LOGW("SD", "❌ SD card removed — monitoring for reinsertion...");
+      startSDWatcher();
+    }
+    wasAvailable = isAvailable;
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+  }
+}
+
+
 // local Tag for logging
 static const char TAG[] = __FILE__;
 
+void logDataToSD();
+
 void setup() {
 
-#ifdef initWithSerialGuide
-  Serial.begin(115200);
+  #ifdef initWithSerialGuide
+    Serial.begin(115200);
 
   checkConfig();
-#endif
+  #endif
   char features[100] = "";
 
   // create some semaphores for syncing / mutexing tasks
@@ -124,26 +170,26 @@ void setup() {
   I2C_MUTEX_UNLOCK();
 
   // disable brownout detection
-#ifdef DISABLE_BROWNOUT
-  // register with brownout is at address DR_REG_RTCCNTL_BASE + 0xd4
-  (*((uint32_t volatile *)ETS_UNCACHED_ADDR((DR_REG_RTCCNTL_BASE + 0xd4)))) = 0;
-#endif
+  #ifdef DISABLE_BROWNOUT
+    // register with brownout is at address DR_REG_RTCCNTL_BASE + 0xd4
+    (*((uint32_t volatile *)ETS_UNCACHED_ADDR((DR_REG_RTCCNTL_BASE + 0xd4)))) = 0;
+  #endif
 
   // setup debug output or silence device
-#if (VERBOSE)
-#ifndef(initWithSerialGuide)
-  Serial.begin(115200);
-#endif
+  #if (VERBOSE)
+  #ifndef(initWithSerialGuide)
+    Serial.begin(115200);
+  #endif
   esp_log_level_set("*", ESP_LOG_VERBOSE);
-#else
-  // mute logs completely by redirecting them to silence function
-  esp_log_level_set("*", ESP_LOG_NONE);
-#endif
+  #else
+    // mute logs completely by redirecting them to silence function
+    esp_log_level_set("*", ESP_LOG_NONE);
+  #endif
 
   do_after_reset(rtc_get_reset_reason(0));
 
   // print chip information on startup if in verbose mode after coldstart
-#if (VERBOSE)
+  #if (VERBOSE)
 
   if (RTC_runmode == RUNMODE_POWERCYCLE) {
     esp_chip_info_t chip_info;
@@ -159,10 +205,10 @@ void setup() {
                                                            : "external");
     ESP_LOGI(TAG, "Internal Total heap %d, internal Free Heap %d",
              ESP.getHeapSize(), ESP.getFreeHeap());
-#ifdef BOARD_HAS_PSRAM
-    ESP_LOGI(TAG, "SPIRam Total heap %d, SPIRam Free Heap %d",
-             ESP.getPsramSize(), ESP.getFreePsram());
-#endif
+  #ifdef BOARD_HAS_PSRAM
+      ESP_LOGI(TAG, "SPIRam Total heap %d, SPIRam Free Heap %d",
+              ESP.getPsramSize(), ESP.getFreePsram());
+  #endif
     ESP_LOGI(TAG, "ChipRevision %d, Cpu Freq %d, SDK Version %s",
              ESP.getChipRevision(), ESP.getCpuFreqMHz(), ESP.getSdkVersion());
     ESP_LOGI(TAG, "Flash Size %d, Flash Speed %d", ESP.getFlashChipSize(),
@@ -170,270 +216,249 @@ void setup() {
     ESP_LOGI(TAG, "Wifi/BT software coexist version %s",
              esp_coex_version_get());
 
-#if (HAS_LORA)
-    ESP_LOGI(TAG, "IBM LMIC version %d.%d.%d", LMIC_VERSION_MAJOR,
-             LMIC_VERSION_MINOR, LMIC_VERSION_BUILD);
-    ESP_LOGI(TAG, "Arduino LMIC version %d.%d.%d.%d",
-             ARDUINO_LMIC_VERSION_GET_MAJOR(ARDUINO_LMIC_VERSION),
-             ARDUINO_LMIC_VERSION_GET_MINOR(ARDUINO_LMIC_VERSION),
-             ARDUINO_LMIC_VERSION_GET_PATCH(ARDUINO_LMIC_VERSION),
-             ARDUINO_LMIC_VERSION_GET_LOCAL(ARDUINO_LMIC_VERSION));
-    showLoraKeys();
-#endif // HAS_LORA
+  #if (HAS_LORA)
+      ESP_LOGI(TAG, "IBM LMIC version %d.%d.%d", LMIC_VERSION_MAJOR,
+              LMIC_VERSION_MINOR, LMIC_VERSION_BUILD);
+      ESP_LOGI(TAG, "Arduino LMIC version %d.%d.%d.%d",
+              ARDUINO_LMIC_VERSION_GET_MAJOR(ARDUINO_LMIC_VERSION),
+              ARDUINO_LMIC_VERSION_GET_MINOR(ARDUINO_LMIC_VERSION),
+              ARDUINO_LMIC_VERSION_GET_PATCH(ARDUINO_LMIC_VERSION),
+              ARDUINO_LMIC_VERSION_GET_LOCAL(ARDUINO_LMIC_VERSION));
+      showLoraKeys();
+  #endif // HAS_LORA
 
-#if (HAS_GPS)
-    ESP_LOGI(TAG, "TinyGPS+ version %s", TinyGPSPlus::libraryVersion());
-#endif
-  }
-#endif // VERBOSE
+  #if (HAS_GPS)
+      ESP_LOGI(TAG, "TinyGPS+ version %s", TinyGPSPlus::libraryVersion());
+  #endif
+    }
+  #endif // VERBOSE
 
   // open i2c bus
   i2c_init();
 
-// setup power on boards with power management logic
-#ifdef EXT_POWER_SW
-  pinMode(EXT_POWER_SW, OUTPUT);
-  digitalWrite(EXT_POWER_SW, EXT_POWER_ON);
-  strcat_P(features, " VEXT");
-#endif
-#ifdef HAS_PMU
-  AXP192_init();
-  strcat_P(features, " PMU");
-#endif
+  // setup power on boards with power management logic
+  #ifdef EXT_POWER_SW
+    pinMode(EXT_POWER_SW, OUTPUT);
+    digitalWrite(EXT_POWER_SW, EXT_POWER_ON);
+    strcat_P(features, " VEXT");
+  #endif
+  #ifdef HAS_PMU
+    AXP192_init();
+    strcat_P(features, " PMU");
+  #endif
 
   // read (and initialize on first run) runtime settings from NVRAM
   loadConfig(); // includes initialize if necessary
 
-// initialize display
-#ifdef HAS_DISPLAY
-  strcat_P(features, " OLED");
-  DisplayIsOn = cfg.screenon;
-  // display verbose info only after a coldstart (note: blocking call!)
-  dp_init(RTC_runmode == RUNMODE_POWERCYCLE ? true : false);
-#endif
+  // initialize display
+  #ifdef HAS_DISPLAY
+    strcat_P(features, " OLED");
+    DisplayIsOn = cfg.screenon;
+    // display verbose info only after a coldstart (note: blocking call!)
+    dp_init(RTC_runmode == RUNMODE_POWERCYCLE ? true : false);
+  #endif
 
   // scan i2c bus for devices
   i2c_scan();
 
-#ifdef BOARD_HAS_PSRAM
-  assert(psramFound());
-  ESP_LOGI(TAG, "PSRAM found and initialized");
-  strcat_P(features, " PSRAM");
-#endif
+  #ifdef BOARD_HAS_PSRAM
+    assert(psramFound());
+    ESP_LOGI(TAG, "PSRAM found and initialized");
+    strcat_P(features, " PSRAM");
+  #endif
 
-#ifdef BAT_MEASURE_EN
-  pinMode(BAT_MEASURE_EN, OUTPUT);
-#endif
+  #ifdef BAT_MEASURE_EN
+    pinMode(BAT_MEASURE_EN, OUTPUT);
+  #endif
 
-// initialize leds
-#if (HAS_LED != NOT_A_PIN)
-  pinMode(HAS_LED, OUTPUT);
-  strcat_P(features, " LED");
+  // initialize leds
+  #if (HAS_LED != NOT_A_PIN)
+    pinMode(HAS_LED, OUTPUT);
+    strcat_P(features, " LED");
 
-#ifdef LED_POWER_SW
-  pinMode(LED_POWER_SW, OUTPUT);
-  digitalWrite(LED_POWER_SW, LED_POWER_ON);
-#endif
+  #ifdef LED_POWER_SW
+    pinMode(LED_POWER_SW, OUTPUT);
+    digitalWrite(LED_POWER_SW, LED_POWER_ON);
+  #endif
 
-#ifdef HAS_TWO_LED
-  pinMode(HAS_TWO_LED, OUTPUT);
-  strcat_P(features, " LED1");
-#endif
+  #ifdef HAS_TWO_LED
+    pinMode(HAS_TWO_LED, OUTPUT);
+    strcat_P(features, " LED1");
+  #endif
 
-// use LED for power display if we have additional RGB LED, else for status
-#ifdef HAS_RGB_LED
-  switch_LED(LED_ON);
-  strcat_P(features, " RGB");
-  rgb_set_color(COLOR_PINK);
-#endif
+  // use LED for power display if we have additional RGB LED, else for status
+  #ifdef HAS_RGB_LED
+    switch_LED(LED_ON);
+    strcat_P(features, " RGB");
+    rgb_set_color(COLOR_PINK);
+  #endif
 
-#endif // HAS_LED
+  #endif // HAS_LED
 
-#if (HAS_LED != NOT_A_PIN) || defined(HAS_RGB_LED)
-  // start led loop
-  ESP_LOGI(TAG, "Starting LED Controller...");
-  xTaskCreatePinnedToCore(ledLoop,      // task function
-                          "ledloop",    // name of task
-                          1024,         // stack size of task
-                          (void *)1,    // parameter of the task
-                          3,            // priority of the task
-                          &ledLoopTask, // task handle
-                          0);           // CPU core
-#endif
+  #if (HAS_LED != NOT_A_PIN) || defined(HAS_RGB_LED)
+    // start led loop
+    ESP_LOGI(TAG, "Starting LED Controller...");
+    xTaskCreatePinnedToCore(ledLoop,      // task function
+                            "ledloop",    // name of task
+                            1024,         // stack size of task
+                            (void *)1,    // parameter of the task
+                            3,            // priority of the task
+                            &ledLoopTask, // task handle
+                            0);           // CPU core
+  #endif
 
-// initialize wifi antenna
-#ifdef HAS_ANTENNA_SWITCH
-  strcat_P(features, " ANT");
-  antenna_init();
-  antenna_select(cfg.wifiant);
-#endif
+  // initialize wifi antenna
+  #ifdef HAS_ANTENNA_SWITCH
+    strcat_P(features, " ANT");
+    antenna_init();
+    antenna_select(cfg.wifiant);
+  #endif
 
-// initialize battery status
-#if (defined BAT_MEASURE_ADC || defined HAS_PMU)
-  strcat_P(features, " BATT");
-  calibrate_voltage();
-  batt_voltage = read_voltage();
-#endif
+  // initialize battery status
+  #if (defined BAT_MEASURE_ADC || defined HAS_PMU)
+    strcat_P(features, " BATT");
+    calibrate_voltage();
+    batt_voltage = read_voltage();
+  #endif
 
-#if (USE_OTA)
-  strcat_P(features, " OTA");
-  // reboot to firmware update mode if ota trigger switch is set
-  if (RTC_runmode == RUNMODE_UPDATE)
-    start_ota_update();
-#endif
+  #if (USE_OTA)
+    strcat_P(features, " OTA");
+    // reboot to firmware update mode if ota trigger switch is set
+    if (RTC_runmode == RUNMODE_UPDATE)
+      start_ota_update();
+  #endif
 
-// start BLE scan callback if BLE function is enabled in NVRAM configuration
-// or switch off bluetooth, if not compiled
-#if (BLECOUNTER)
-  TaskHandle_t btHandlerTask = NULL;
-  strcat_P(features, " BLE");
-  if (cfg.blescan) {
-    ESP_LOGI(TAG, "Starting Bluetooth LE...");
-    // initBLE();
-    // BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
-    //initBLE();
-    //BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
-  }
-  strcat_P(features, " BT");
-  if (cfg.btscan) {
-    ESP_LOGI(TAG, "Starting Bluetooth...");
-    //initBT();
-    //BTCycler.attach(BTLE_SCAN_TIME, BTCycle);
-  }
-  xTaskCreatePinnedToCore(btHandler,      // task function
-                          "bthandler",    // name of task
-                          4096,            // stack size of task
-                          (void *)1,       // parameter of the task
-                          0,               // priority of the task
-                          &btHandlerTask, // task handle
-                          1);              // CPU core
-#endif
-ESP_ERROR_CHECK(esp_coex_preference_set(
-    ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
+  // start BLE scan callback if BLE function is enabled in NVRAM configuration
+  // or switch off bluetooth, if not compiled
+  #if (BLECOUNTER)
+    TaskHandle_t btHandlerTask = NULL;
+    strcat_P(features, " BLE");
+    if (cfg.blescan) {
+      ESP_LOGI(TAG, "Starting Bluetooth LE...");
+      // initBLE();
+      // BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
+      //initBLE();
+      //BLECycler.attach(BTLE_SCAN_TIME, BLECycle);
+    }
+    strcat_P(features, " BT");
+    if (cfg.btscan) {
+      ESP_LOGI(TAG, "Starting Bluetooth...");
+      //initBT();
+      //BTCycler.attach(BTLE_SCAN_TIME, BTCycle);
+    }
+    xTaskCreatePinnedToCore(btHandler,      // task function
+                            "bthandler",    // name of task
+                            4096,            // stack size of task
+                            (void *)1,       // parameter of the task
+                            0,               // priority of the task
+                            &btHandlerTask, // task handle
+                            1);              // CPU core
+  #endif
+  ESP_ERROR_CHECK(esp_coex_preference_set(
+      ESP_COEX_PREFER_WIFI)); // configure Wifi/BT coexist lib
 
-// initialize gps
-#if (HAS_GPS)
-  strcat_P(features, " GPS");
-  if (gps_init()) {
-    ESP_LOGI(TAG, "Starting GPS Feed...");
-    xTaskCreatePinnedToCore(gps_loop,  // task function
-                            "gpsloop", // name of task
-                            2048,      // stack size of task
-                            (void *)1, // parameter of the task
-                            1,         // priority of the task
-                            &GpsTask,  // task handle
-                            1);        // CPU core
-  }
-#endif
+  // initialize gps
+  #if (HAS_GPS)
+    strcat_P(features, " GPS");
+    if (gps_init()) {
+      ESP_LOGI(TAG, "Starting GPS Feed...");
+      xTaskCreatePinnedToCore(gps_loop,  // task function
+                              "gpsloop", // name of task
+                              2048,      // stack size of task
+                              (void *)1, // parameter of the task
+                              1,         // priority of the task
+                              &GpsTask,  // task handle
+                              1);        // CPU core
+    }
+  #endif
 
-// initialize sensors
-#if (HAS_SENSORS)
-  strcat_P(features, " SENS");
-  sensor_init();
-#endif
+  // initialize sensors
+  #if (HAS_SENSORS)
+    strcat_P(features, " SENS");
+    sensor_init();
+  #endif
 
-// initialize LoRa
-#if (HAS_LORA)
-  strcat_P(features, " LORA");
-  // kick off join, except we come from sleep
-  assert(lora_stack_init(RTC_runmode == RUNMODE_WAKEUP ? false : true) ==
-         ESP_OK);
-#endif
+  // initialize LoRa
+  #if (HAS_LORA)
+    strcat_P(features, " LORA");
+    // kick off join, except we come from sleep
+    assert(lora_stack_init(RTC_runmode == RUNMODE_WAKEUP ? false : true) ==
+          ESP_OK);
+  #endif
 
-#if (HAS_NBIOT)
-  strcat_P(features, " NBIOT");
-  assert(nb_iot_init() == ESP_OK);
-#endif
+  #if (HAS_NBIOT)
+    strcat_P(features, " NBIOT");
+    assert(nb_iot_init() == ESP_OK);
+  #endif
 
-#if (!HAS_LORA && HAS_NBIOT)
-  nb_enable(false);
-  ESP_LOGI(TAG, "Using NB-Only Mode");
-#endif
-// initialize SPI
-#ifdef HAS_SPI
-  strcat_P(features, " SPI");
-  assert(spi_init() == ESP_OK);
-#endif
+  #if (!HAS_LORA && HAS_NBIOT)
+    nb_enable(false);
+    ESP_LOGI(TAG, "Using NB-Only Mode");
+  #endif
 
-// esta has_sdcard se modifica para evitar bloqueo si no hay SD
+  // initialize SPI
+  #ifdef HAS_SPI
+    strcat_P(features, " SPI");
+    assert(spi_init() == ESP_OK);
+  #endif
+
 #ifdef HAS_SDCARD
   if (sdcardInit()) {
     strcat_P(features, " SD");
   } else {
     ESP_LOGW(TAG, "⚠️ No SD detected at startup. NB-IoT config will load when card is inserted.");
-
-    // 🔁 Tarea en segundo plano que detecta inserción de SD cada 5 segundos
-    xTaskCreatePinnedToCore(
-      [] (void *param) {
-        while (true) {
-          // Reintenta solo si no hay SD detectada
-          if (!isSDCardAvailable() && sdcardInit()) {
-            ESP_LOGI(TAG, "💾 SD card inserted — reloading NB-IoT config...");
-#if (HAS_NBIOT)
-            ConfigBuffer_t conf;
-            if (sdLoadNbConfig(&conf) == 0) {
-              ESP_LOGI(TAG, "✅ NB-IoT config reloaded successfully after SD insertion.");
-            } else {
-              ESP_LOGW(TAG, "⚠️ NB-IoT config not loaded correctly after SD insertion.");
-            }
-#endif
-            vTaskDelete(NULL);  // Detiene la tarea tras detectar e inicializar la SD
-          }
-          vTaskDelay(5000 / portTICK_PERIOD_MS);  // Espera 5 segundos antes de reintentar
-        }
-      },
-      "checkSDTask", 4096, NULL, 1, NULL, 1
-    );
+    startSDWatcher();  // inicia el detector de inserción
+    xTaskCreatePinnedToCore(sdReinsertMonitor, "sdReinsertMonitor", 2048, NULL, 1, NULL, 1);
   }
 #endif
 
 
 
-#if (VENDORFILTER)
-  strcat_P(features, " FILTER");
-#endif
+  #if (VENDORFILTER)
+    strcat_P(features, " FILTER");
+  #endif
 
-// initialize matrix display
-#ifdef HAS_MATRIX_DISPLAY
-  strcat_P(features, " LED_MATRIX");
-  MatrixDisplayIsOn = cfg.screenon;
-  init_matrix_display(); // note: blocking call
-#endif
+  // initialize matrix display
+  #ifdef HAS_MATRIX_DISPLAY
+    strcat_P(features, " LED_MATRIX");
+    MatrixDisplayIsOn = cfg.screenon;
+    init_matrix_display(); // note: blocking call
+  #endif
 
-// show payload encoder
-#if PAYLOAD_ENCODER == 1
-  strcat_P(features, " PLAIN");
-#elif PAYLOAD_ENCODER == 2
-  strcat_P(features, " PACKED");
-#elif PAYLOAD_ENCODER == 3
-  strcat_P(features, " LPPDYN");
-#elif PAYLOAD_ENCODER == 4
-  strcat_P(features, " LPPPKD");
-#endif
+  // show payload encoder
+  #if PAYLOAD_ENCODER == 1
+    strcat_P(features, " PLAIN");
+  #elif PAYLOAD_ENCODER == 2
+    strcat_P(features, " PACKED");
+  #elif PAYLOAD_ENCODER == 3
+    strcat_P(features, " LPPDYN");
+  #elif PAYLOAD_ENCODER == 4
+    strcat_P(features, " LPPPKD");
+  #endif
 
-// initialize RTC
-#ifdef HAS_RTC
-  strcat_P(features, " RTC");
-  assert(rtc_init());
-#endif
+  // initialize RTC
+  #ifdef HAS_RTC
+    strcat_P(features, " RTC");
+    assert(rtc_init());
+  #endif
 
-#if defined HAS_DCF77
-  strcat_P(features, " DCF77");
-#endif
+  #if defined HAS_DCF77
+    strcat_P(features, " DCF77");
+  #endif
 
-#if defined HAS_IF482
-  strcat_P(features, " IF482");
-#endif
+  #if defined HAS_IF482
+    strcat_P(features, " IF482");
+  #endif
 
-#if (WIFICOUNTER)
-  strcat_P(features, " WIFI");
-  // start wifi in monitor mode and start channel rotation timer
-  ESP_LOGI(TAG, "Starting Wifi...");
-  wifi_sniffer_init();
-#else
-  // switch off wifi
-  esp_wifi_deinit();
-#endif
+  #if (WIFICOUNTER)
+    strcat_P(features, " WIFI");
+    // start wifi in monitor mode and start channel rotation timer
+    ESP_LOGI(TAG, "Starting Wifi...");
+    wifi_sniffer_init();
+  #else
+    // switch off wifi
+    esp_wifi_deinit();
+  #endif
 
   // initialize salt value using esp_random() called by random() in
   // arduino-esp32 core. Note: do this *after* wifi has started, since
@@ -450,84 +475,89 @@ ESP_ERROR_CHECK(esp_coex_preference_set(
                           &irqHandlerTask, // task handle
                           1);              // CPU core
 
-// initialize BME sensor (BME280/BME680)
-#if (HAS_BME)
-#ifdef HAS_BME680
-  strcat_P(features, " BME680");
-#elif defined HAS_BME280
-  strcat_P(features, " BME280");
-#elif defined HAS_BMP180
-  strcat_P(features, " BMP180");
-#endif
-  if (bme_init())
-    ESP_LOGI(TAG, "Starting BME sensor...");
-#endif
+  // initialize BME sensor (BME280/BME680)
+  #if (HAS_BME)
+  #ifdef HAS_BME680
+    strcat_P(features, " BME680");
+  #elif defined HAS_BME280
+    strcat_P(features, " BME280");
+  #elif defined HAS_BMP180
+    strcat_P(features, " BMP180");
+  #endif
+    if (bme_init())
+      ESP_LOGI(TAG, "Starting BME sensor...");
+  #endif
 
   // starting timers and interrupts
   assert(irqHandlerTask != NULL); // has interrupt handler task started?
   ESP_LOGI(TAG, "Starting Timers...");
 
-// display interrupt
-#ifdef HAS_DISPLAY
-  // https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
-  // prescaler 80 -> divides 80 MHz CPU freq to 1 MHz, timer 0, count up
-  displayIRQ = timerBegin(0, 80, true);
-  timerAttachInterrupt(displayIRQ, &DisplayIRQ, true);
-  timerAlarmWrite(displayIRQ, DISPLAYREFRESH_MS * 1000, true);
-  timerAlarmEnable(displayIRQ);
-#endif
+  // display interrupt
+  #ifdef HAS_DISPLAY
+    // https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
+    // prescaler 80 -> divides 80 MHz CPU freq to 1 MHz, timer 0, count up
+    displayIRQ = timerBegin(0, 80, true);
+    timerAttachInterrupt(displayIRQ, &DisplayIRQ, true);
+    timerAlarmWrite(displayIRQ, DISPLAYREFRESH_MS * 1000, true);
+    timerAlarmEnable(displayIRQ);
+  #endif
 
-// LED Matrix display interrupt
-#ifdef HAS_MATRIX_DISPLAY
-  // https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
-  // prescaler 80 -> divides 80 MHz CPU freq to 1 MHz, timer 3, count up
-  matrixDisplayIRQ = timerBegin(3, 80, true);
-  timerAttachInterrupt(matrixDisplayIRQ, &MatrixDisplayIRQ, true);
-  timerAlarmWrite(matrixDisplayIRQ, MATRIX_DISPLAY_SCAN_US, true);
-  timerAlarmEnable(matrixDisplayIRQ);
-#endif
+  // LED Matrix display interrupt
+  #ifdef HAS_MATRIX_DISPLAY
+    // https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
+    // prescaler 80 -> divides 80 MHz CPU freq to 1 MHz, timer 3, count up
+    matrixDisplayIRQ = timerBegin(3, 80, true);
+    timerAttachInterrupt(matrixDisplayIRQ, &MatrixDisplayIRQ, true);
+    timerAlarmWrite(matrixDisplayIRQ, MATRIX_DISPLAY_SCAN_US, true);
+    timerAlarmEnable(matrixDisplayIRQ);
+  #endif
 
-// initialize button
-#ifdef HAS_BUTTON
-  strcat_P(features, " BTN_");
-#ifdef BUTTON_PULLUP
-  strcat_P(features, "PU");
-#else
-  strcat_P(features, "PD");
-#endif // BUTTON_PULLUP
-  button_init(HAS_BUTTON);
-#endif // HAS_BUTTON
+  // initialize button
+  #ifdef HAS_BUTTON
+    strcat_P(features, " BTN_");
+  #ifdef BUTTON_PULLUP
+    strcat_P(features, "PU");
+  #else
+    strcat_P(features, "PD");
+  #endif // BUTTON_PULLUP
+    button_init(HAS_BUTTON);
+  #endif // HAS_BUTTON
 
   // cyclic function interrupts
   sendcycler.attach(cfg.sendcycle * 2, sendcycle);
   housekeeper.attach(HOMECYCLE, housekeeping);
 
-#if (TIME_SYNC_INTERVAL)
+  //adicion para la escritura en SD de los datos que se envian
+  Ticker sdLogger;
+  sdLogger.attach(30, logDataToSD);  // Guarda cada 30 segundos
 
-#if (!(TIME_SYNC_LORAWAN) && !(TIME_SYNC_LORASERVER) && !defined HAS_GPS &&    \
+
+  #if (TIME_SYNC_INTERVAL)
+
+  #if (!(TIME_SYNC_LORAWAN) && !(TIME_SYNC_LORASERVER) && !defined HAS_GPS &&    \
      !defined HAS_RTC)
-#warning you did not specify a time source, time will not be synched
-#endif
+  #warning you did not specify a time source, time will not be synched
+  #endif
 
-// initialize gps time
-#if (HAS_GPS)
-  fetch_gpsTime();
-#endif
+  // initialize gps time
+  #if (HAS_GPS)
+    fetch_gpsTime();
+  #endif
 
-#if (defined HAS_IF482 || defined HAS_DCF77)
-  ESP_LOGI(TAG, "Starting Clock Controller...");
-  clock_init();
-#endif
+  #if (defined HAS_IF482 || defined HAS_DCF77)
+    ESP_LOGI(TAG, "Starting Clock Controller...");
+    clock_init();
+  #endif
 
-#if (TIME_SYNC_LORASERVER)
-  timesync_init(); // create loraserver time sync task
-#endif
+  #if (TIME_SYNC_LORASERVER)
+    timesync_init(); // create loraserver time sync task
+  #endif
 
   ESP_LOGI(TAG, "Starting Timekeeper...");
   assert(timepulse_init()); // setup pps timepulse
   timepulse_start();        // starts pps and cyclic time sync
 
-#endif // TIME_SYNC_INTERVAL
+  #endif // TIME_SYNC_INTERVAL
 
   // show compiled features
   ESP_LOGI(TAG, "Features:%s", features);
@@ -537,6 +567,15 @@ ESP_ERROR_CHECK(esp_coex_preference_set(
 
   vTaskDelete(NULL);
 
-} // setup()
+} // end setup()
+
+void logDataToSD() {
+#if defined(HAS_SDCARD)
+  if (isSDCardAvailable()) {
+    sdcardWriteData(macs_wifi, macs_ble);
+    ESP_LOGI("SD_LOG", "Data logged: WiFi=%d BLE=%d", macs_wifi, macs_ble);
+  }
+#endif
+}
 
 void loop() { vTaskDelete(NULL); }

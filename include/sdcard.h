@@ -48,5 +48,7 @@ bool openFile(std::string filename, FileMySD &file);
 bool createFolder(std::string path);
 bool folderExists(std::string path);
 bool isSDCardAvailable(); //nueva funcion para saber si hay SD
+void sdcardWriteLine(const char *line); //
+
 
 #endif

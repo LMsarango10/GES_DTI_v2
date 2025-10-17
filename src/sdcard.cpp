@@ -16,9 +16,30 @@ extern "C" {
 }
 static bool useSDCard;
 
+struct MqttMessage {
+  String applicationID;
+  String applicationName;
+  int fPort;
+  String data;
+  String deviceName;
+  String devEUI;
+};
+
+// variable global
+MqttMessage lastMqttMsg;
+
+
+#define MAX_LOG_FILE_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB
+
+static int currentFileIndex = 0;  // índice de archivo actual
+extern bool useSDCard;            // declarado globalmente en tu sistema
+extern FileMySD fileSDCard;       // manejador global del archivo activo
+
+
 static void createFile(void);
 void createTempFile(FileMySD &tempFileSDCard, char* filename);
 void replaceCurrentFile(char* newFilename);
+void checkAndRotateLogFile();
 
 FileMySD fileSDCard;
 int fileIndex;
@@ -163,21 +184,142 @@ static bool nb_read_and_decrypt(const char* path, std::string& outJson) {
 }
 
 
+// criptografia de la linea guardada en paxcounter.xx
+
+// ====== AES-GCM por línea (para PAXCOUNT.00) ======
+extern "C" {
+  #include "mbedtls/gcm.h"
+  #include "mbedtls/base64.h"
+}
+
+// Deriva la misma clave del chip
+static void derive_key_from_chip_gcm(uint8_t key[32]) {
+  derive_key_from_chip(key);
+}
+
+// Genera nonce aleatorio de 12 bytes
+static void random_nonce(uint8_t nonce[12]) {
+  trng_fill(nonce, 12);
+}
+
+// Codifica en Base64
+static std::string base64_encode(const uint8_t* data, size_t len) {
+  size_t outlen = 0;
+  size_t cap = 4 * ((len + 2) / 3) + 4;
+  std::unique_ptr<uint8_t[]> out(new uint8_t[cap]);
+  if (mbedtls_base64_encode(out.get(), cap, &outlen, data, len) != 0)
+    return {};
+  return std::string((char*)out.get(), outlen);
+}
+
+// Decodifica Base64
+static bool base64_decode(const std::string& in, std::vector<uint8_t>& out) {
+  size_t outlen = 0;
+  out.resize((in.size() * 3) / 4 + 4);
+  if (mbedtls_base64_decode(out.data(), out.size(), &outlen,
+                            (const unsigned char*)in.data(), in.size()) != 0)
+    return false;
+  out.resize(outlen);
+  return true;
+}
+
+// Cifra una línea → Base64
+static std::string encrypt_line_to_base64(const std::string& plain) {
+  uint8_t key[32]; derive_key_from_chip_gcm(key);
+  uint8_t nonce[12]; random_nonce(nonce);
+
+  mbedtls_gcm_context gcm;
+  mbedtls_gcm_init(&gcm);
+  if (mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, key, 256) != 0) {
+    mbedtls_gcm_free(&gcm);
+    return {};
+  }
+
+  std::vector<uint8_t> cipher(plain.size());
+  uint8_t tag[16];
+  if (mbedtls_gcm_crypt_and_tag(&gcm, MBEDTLS_GCM_ENCRYPT, plain.size(),
+                                nonce, sizeof(nonce),
+                                nullptr, 0,
+                                (const uint8_t*)plain.data(),
+                                cipher.data(),
+                                sizeof(tag), tag) != 0) {
+    mbedtls_gcm_free(&gcm);
+    return {};
+  }
+  mbedtls_gcm_free(&gcm);
+
+  // Estructura: "PC" + nonce(12) + cipher + tag(16)
+  size_t total = 2 + sizeof(nonce) + cipher.size() + sizeof(tag);
+  std::vector<uint8_t> frame(total);
+  frame[0] = 'P'; frame[1] = 'C';
+  memcpy(&frame[2], nonce, sizeof(nonce));
+  memcpy(&frame[14], cipher.data(), cipher.size());
+  memcpy(&frame[14 + cipher.size()], tag, sizeof(tag));
+
+  return base64_encode(frame.data(), total);
+}
+
+
+
 
 //funcion modificada para evitar bloqueo si no hay SD
 bool sdcardInit() {
-  ESP_LOGD(TAG, "looking for SD-card...");
+  ESP_LOGI("SD", "🔍 Checking SD-card status...");
+
+  // Si ya estaba montada, cerramos el archivo actual y reiniciamos
+  if (useSDCard) {
+    ESP_LOGI("SD", "Unmounting previous SD instance...");
+    if (fileSDCard) {
+      fileSDCard.flush();
+      fileSDCard.close();
+    }
+    useSDCard = false;
+    delay(100);
+  }
+
+  // Intentamos montar nuevamente
   useSDCard = mySD.begin(SDCARD_CS, SDCARD_MOSI, SDCARD_MISO, SDCARD_SCLK);
 
   if (!useSDCard) {
-    ESP_LOGW(TAG, "⚠️ SD card not detected.");
-    return false;   // <- evita bloqueo y no crea archivo
+    ESP_LOGW("SD", "⚠️ SD card not detected or failed to initialize.");
+    return false;
   }
 
-  createFile();     // solo si se detecta
-  return useSDCard;
-}
+  // 🔹 Detectar el último archivo válido existente
+  for (int i = 0; i < 100; i++) {
+    char testname[16];
+    sprintf(testname, SDCARD_FILE_NAME, i);
+    if (!mySD.exists(testname)) {
+      currentFileIndex = (i == 0) ? 0 : i - 1;
+      break;
+    }
+  }
+  ESP_LOGI("SD", "📁 Current log index set to %d", currentFileIndex);
 
+  // Crear o reabrir el archivo principal
+  char filename[16];
+  sprintf(filename, SDCARD_FILE_NAME, currentFileIndex);  // "paxcount.xx"
+  if (mySD.exists(filename)) {
+    ESP_LOGI("SD", "📁 Existing log file found: %s", filename);
+    fileSDCard = mySD.open(filename, FILE_WRITE);
+    fileSDCard.seek(fileSDCard.size());
+  } else {
+    ESP_LOGI("SD", "🆕 Creating new log file: %s", filename);
+    fileSDCard = mySD.open(filename, FILE_WRITE);
+    if (fileSDCard) {
+      fileSDCard.println(SDCARD_FILE_HEADER);
+    }
+  }
+
+  if (!fileSDCard) {
+    ESP_LOGE("SD", "❌ Failed to open file on SD.");
+    useSDCard = false;
+    return false;
+  }
+
+  ESP_LOGI("SD", "✅ SD-card initialized and ready for logging.");
+  return true;
+}
 
 bool createFile(std::string filename, FileMySD &file)
 {
@@ -244,26 +386,48 @@ bool folderExists(std::string path)
 
 void sdcardWriteData(uint16_t noWifi, uint16_t noBle) {
   static int counterWrites = 0;
-  char tempBuffer[12 + 1];
+  char tempBuffer[128];
   time_t t = now();
 
   if (!useSDCard)
     return;
 
-  sprintf(tempBuffer, "%02d.%02d.%4d,", day(t), month(t), year(t));
+  // Fecha y hora
+  sprintf(tempBuffer, "%02d/%02d/%04d,%02d:%02d:%02d,",
+          day(t), month(t), year(t),
+          hour(t), minute(t), second(t));
   fileSDCard.print(tempBuffer);
-  sprintf(tempBuffer, "%02d:%02d:%02d,", hour(t), minute(t), second(t));
+
+  // WiFi y BLE
+  sprintf(tempBuffer, "%d,%d,", noWifi, noBle);
   fileSDCard.print(tempBuffer);
-  sprintf(tempBuffer, "%d,%d", noWifi, noBle);
+
+  // Batería
+#if defined(BAT_MEASURE_ADC) || defined(HAS_PMU)
+  float voltage = read_voltage() / 1000.0;
+  sprintf(tempBuffer, "%.2f,", voltage);
+  fileSDCard.print(tempBuffer);
+#else
+  fileSDCard.print("N/A,");
+#endif
+
+  // GPS
+#if defined(HAS_GPS)
+  double lat = gps.location.lat();
+  double lon = gps.location.lng();
+  sprintf(tempBuffer, "%.6f,%.6f", lat, lon);
   fileSDCard.println(tempBuffer);
+#else
+  fileSDCard.println("N/A,N/A");
+#endif
 
   if (++counterWrites > 2) {
-    // force writing to SD-card
-    ESP_LOGV(TAG, "flushing data to card");
     fileSDCard.flush();
     counterWrites = 0;
   }
 }
+
+
 
 void printFile(FileMySD file)
 {
@@ -286,32 +450,49 @@ void printSdFile()
 }
 
 void sdcardWriteFrame(MessageBuffer_t *message) {
-  static int counterWrites = 0;
-  char tempBuffer[128];
-
-  if (!useSDCard)
+  if (!useSDCard || !fileSDCard) {
+    ESP_LOGW("SD", "⚠️ SD not available — skipping write.");
     return;
-
-  int sz = message->MessageSize;
-  int i = 1;
-  sprintf(tempBuffer, "%02X", message->MessagePort);
-  ESP_LOGD(TAG, "PORT: %02X", message->MessagePort);
-  for (; i < sz; i++)
-  {
-    sprintf(tempBuffer + 2*i, "%02X", message->Message[i-1]);
   }
 
-  ESP_LOGD(TAG, "writing BUFFER (lenght = %d) to SD-card: %s", i, tempBuffer);
-  fileSDCard.println(tempBuffer);
+  // Verifica si debe rotar antes de escribir
+  checkAndRotateLogFile();
 
-  /*if (++counterWrites > 2) {
-    // force writing to SD-card
-    ESP_LOGD(TAG, "flushing data to card");
-    counterWrites = 0;
-  }*/
+  // Construir la línea de registro
+  String line;
+  line.reserve(256);  // optimización de memoria
+
+  time_t nowTime = now();
+  struct tm timeinfo;
+  localtime_r(&nowTime, &timeinfo);
+
+  char timeStr[32];
+  strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
+
+  line += timeStr;
+  line += ", ";
+
+  // Si tu mensaje tiene campos útiles, agrégalos aquí
+  line += String(message->MessagePort);
+  line += ", ";
+  line += String(message->MessageSize);
+  line += ", ";
+
+  // Representación hexadecimal del payload
+  for (uint8_t i = 0; i < message->MessageSize; i++) {
+    char hexByte[4];
+    sprintf(hexByte, "%02X ", message->Message[i]);
+    line += hexByte;
+  }
+
+  // Escribir línea y forzar guardado
+  fileSDCard.println(line);
   fileSDCard.flush();
-  //printFile(fileSDCard);
+
+  ESP_LOGI("SD", "💾 Logged frame (%d bytes) to file %02d: %s",
+           message->MessageSize, currentFileIndex, line.c_str());
 }
+
 
 int sdReadLine(FileMySD file, int lineNumber, char* outBuffer)
 {
@@ -421,23 +602,23 @@ void createFile(void) {
   char bufferFilename[8 + 1 + 3 + 1];
 
   useSDCard = false;
-
   sprintf(bufferFilename, SDCARD_FILE_NAME, 0);
   fileIndex = 0;
-  ESP_LOGV(TAG, "SD: looking for file <%s>", bufferFilename);
-  bool fileExists = mySD.exists(bufferFilename);
-  if (fileExists)
-  {
+
+  if (mySD.exists(bufferFilename)) {
     mySD.remove(bufferFilename);
   }
-  ESP_LOGV(TAG, "SD: file does not exist: opening");
+
   fileSDCard = mySD.open(bufferFilename, FILE_WRITE);
   if (fileSDCard) {
-    ESP_LOGV(TAG, "SD: name opended: <%s>", bufferFilename);
-    //fileSDCard.println(SDCARD_FILE_HEADER);
+    ESP_LOGV(TAG, "SD: name opened: <%s>", bufferFilename);
+    // ✅ Añadimos encabezado extendido
+    fileSDCard.println("date,time,wifi,bluet,batt_V,lat,lon,applicationID,applicationName,fPort,data,deviceName,devEUI");
+    fileSDCard.flush();
     useSDCard = true;
   }
 }
+
 
 void replaceCurrentFile(char* newFilename)
 {
@@ -566,6 +747,47 @@ char path[] = "nb.cnf";
 
 bool isSDCardAvailable() {
   return useSDCard;
+}
+
+// nueva funcion para escribir linea en SD
+void sdcardWriteLine(const char *line) {
+  if (!useSDCard) return;
+  if (!fileSDCard) {
+    ESP_LOGW("SD", "File closed, recreating...");
+    createFile();
+  }
+  fileSDCard.println(line);
+  fileSDCard.flush();
+}
+
+void checkAndRotateLogFile() {
+  if (!useSDCard || !fileSDCard) return;
+
+  uint64_t size = fileSDCard.size();
+  if (size < MAX_LOG_FILE_SIZE) return;
+
+  ESP_LOGW("SD", "⚠️ Log file reached %.2f MB, rotating...", size / (1024.0 * 1024.0));
+
+  // Cerrar archivo actual
+  fileSDCard.flush();
+  fileSDCard.close();
+
+  // Incrementar índice y reiniciar si llega a 99
+  currentFileIndex++;
+  if (currentFileIndex > 99) currentFileIndex = 0;
+
+  // Crear nuevo archivo
+  char filename[16];
+  sprintf(filename, SDCARD_FILE_NAME, currentFileIndex);
+
+  fileSDCard = mySD.open(filename, FILE_WRITE);
+  if (fileSDCard) {
+    fileSDCard.println(SDCARD_FILE_HEADER);
+    ESP_LOGI("SD", "🆕 New log file created: %s", filename);
+  } else {
+    ESP_LOGE("SD", "❌ Failed to create new log file!");
+    useSDCard = false;
+  }
 }
 
 

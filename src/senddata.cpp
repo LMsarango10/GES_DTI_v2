@@ -59,10 +59,45 @@ void SendPayload(uint8_t port, sendprio_t prio) {
 
 // write data to sdcard, if present
 #ifdef HAS_SDCARD
-//enqueued = false; //DEBUG
-/*if (!enqueued)
-  sdcardWriteFrame(&SendBuffer);*/
+if (isSDCardAvailable()) {
+  // Decodificar la data del mensaje NB-IoT (por ejemplo, lo que se enviará o lo que envía el gateway)
+  char dataHex[SendBuffer.MessageSize * 2 + 1];
+  for (int i = 0; i < SendBuffer.MessageSize; i++)
+    sprintf(dataHex + i * 2, "%02X", SendBuffer.Message[i]);
+
+  // Obtener hora actual
+  time_t t = now();
+  char line[512];
+  snprintf(line, sizeof(line),
+           "%02d/%02d/%04d,%02d:%02d:%02d,%u,%u,%.2f,%.6f,%.6f,%s,%s,%d,%s,%s,%s",
+           day(t), month(t), year(t),
+           hour(t), minute(t), second(t),
+           macs_wifi, macs_ble,
+#if defined(BAT_MEASURE_ADC) || defined(HAS_PMU)
+           read_voltage() / 1000.0,
+#else
+           0.0,
 #endif
+#if defined(HAS_GPS)
+           gps.location.lat(), gps.location.lng(),
+#else
+           0.0, 0.0,
+#endif
+           "1",            // applicationID (puedes parametrizarlo)
+           "app",          // applicationName
+           SendBuffer.MessagePort,
+           dataHex,        // datos enviados (hex)
+           "device_local", // nombre local del dispositivo
+           "devEUI_local"  // EUI local (si lo tienes)
+  );
+
+  sdcardWriteLine(line);
+
+
+  ESP_LOGI(TAG, "💾 Data saved to SD: %s", line);
+}
+#endif
+
 
 } // SendPayload
 

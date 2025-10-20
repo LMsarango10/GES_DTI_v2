@@ -486,8 +486,8 @@ void sdcardWriteFrame(MessageBuffer_t *message) {
   }
 
   // Escribir línea y forzar guardado
-  fileSDCard.println(line);
-  fileSDCard.flush();
+  sdcardWriteLine(line.c_str());
+
 
   ESP_LOGI("SD", "💾 Logged frame (%d bytes) to file %02d: %s",
            message->MessageSize, currentFileIndex, line.c_str());
@@ -749,16 +749,28 @@ bool isSDCardAvailable() {
   return useSDCard;
 }
 
-// nueva funcion para escribir linea en SD
+// nueva funcion para escribir linea cifrada en SD
 void sdcardWriteLine(const char *line) {
   if (!useSDCard) return;
   if (!fileSDCard) {
     ESP_LOGW("SD", "File closed, recreating...");
     createFile();
   }
-  fileSDCard.println(line);
+
+  // 🔒 Cifra la línea en AES-GCM y codifica en Base64
+  std::string encrypted = encrypt_line_to_base64(line);
+
+  if (encrypted.empty()) {
+    ESP_LOGE("SD", "❌ Encryption failed, line skipped.");
+    return;
+  }
+
+  fileSDCard.println(encrypted.c_str());
   fileSDCard.flush();
+
+  ESP_LOGI("SD", "🔐 Encrypted line written to SD (%d bytes)", encrypted.length());
 }
+
 
 void checkAndRotateLogFile() {
   if (!useSDCard || !fileSDCard) return;

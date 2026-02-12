@@ -462,7 +462,7 @@ void PayloadConvert::addBME(bmeStatus_t value) {
 #if(HAS_BME)
 
   // data value conversions to meet cayenne data type definition
-  // 0.1°C per bit => -3276,7 .. +3276,7 °C
+  // 0.1Â°C per bit => -3276,7 .. +3276,7 Â°C
   int16_t temperature = (int16_t)(value.temperature * 10.0);
   // 0.1 hPa per bit => 0 .. 6553,6 hPa
   uint16_t pressure = (uint16_t)(value.pressure * 10);
@@ -473,7 +473,7 @@ void PayloadConvert::addBME(bmeStatus_t value) {
 #if (PAYLOAD_ENCODER == 3)
   buffer[cursor++] = LPP_TEMPERATURE_CHANNEL;
 #endif
-  buffer[cursor++] = LPP_TEMPERATURE; // 2 bytes 0.1 °C Signed MSB
+  buffer[cursor++] = LPP_TEMPERATURE; // 2 bytes 0.1 Â°C Signed MSB
   buffer[cursor++] = highByte(temperature);
   buffer[cursor++] = lowByte(temperature);
 #if (PAYLOAD_ENCODER == 3)

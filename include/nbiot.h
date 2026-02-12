@@ -88,6 +88,14 @@ class NbIotManager {
 
 extern TaskHandle_t nbIotTask;
 
+struct nb_queue_stats_t {
+    UBaseType_t messages_waiting;
+    UBaseType_t spaces_available;
+    UBaseType_t queue_size;
+    uint8_t usage_percent;
+    uint32_t sd_queue_count;
+};
+
 bool nb_enqueuedata(MessageBuffer_t *message);
 void nb_queuereset(void);
 void nb_enable(bool temporary);

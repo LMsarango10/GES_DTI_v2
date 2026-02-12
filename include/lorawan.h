@@ -58,7 +58,7 @@ uint8_t getBattLevel(void);
 const char *getSfName(rps_t rps);
 const char *getBwName(rps_t rps);
 const char *getCrName(rps_t rps);
-
+bool lora_isJoined();
 #if (TIME_SYNC_LORAWAN)
 void user_request_network_time_callback(void *pVoidUserUTCTime,
                                                int flagSuccess);

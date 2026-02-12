@@ -94,6 +94,7 @@ typedef struct {
   uint8_t MessageSize;
   uint8_t MessagePort;
   sendprio_t MessagePrio;
+  uint32_t MsgId;//unique message ID (ties to SD record)
   uint8_t Message[PAYLOAD_BUFFER_SIZE];
 } MessageBuffer_t;
 

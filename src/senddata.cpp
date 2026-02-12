@@ -1,6 +1,6 @@
+
 // Basic Config
 #include "senddata.h"
-
 static const char TAG[] = "senddata";
 
 Ticker sendcycler;
@@ -13,9 +13,7 @@ void sendcycle() {
 // put data to send in RTos Queues used for transmit over channels Lora and SPI
 void SendPayload(uint8_t port, sendprio_t prio) {
 
-  MessageBuffer_t
-      SendBuffer; // contains MessageSize, MessagePort, MessagePrio, Message[]
-
+  MessageBuffer_t SendBuffer; // contains MessageSize, MessagePort, MessagePrio, Message[]
   SendBuffer.MessageSize = payload.getSize();
   SendBuffer.MessagePrio = prio;
 
@@ -44,76 +42,80 @@ void SendPayload(uint8_t port, sendprio_t prio) {
   default:
     SendBuffer.MessagePort = port;
   }
+
   memcpy(SendBuffer.Message, payload.getBuffer(), SendBuffer.MessageSize);
 
-// enqueue message in device's send queues
+  // enqueue message in device's send queues
 #if (HAS_LORA)
   bool enqueued = lora_enqueuedata(&SendBuffer);
+  if (!enqueued) {
+    ESP_LOGW(TAG, "LoRa queue full (port %u, %u bytes)", 
+             SendBuffer.MessagePort, SendBuffer.MessageSize);
+    
+#if (HAS_NBIOT)
+    nb_enable(true);
+    if (!nb_enqueuedata(&SendBuffer)) {
+      ESP_LOGW(TAG, "NB-IoT also failed to enqueue");
+#ifdef HAS_SDCARD
+      if (isSDCardAvailable()) {
+        sdqueueEnqueue(&SendBuffer);
+        ESP_LOGI(TAG, "Message saved to SD (port %u, %u bytes)", 
+                 SendBuffer.MessagePort, SendBuffer.MessageSize);
+      } else {
+        ESP_LOGE(TAG, "SD not available - MESSAGE LOST!");
+      }
 #endif
+    } else {
+      ESP_LOGI(TAG, "Message routed to NB-IoT");
+    }
+#else
+#ifdef HAS_SDCARD
+    if (isSDCardAvailable()) {
+      sdqueueEnqueue(&SendBuffer);
+      ESP_LOGI(TAG, "Message saved to SD (LoRa full, port %u, %u bytes)", 
+               SendBuffer.MessagePort, SendBuffer.MessageSize);
+    } else {
+      ESP_LOGE(TAG, "SD not available - MESSAGE LOST!");
+    }
+#endif
+#endif
+  }
+#endif
+
 #if (!HAS_LORA && HAS_NBIOT)
   bool enqueued = nb_enqueuedata(&SendBuffer);
+  if (!enqueued) {
+#ifdef HAS_SDCARD
+    if (isSDCardAvailable()) sdqueueEnqueue(&SendBuffer);
 #endif
+  }
+#endif
+
 #ifdef HAS_SPI
   spi_enqueuedata(&SendBuffer);
 #endif
-
-// write data to sdcard, if present
-#ifdef HAS_SDCARD
-if (isSDCardAvailable()) {
-  // Decodificar la data del mensaje NB-IoT (por ejemplo, lo que se enviará o lo que envía el gateway)
-  char dataHex[SendBuffer.MessageSize * 2 + 1];
-  for (int i = 0; i < SendBuffer.MessageSize; i++)
-    sprintf(dataHex + i * 2, "%02X", SendBuffer.Message[i]);
-
-  // Obtener hora actual
-  time_t t = now();
-  char line[512];
-  snprintf(line, sizeof(line),
-           "%02d/%02d/%04d,%02d:%02d:%02d,%u,%u,%.2f,%.6f,%.6f,%s,%s,%d,%s,%s,%s",
-           day(t), month(t), year(t),
-           hour(t), minute(t), second(t),
-           macs_wifi, macs_ble,
-#if defined(BAT_MEASURE_ADC) || defined(HAS_PMU)
-           read_voltage() / 1000.0,
-#else
-           0.0,
-#endif
-#if defined(HAS_GPS)
-           gps.location.lat(), gps.location.lng(),
-#else
-           0.0, 0.0,
-#endif
-           "1",            // applicationID (puedes parametrizarlo)
-           "app",          // applicationName
-           SendBuffer.MessagePort,
-           dataHex,        // datos enviados (hex)
-           "device_local", // nombre local del dispositivo
-           "devEUI_local"  // EUI local (si lo tienes)
-  );
-
-  sdcardWriteLine(line);
-
-
-  ESP_LOGI(TAG, "💾 Data saved to SD: %s", line);
-}
-#endif
-
-
 } // SendPayload
 
 // interrupt triggered function to prepare payload to send
 void sendData() {
   time_t tstamp;
   tstamp = now();
-  //float temp = get_rtctemp();
+
   ESP_LOGD(TAG, "timestamp is %lu", tstamp);
-  //ESP_LOGD(TAG, "rtc temp is: %f", temp);
+  
+  // AÑADIR CADA N CICLOS:
+//  static uint8_t cycle_counter = 0;
+  //if (++cycle_counter >= 10) {  // Cada 10 ciclos
+    //  cycle_counter = 0;
+     // printQueueStats();
+ // }
+
   uint8_t bitmask = cfg.payloadmask;
   uint8_t mask = 1;
-  uint8_t* bfs;
-  #if (HAS_GPS)
+
+#if (HAS_GPS)
   gpsStatus_t gps_status;
-  #endif
+#endif
 
   while (bitmask) {
     switch (bitmask & mask) {
@@ -123,162 +125,102 @@ void sendData() {
       ESP_LOGI(TAG, "Total mac hashes detected: %u", macs_wifi + macs_ble + macs_bt);
       payload.reset();
       payload.addTime(tstamp);
+
 #if !(PAYLOAD_OPENSENSEBOX)
-      if (cfg.wifiscan)
-        payload.addCount(macs_wifi, MAC_SNIFF_WIFI);
-      if (cfg.blescan)
-        payload.addCount(macs_ble, MAC_SNIFF_BLE);
-      if (cfg.btscan)
-        payload.addCount(macs_bt, MAC_SNIFF_BT);
+      if (cfg.wifiscan) payload.addCount(macs_wifi, MAC_SNIFF_WIFI);
+      if (cfg.blescan) payload.addCount(macs_ble, MAC_SNIFF_BLE);
+      if (cfg.btscan)  payload.addCount(macs_bt,  MAC_SNIFF_BT);
 #endif
+
 #if (HAS_GPS)
       if (GPSPORT == COUNTERPORT) {
-        // send GPS position only if we have a fix
         if (gps_hasfix()) {
           gps_storelocation(&gps_status);
           payload.addGPS(gps_status);
-        } else
+        } else {
           ESP_LOGD(TAG, "No valid GPS position");
+        }
       }
 #endif
+
 #if (PAYLOAD_OPENSENSEBOX)
-      if (cfg.wifiscan)
-        payload.addCount(macs_wifi, MAC_SNIFF_WIFI);
-      if (cfg.blescan)
-        payload.addCount(macs_ble, MAC_SNIFF_BLE);
-      if (cfg.btscan)
-        payload.addCount(macs_bt, MAC_SNIFF_BT);
+      if (cfg.wifiscan) payload.addCount(macs_wifi, MAC_SNIFF_WIFI);
+      if (cfg.blescan) payload.addCount(macs_ble, MAC_SNIFF_BLE);
+      if (cfg.btscan)  payload.addCount(macs_bt,  MAC_SNIFF_BT);
 #endif
+
       SendPayload(COUNTERPORT, prio_high);
       ESP_LOGI(TAG, "enqueue mac counter");
-      if (cfg.wifiscan)
-      {
+
+      // ---- MAC lists messages (unchanged logic) ----
+      if (cfg.wifiscan) {
         std::vector<uint32_t> macs_vector;
-        uint32_t dummy_mac;
-        for (auto m : macs_list_wifi) {
-          // ESP_LOGI(TAG, "%X", m);
-          macs_vector.push_back(m);
-        }
-        // Space for Dummy MAC generation:
-        // change 100 for the amount of MACs desired in a 2 minute interval.
-        /*if(!sent){
-          for (int i =0; i < 400; i++)
-          {
-            dummy_mac=(uint32_t)random(10000);
-            macs_vector.push_back(dummy_mac);
-          }//hasta aqui
-          sent = true;
-        }*/
+        for (auto m : macs_list_wifi) macs_vector.push_back(m);
 
         uint16_t total_macs = macs_vector.size();
         ESP_LOGI(TAG, "Total WIFI MAC counter currently is at: %d", total_macs);
+
         while (total_macs != 0) {
-          uint16_t macs_to_send = 0;
-          if (total_macs <= 11) {
-            macs_to_send = total_macs;
-          } else {
-            macs_to_send = 11;
-          }
+          uint16_t macs_to_send = (total_macs <= 11) ? total_macs : 11;
           total_macs -= macs_to_send;
           payload.reset();
-          //payload.setupMac(macs_wifi);
           payload.addTime(tstamp);
+
           for (int i = 0; i < macs_to_send; i++) {
             payload.addMac(macs_vector.back());
             macs_vector.pop_back();
           }
-          //ESP_LOGI(TAG, "Macs being sent in this payload: %d", macs_to_send);
-          //ESP_LOGI(TAG, "Lenght of Payload is: %d", sizeof(payload));
           SendPayload(WIFIMACSPORT, prio_low);
-          //ESP_LOGI(TAG, "enqueue mac message");
         }
       }
-      if (cfg.blescan)
-      {
+
+      if (cfg.blescan) {
         std::vector<uint32_t> macs_vector;
-        uint32_t dummy_mac;
-        for (auto m : macs_list_ble) {
-          // ESP_LOGI(TAG, "%X", m);
-          macs_vector.push_back(m);
-        }
-        // Space for Dummy MAC generation:
-        // change 100 for the amount of MACs desired in a 2 minute interval.
-        /*for (int i =0; i < 400; i++)
-        {
-          dummy_mac=(uint32_t)random(10000);
-          macs_vector.push_back(dummy_mac);
-        }//hasta aqui*/
+        for (auto m : macs_list_ble) macs_vector.push_back(m);
+
         uint16_t total_macs = macs_vector.size();
         ESP_LOGI(TAG, "Total BLE MAC counter currently is at: %d", total_macs);
+
         while (total_macs != 0) {
-          uint16_t macs_to_send = 0;
-          if (total_macs <= 11) {
-            macs_to_send = total_macs;
-          } else {
-            macs_to_send = 11;
-          }
+          uint16_t macs_to_send = (total_macs <= 11) ? total_macs : 11;
           total_macs -= macs_to_send;
           payload.reset();
-          //payload.setupMac(macs_wifi);
           payload.addTime(tstamp);
+
           for (int i = 0; i < macs_to_send; i++) {
             payload.addMac(macs_vector.back());
             macs_vector.pop_back();
           }
-          //ESP_LOGI(TAG, "Macs being sent in this payload: %d", macs_to_send);
-          //ESP_LOGI(TAG, "Lenght of Payload is: %d", sizeof(payload));
           SendPayload(BLEMACSPORT, prio_low);
-          //ESP_LOGI(TAG, "enqueue mac message");
         }
       }
-      if (cfg.btscan)
-      {
+
+      if (cfg.btscan) {
         std::vector<uint32_t> macs_vector;
-        uint32_t dummy_mac;
-        for (auto m : macs_list_bt) {
-          // ESP_LOGI(TAG, "%X", m);
-          macs_vector.push_back(m);
-        }
-        // Space for Dummy MAC generation:
-        // change 100 for the amount of MACs desired in a 2 minute interval.
-        /*for (int i =0; i < 400; i++)
-        {
-          dummy_mac=(uint32_t)random(10000);
-          macs_vector.push_back(dummy_mac);
-        }//hasta aqui*/
+        for (auto m : macs_list_bt) macs_vector.push_back(m);
+
         uint16_t total_macs = macs_vector.size();
         ESP_LOGI(TAG, "Total BT MAC counter currently is at: %d", total_macs);
+
         while (total_macs != 0) {
-          uint16_t macs_to_send = 0;
-          if (total_macs <= 11) {
-            macs_to_send = total_macs;
-          } else {
-            macs_to_send = 11;
-          }
+          uint16_t macs_to_send = (total_macs <= 11) ? total_macs : 11;
           total_macs -= macs_to_send;
           payload.reset();
-          //payload.setupMac(macs_wifi);
           payload.addTime(tstamp);
+
           for (int i = 0; i < macs_to_send; i++) {
             payload.addMac(macs_vector.back());
             macs_vector.pop_back();
           }
-          //ESP_LOGI(TAG, "Macs being sent in this payload: %d", macs_to_send);
-          //ESP_LOGI(TAG, "Lenght of Payload is: %d", sizeof(payload));
           SendPayload(BTMACSPORT, prio_low);
-          //ESP_LOGI(TAG, "enqueue mac message");
         }
       }
-      // clear counter if not in cumulative counter mode
+
       if (cfg.countermode != 1) {
-        reset_counters(); // clear macs container and reset all counters
-        get_salt();       // get new salt for salting hashes
+        reset_counters();
+        get_salt();
         ESP_LOGI(TAG, "Counter cleared");
       }
-#ifdef HAS_DISPLAY
-      else
-        dp_plotCurve(macs_total, true);
-#endif
       break;
 #endif
 
@@ -293,14 +235,12 @@ void sendData() {
 #if (HAS_GPS)
     case GPS_DATA:
       if (GPSPORT != COUNTERPORT) {
-        // send GPS position only if we have a fix
         if (gps_hasfix()) {
           gps_storelocation(&gps_status);
           payload.reset();
           payload.addGPS(gps_status);
           SendPayload(GPSPORT, prio_high);
-        } else
-          ESP_LOGD(TAG, "No valid GPS position");
+        } else ESP_LOGD(TAG, "No valid GPS position");
       }
       break;
 #endif
@@ -330,37 +270,42 @@ void sendData() {
       SendPayload(BATTPORT, prio_normal);
       break;
 #endif
-
     } // switch
+
     bitmask &= ~mask;
     mask <<= 1;
-  } // while (bitmask)
-
+  } // while
 } // sendData()
+
 
 void checkQueue() {
 #if (HAS_LORA && HAS_NBIOT)
   long loraMessages = get_lora_queue_pending_messages();
   MessageBuffer_t SendBuffer;
   auto loraQueueHandle = lora_get_queue_handle();
-  if (nb_isEnabled() && loraMessages >= MIN_SEND_MESSAGES_THRESHOLD){
-    ESP_LOGI(TAG, "Lora queue threshold reached, sending %d messages through NB", loraMessages);
-    // Transfer queue
-    while (uxQueueMessagesWaitingFromISR(loraQueueHandle) > 0) {
-      if(xQueueReceive(loraQueueHandle, &SendBuffer, portMAX_DELAY) == pdTRUE)
-        nb_enqueuedata(&SendBuffer);
-    }
-  }
-  else if (loraMessages >= NB_FAILOVER_MESSAGES_THRESHOLD){
-    ESP_LOGI(TAG, "Lora queue threshold reached, sending %d messages through NB", loraMessages);
-    nb_enable(true);
-    // Transfer queue
-    while (uxQueueMessagesWaitingFromISR(loraQueueHandle) > 0) {
-      if(xQueueReceive(loraQueueHandle, &SendBuffer, portMAX_DELAY) == pdTRUE)
-        nb_enqueuedata(&SendBuffer);
-    }
-  }
 
+  // Verificamos si debemos activar el "Plan B" (NB-IoT)
+  if (nb_isEnabled() && loraMessages >= MIN_SEND_MESSAGES_THRESHOLD) {
+    ESP_LOGI(TAG, "LoRa saturado (%d msgs) -> Intentando derivar a NB-IoT...", loraMessages);
+    
+    // Drenamos la cola de LoRa
+    while (uxQueueMessagesWaitingFromISR(loraQueueHandle) > 0) {
+      if (xQueueReceive(loraQueueHandle, &SendBuffer, portMAX_DELAY) == pdTRUE) {
+        
+        // INTENTAMOS ENVIAR A NB-IOT
+        if (!nb_enqueuedata(&SendBuffer)) {
+            // Si nb_enqueuedata devuelve false, es que ni RAM ni SD funcionaron.
+            // (Con la corrección 1, esto es muy difícil que pase, pero prevenimos)
+            ESP_LOGE(TAG, "Fallo al derivar mensaje (Rechazado por NB y SD)");
+            
+            // Opcional: Podríamos intentar guardarlo en SD aquí directamente si no confiamos en nb_enqueuedata
+            #ifdef HAS_SDCARD
+            if (isSDCardAvailable()) sdqueueEnqueue(&SendBuffer);
+            #endif
+        }
+      }
+    }
+  } 
 #endif
 }
 
@@ -373,5 +318,27 @@ void flushQueues() {
 #endif
 #ifdef HAS_SPI
   spi_queuereset();
+#endif
+}
+
+// Estadísticas de colas (útil para debug)
+void printQueueStats() {
+#if (HAS_LORA)
+    ESP_LOGI(TAG, "📊 LoRa queue: %u/%u messages", 
+             uxQueueMessagesWaiting(lora_get_queue_handle()),
+             SEND_QUEUE_SIZE);
+#endif
+
+#if (HAS_NBIOT)
+    extern QueueHandle_t nb_get_queue_handle();
+    ESP_LOGI(TAG, "📊 NB-IoT queue: %u/%u messages", 
+             uxQueueMessagesWaiting(nb_get_queue_handle()),
+             SEND_QUEUE_SIZE);
+#endif
+
+#ifdef HAS_SDCARD
+    if (isSDCardAvailable()) {
+        ESP_LOGI(TAG, "📊 SD queue: %u messages", sdqueueCount());
+    }
 #endif
 }

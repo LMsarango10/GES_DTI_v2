@@ -51,4 +51,14 @@ bool isSDCardAvailable(); //nueva funcion para saber si hay SD
 void sdcardWriteLine(const char *line); //
 
 
+// ===== Persistent SD FIFO queue (paxqueue.q) =====
+bool sdqueueInit();
+bool sdqueueEnqueue(MessageBuffer_t *msg);
+bool sdqueuePeek(MessageBuffer_t *msg);
+bool sdqueueDequeue(MessageBuffer_t *msg);
+uint32_t sdqueueCount();
+void sdqueueStartFlusher();   // task that flushes SD queue to LoRa/NB with priority LoRa
+
+
+
 #endif

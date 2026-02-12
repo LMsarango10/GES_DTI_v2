@@ -842,3 +842,105 @@ int disconnectMqtt() {
   }
   return 0;
 }
+
+
+// =========================================================
+//  Obtener IMEI del modem Quectel BC95-G  (AT+CGSN=1)
+//  Respuesta esperada: +CGSN:<imei> ... OK
+// =========================================================
+String bc95_getImei() {
+    char buffer[256];
+
+    ESP_LOGI(TAG, "Solicitando IMEI del módulo BC95-G...");
+
+    // Limpia buffer antes de enviar comandos
+    cleanbuffer();
+
+    // Desactivar eco para respuesta más limpia
+    sendAndReadOkResponseBC(&bc95serial, "ATE0", buffer, sizeof(buffer), 800);
+
+    // Comando oficial BC95-G para IMEI: AT+CGSN=1  [1](https://github.com/chirpstack/chirpstack-rest-api/issues/8)
+    bc95serial.println("AT+CGSN=1");
+
+    int len = readResponseBC(&bc95serial, buffer, sizeof(buffer), 2000);
+    if (len <= 0) {
+        ESP_LOGE(TAG, "No hubo respuesta al comando AT+CGSN=1");
+        return "";
+    }
+
+    ESP_LOGD(TAG, "Respuesta cruda IMEI: %s", buffer);
+
+    // Buscar +CGSN:
+    String resp = buffer;
+    int p = resp.indexOf("+CGSN:");
+    if (p < 0) {
+        ESP_LOGE(TAG, "No se encontró +CGSN: en la respuesta");
+        return "";
+    }
+    p += 6; // saltar "+CGSN:"
+
+    // Extraer 15 dígitos consecutivos
+    String imei = "";
+    for (int i = p; i < resp.length(); i++) {
+        char c = resp[i];
+        if (c >= '0' && c <= '9') imei += c;
+        else if (imei.length() > 0) break;
+    }
+
+    if (imei.length() == 15) {
+        ESP_LOGI(TAG, "IMEI del BC95-G: %s", imei.c_str());
+        return imei;
+    }
+
+    ESP_LOGE(TAG, "IMEI inválido o incompleto: %s", imei.c_str());
+    return "";
+}
+
+
+// =========================================================
+// Obtener MSISDN del modem Quectel BC95-G (AT+CNUM)
+// Ejemplo respuesta: +CNUM: "Voice","346XXXXXXXX",129
+// =========================================================
+String bc95_getMsisdn() {
+    char buffer[256];
+
+    ESP_LOGI(TAG, "Solicitando MSISDN (numero telefonico SIM)...");
+
+    cleanbuffer();
+    sendAndReadOkResponseBC(&bc95serial, "ATE0", buffer, sizeof(buffer), 800);
+
+    bc95serial.println("AT+CNUM");
+    int len = readResponseBC(&bc95serial, buffer, sizeof(buffer), 2000);
+
+    if (len <= 0) {
+        ESP_LOGE(TAG, "No hubo respuesta al comando AT+CNUM");
+        return "";
+    }
+
+    ESP_LOGD(TAG, "Respuesta cruda MSISDN: %s", buffer);
+
+    String resp = buffer;
+    int p = resp.indexOf("+CNUM:");
+    if (p < 0) {
+        ESP_LOGE(TAG, "No se encontró +CNUM: en la respuesta");
+        return "";
+    }
+
+    // Extraer segunda cadena entre comillas (el número)
+    int q1 = resp.indexOf('"', p + 6);
+    if (q1 < 0) return "";
+
+    int q2 = resp.indexOf('"', q1 + 1);
+    if (q2 < 0) return "";
+
+    int q3 = resp.indexOf('"', q2 + 1);
+    if (q3 < 0) return "";
+
+    int q4 = resp.indexOf('"', q3 + 1);
+    if (q4 < 0) return "";
+
+    String msisdn = resp.substring(q3 + 1, q4);
+
+    ESP_LOGI(TAG, "MSISDN de la SIM: %s", msisdn.c_str());
+    return msisdn;
+}

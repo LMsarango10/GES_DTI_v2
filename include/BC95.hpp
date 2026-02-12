@@ -41,5 +41,7 @@ int publishMqtt(char *topic, char *message, int qos);
 int disconnectMqtt();
 int postPage(char *domainBuffer, int thisPort, char *page, char *thisData, char* identityKey);
 int getData(char *ip, int port, char *page, char *responseBuffer, int responseBufferSize, int *responseSizePtr);
+String bc95_getImei();
+String bc95_getMsisdn();
 
 #endif

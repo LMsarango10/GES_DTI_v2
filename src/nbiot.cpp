@@ -8,6 +8,12 @@ TaskHandle_t nbIotTask = NULL;
 unsigned long lastMessage;
 bool nbIotEnabled = false;
 
+// Estado NB-IoT para health check
+uint8_t nb_status_registered = 0;
+uint8_t nb_status_connected = 0;
+uint8_t nb_status_failures = 0;
+uint8_t nb_status_rssi = 99;  // 99 = desconocido
+
 
 // Indica si NB puede usarse como transporte (no solo si la cola RAM existe)
 bool nbTransportAvailable = true;
@@ -410,9 +416,15 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui) {
     return publishMqtt(topic, messageBuffer, 0);
 }
 
-void NbIotManager::nb_registerNetwork() { this->registered = this->nb_checkNetworkRegister(); }
+void NbIotManager::nb_registerNetwork() {
+  this->registered = this->nb_checkNetworkRegister();
+  nb_status_registered = this->registered ? 1 : 0;
+}
 
-void NbIotManager::nb_connectNetwork() { this->connected = this->nb_checkNetworkConnected(); }
+void NbIotManager::nb_connectNetwork() {
+  this->connected = this->nb_checkNetworkConnected();
+  nb_status_connected = this->connected ? 1 : 0;
+}
 
 void NbIotManager::nb_connectMqtt() {
     sprintf(this->devEui, "%02x%02x%02x%02x%02x%02x%02x%02x", DEVEUI[0], DEVEUI[1], DEVEUI[2],
@@ -457,6 +469,11 @@ void NbIotManager::nb_resetStatus() {
     connectFailures = 0;
     mqttConnectFailures = 0;
     subscribeFailures = 0;
+
+    // Actualizar estado global para health check
+    nb_status_registered = 0;
+    nb_status_connected = 0;
+    nb_status_failures = 0;
 }
 
 bool NbIotManager::nb_checkNetworkRegister() {
@@ -515,6 +532,9 @@ bool NbIotManager::nb_checkStatus() {
 }
 
 void NbIotManager::loop() {
+// Exportar contador de fallos para health check
+nb_status_failures = (uint8_t)this->consecutiveFailures;
+
 if ( this->consecutiveFailures > MAX_CONSECUTIVE_FAILURES  ||
      this->initializeFailures  > MAX_INITIALIZE_FAILURES   ||
      this->registerFailures    > MAX_REGISTER_FAILURES     ||
@@ -555,31 +575,27 @@ if ( this->consecutiveFailures > MAX_CONSECUTIVE_FAILURES  ||
         this->lastUpdateCheck + UPDATES_CHECK_INTERVAL < millis();
 #endif
 
-    if (shouldCheckForUpdates || this->enabled) {
-        if (!this->registered) {
-            this->nb_registerNetwork();
-            return;
-        }
-        if (!this->connected) {
-            this->nb_connectNetwork();
-            return;
-        }
-        if (this->enabled) {
-            if (!this->mqttConnected) {
-                this->nb_connectMqtt();
-                return;
-            }
-            if (!this->subscribed) {
-                this->nb_subscribeMqtt();
-                return;
-            }
-        }
-        if (!this->nb_checkStatus()) {
-            ESP_LOGD(TAG, "NB status changed");
-            return;
-        }
+// Siempre mantener la conexión NB-IoT activa (ADEMUX)
+    if (!this->registered) {
+        this->nb_registerNetwork();
+        return;
     }
-
+    if (!this->connected) {
+        this->nb_connectNetwork();
+        return;
+    }
+    if (!this->mqttConnected) {
+        this->nb_connectMqtt();
+        return;
+    }
+    if (!this->subscribed) {
+        this->nb_subscribeMqtt();
+        return;
+    }
+    if (!this->nb_checkStatus()) {
+        ESP_LOGD(TAG, "NB status changed");
+        return;
+    }
 #ifdef UPDATES_ENABLED
     if (shouldCheckForUpdates && this->nb_checkLastSoftwareVersion()) {
         if (downloadUpdates(std::string(updatesServerResponse))) {
@@ -602,11 +618,14 @@ if ( this->consecutiveFailures > MAX_CONSECUTIVE_FAILURES  ||
     }
 #endif
 
-    if (this->enabled) {
-        this->nb_readMessages();
+// Leer mensajes siempre (comandos remotos)
+    this->nb_readMessages();
+
+    // Enviar mensajes si hay algo en la cola
+    if (uxQueueMessagesWaiting(NbSendQueue) > 0) {
         this->nb_sendMessages();
-        this->consecutiveFailures = 0;
     }
+    this->consecutiveFailures = 0;
 }
 
 void NbIotManager::nb_sendMessages() {
@@ -653,7 +672,7 @@ continue;
     if (this->temporaryEnabled && uxQueueMessagesWaiting(NbSendQueue) == 0) {
         this->temporaryEnabled = false;
         ESP_LOGI(TAG, "NBIOT temporary mode disabled");
-        nb_disable();
+        // No desactivar NB-IoT, solo quitar el modo temporal (ADEMUX)
     }
 }
 

@@ -10,6 +10,9 @@ unsigned long lastJoinAttemptTime = 0;
 unsigned long lastConfirmedSendTime = 0;
 unsigned long joinStartedTime = 0;
 bool firstJoin = true;
+uint8_t healthcheck_failures = 0;
+bool healthcheck_pending = false;
+bool nb_data_mode = false;
 
 #if (HAS_LORA)
 
@@ -377,15 +380,20 @@ if (isSDCardAvailable() && sdqueueCount() > 50 &&
         busyStartMs = 0;
         busyCount = 0;
 
-#ifdef CONFIRMED_SEND_THRESHOLD
-        bool sendConfirmed =
-            (millis() - lastConfirmedSendTime) >
-            (CONFIRMED_SEND_THRESHOLD * 60UL * 1000UL);
-#else
+// ADEMUX: health checks siempre confirmed
         bool sendConfirmed = false;
+        if (Pending.MessagePort == TELEMETRYPORT) {
+            sendConfirmed = true;
+            healthcheck_pending = true;
+        }
+#ifdef CONFIRMED_SEND_THRESHOLD
+        else if ((millis() - lastConfirmedSendTime) >
+                 (CONFIRMED_SEND_THRESHOLD * 60UL * 1000UL)) {
+            sendConfirmed = true;
+        }
 #endif
 
-        bool confirmedNow = ((cfg.countermode & 0x02) != 0) && sendConfirmed;
+        bool confirmedNow = sendConfirmed || ((cfg.countermode & 0x02) != 0);
 
         // intentamos transmitir payload
         switch (LMIC_sendWithCallback(
@@ -651,7 +659,12 @@ void myEventCallback(void *pUserData, ev_t ev) {
         lora_setupForNetwork(false);
 #if (HAS_NBIOT)
         firstJoin = false;
-        nb_disable();
+        // NB-IoT siempre activo — no llamar nb_disable()
+        if (nb_data_mode) {
+            ESP_LOGI(TAG, "LoRa joined, deactivating NB-IoT failover");
+            nb_data_mode = false;
+            healthcheck_failures = 0;
+        }
 #endif
         break;
 
@@ -667,8 +680,22 @@ void myEventCallback(void *pUserData, ev_t ev) {
         RTCseqnoDn = LMIC.seqnoDn;
         if (LMIC.txrxFlags & TXRX_ACK) {
             ESP_LOGI(TAG, "Received ack");
+            if (nb_data_mode) {
+                ESP_LOGI(TAG, "LoRa recovered! Resuming primary channel (was failover with %u failures)", healthcheck_failures);
+                nb_data_mode = false;
+            }
+            healthcheck_failures = 0;
+            healthcheck_pending = false;
+        }
+        else if (healthcheck_pending) {
+            healthcheck_failures++;
+            healthcheck_pending = false;
+            ESP_LOGW(TAG, "Health check no ACK, consecutive failures: %u", healthcheck_failures);
 #if (HAS_NBIOT)
-            if (nb_isEnabled()) nb_disable();
+            if (healthcheck_failures >= MAX_HEALTHCHECK_FAILURES && !nb_data_mode) {
+                ESP_LOGE(TAG, "LoRa failed %u health checks, activating NB-IoT failover", healthcheck_failures);
+                nb_data_mode = true;
+            }
 #endif
         }
         break;
@@ -681,13 +708,13 @@ void myEventCallback(void *pUserData, ev_t ev) {
     case EV_LINK_DEAD:
         snprintf(lmic_event_msg, LMIC_EVENTMSG_LEN, "%-16s", "LINK_DEAD");
 #if (HAS_NBIOT)
-        nb_enable(false);
+        if (!nb_data_mode) {
+            ESP_LOGE(TAG, "Link dead, activating NB-IoT failover");
+            nb_data_mode = true;
+        }
 #endif
         lastJoinAttemptTime = millis();
         LMIC_startJoining();
-        break;
-
-    default:
         break;
     }
 

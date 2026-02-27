@@ -10,6 +10,10 @@ https://github.com/nkolban/esp32-snippets/tree/master/BLE/scanner
 // local Tag for logging
 static const char TAG[] = "bluetooth";
 
+// Estado de los módulos BT y BLE para health check
+bool bt_module_ok = false;
+bool ble_module_ok = false;
+
 int readResponse(HardwareSerial* port, char* buff, int b_size, uint32_t timeout=500)
 {
   port->setTimeout(timeout);
@@ -438,14 +442,16 @@ void btHandler(void *pvParameters)
   /*pinMode(BLEBTMUX_B, OUTPUT);
   digitalWrite(BLEBTMUX_B, LOW);*/
   delay(100);
-  initBTSerial(BT_BAUD);
+initBTSerial(BT_BAUD);
   bool btInitialized = initBT(BT_BAUD);
+  bt_module_ok = btInitialized;
   delay(100);
 
 #ifdef LEGACY_MODULE
   initBLESerial();
 #endif
   bool bleInitialized = initBLE();
+  ble_module_ok = bleInitialized;
   delay(100);
 
   ESP_LOGV(TAG,"start loop");
@@ -454,16 +460,20 @@ void btHandler(void *pvParameters)
     setSerialToBT();
     if(btInitialized)
       BTCycle(BT_BAUD);
-    else
+    else {
       btInitialized = reinitBT();
+      bt_module_ok = btInitialized;
+    }
 
     delay(5000);
 
     setSerialToBLE();
     if(bleInitialized)
       BLECycle();
-    else
+    else {
       bleInitialized = reinitBLE();
+      ble_module_ok = bleInitialized;
+    }
     delay(5000);
   }
 }

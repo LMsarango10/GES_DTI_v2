@@ -51,8 +51,12 @@ public:
   void addSaltVersion(uint32_t value);
   void addSaltTimestamp(uint32_t value);
   void addConfig(configData_t value);
-  void addStatus(uint16_t voltage, uint64_t uptime, float cputemp, uint32_t mem,
-                 uint8_t reset1, uint8_t reset2);
+  void addStatus(uint32_t uptime, uint8_t cputemp,
+                  uint16_t free_heap_div16, uint16_t min_heap_div16,
+                  uint8_t reset_reason, uint8_t flags1, uint8_t flags2,
+                  uint8_t lora_rssi, int8_t lora_snr,
+                  uint8_t nb_rssi, uint8_t nb_failures,
+                  uint8_t flags3);
   void addAlarm(int8_t rssi, uint8_t message);
   void addVoltage(uint16_t value);
   void addGPS(gpsStatus_t value);

@@ -9,9 +9,9 @@
 #include "soc/timer_group_reg.h"
 
 #define BT_OLD_MODULE 1// para usar el viejo modulo
-// #define BT_REQUIRES_INIT 1 // para usar versiones muy viejas que requieren del comando AT+INIT (modulos viejos)
+#define BT_REQUIRES_INIT 1 // para usar versiones muy viejas que requieren del comando AT+INIT (modulos viejos)
 #define BLE_RETURNS_SCANNING 1 // para usar BLE si devuelve la palabra scanning (modulos nuevos)
-// #define BLE_RETURNS_OK_ON_INIT 1 // para usar BLE si devuelve la palabra OK al iniciar (modulos viejos)
+//#define BLE_RETURNS_OK_ON_INIT 1 // para usar BLE si devuelve la palabra OK al iniciar (modulos viejos)
 
 // #define VERSION_ADEMUZ 1 // para usar el modulo ADEMUZ
 #ifdef VERSION_ADEMUZ
@@ -66,4 +66,6 @@ void btHandler(void *pvParameters);
 void BLECycle(void);
 void BTCycle(void);
 
+extern bool bt_module_ok;
+extern bool ble_module_ok;
 #endif

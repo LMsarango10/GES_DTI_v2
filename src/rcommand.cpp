@@ -2,6 +2,9 @@
 // Basic Config
 #include "globals.h"
 #include "rcommand.h"
+#include "blescan.h"    // Para bt_module_ok, ble_module_ok
+#include "nbiot.h"      // Para nb_status_registered, etc.
+#include <esp_system.h> // Para esp_reset_reason()
 
 // ✅ Para crear task sin bloquear el callback LoRa / parser
 #include "freertos/FreeRTOS.h"
@@ -305,10 +308,69 @@ void get_config(uint8_t val[]) {
 
 void get_status(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: get device status");
+
+  uint32_t up = (uint32_t)(millis() / 1000);
+  uint8_t cputemp = (uint8_t)round(temperatureRead());
+  uint16_t free_heap_div16 = (uint16_t)(ESP.getFreeHeap() / 16);
+  uint16_t min_heap_div16 = (uint16_t)(ESP.getMinFreeHeap() / 16);
+  uint8_t reset_reason = (uint8_t)esp_reset_reason();
+
+  uint8_t flags1 = 0;
+  flags1 |= (cfg.wifiscan ? 1 : 0) << 7;
+  flags1 |= (cfg.blescan ? 1 : 0) << 6;
+  flags1 |= (cfg.btscan ? 1 : 0) << 5;
+#if (HAS_LORA)
+  flags1 |= (LMIC.devaddr ? 1 : 0) << 4;
+#endif
+#if (HAS_NBIOT)
+  flags1 |= (nb_isEnabled() ? 1 : 0) << 3;
+#endif
+#ifdef HAS_SDCARD
+  flags1 |= (1) << 2;
+#endif
+#if (HAS_GPS)
+  flags1 |= (gps_hasfix() ? 1 : 0) << 1;
+#endif
+
+  uint8_t flags2 = 0;
+#if (HAS_LORA)
+  extern uint8_t healthcheck_failures;
+  flags2 = healthcheck_failures;
+#endif
+
+  uint8_t lora_rssi = 0;
+  int8_t lora_snr = 0;
+#if (HAS_LORA)
+  lora_rssi = (uint8_t)(LMIC.rssi < 0 ? -LMIC.rssi : LMIC.rssi);
+  lora_snr = (int8_t)LMIC.snr;
+#endif
+
+  uint8_t nb_rssi = 99;
+  uint8_t nb_failures = 0;
+#if (HAS_NBIOT)
+  nb_rssi = nb_status_rssi;
+  nb_failures = nb_status_failures;
+#endif
+
+  uint8_t flags3 = 0;
+#if (HAS_NBIOT)
+  flags3 |= (nb_status_registered ? 1 : 0) << 7;
+  flags3 |= (nb_status_connected ? 1 : 0) << 6;
+#endif
+  uint8_t cpu_freq_code = 0;
+  int cpuMHz = getCpuFrequencyMhz();
+  if (cpuMHz <= 80) cpu_freq_code = 0;
+  else if (cpuMHz <= 160) cpu_freq_code = 1;
+  else cpu_freq_code = 2;
+  flags3 |= (cpu_freq_code & 0x03) << 4;
+  flags3 |= (bt_module_ok ? 1 : 0) << 1;
+  flags3 |= (ble_module_ok ? 1 : 0) << 0;
+
   payload.reset();
-  payload.addStatus(read_voltage(), uptime() / 1000, temperatureRead(),
-                    getFreeRAM(), rtc_get_reset_reason(0),
-                    rtc_get_reset_reason(1));
+  payload.addStatus(up, cputemp, free_heap_div16, min_heap_div16,
+                    reset_reason, flags1, flags2,
+                    lora_rssi, lora_snr,
+                    nb_rssi, nb_failures, flags3);
   SendPayload(STATUSPORT, prio_high);
 };
 

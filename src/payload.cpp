@@ -91,26 +91,41 @@ void PayloadConvert::addConfig(configData_t value) {
   cursor += 10;
 }
 
-void PayloadConvert::addStatus(uint16_t voltage, uint64_t uptime, float cputemp,
-                               uint32_t mem, uint8_t reset1, uint8_t reset2) {
-
-  buffer[cursor++] = highByte(voltage);
-  buffer[cursor++] = lowByte(voltage);
-  buffer[cursor++] = (byte)((uptime & 0xFF00000000000000) >> 56);
-  buffer[cursor++] = (byte)((uptime & 0x00FF000000000000) >> 48);
-  buffer[cursor++] = (byte)((uptime & 0x0000FF0000000000) >> 40);
-  buffer[cursor++] = (byte)((uptime & 0x000000FF00000000) >> 32);
-  buffer[cursor++] = (byte)((uptime & 0x00000000FF000000) >> 24);
-  buffer[cursor++] = (byte)((uptime & 0x0000000000FF0000) >> 16);
-  buffer[cursor++] = (byte)((uptime & 0x000000000000FF00) >> 8);
-  buffer[cursor++] = (byte)((uptime & 0x00000000000000FF));
-  buffer[cursor++] = (byte)(cputemp);
-  buffer[cursor++] = (byte)((mem & 0xFF000000) >> 24);
-  buffer[cursor++] = (byte)((mem & 0x00FF0000) >> 16);
-  buffer[cursor++] = (byte)((mem & 0x0000FF00) >> 8);
-  buffer[cursor++] = (byte)((mem & 0x000000FF));
-  buffer[cursor++] = (byte)(reset1);
-  buffer[cursor++] = (byte)(reset2);
+void PayloadConvert::addStatus(uint32_t uptime, uint8_t cputemp,
+                               uint16_t free_heap_div16, uint16_t min_heap_div16,
+                               uint8_t reset_reason, uint8_t flags1, uint8_t flags2,
+                               uint8_t lora_rssi, int8_t lora_snr,
+                               uint8_t nb_rssi, uint8_t nb_failures,
+                               uint8_t flags3) {
+  // Offset 0-3: uptime (uint32, big-endian)
+  buffer[cursor++] = (byte)((uptime & 0xFF000000) >> 24);
+  buffer[cursor++] = (byte)((uptime & 0x00FF0000) >> 16);
+  buffer[cursor++] = (byte)((uptime & 0x0000FF00) >> 8);
+  buffer[cursor++] = (byte)((uptime & 0x000000FF));
+  // Offset 4: cputemp
+  buffer[cursor++] = cputemp;
+  // Offset 5-6: free_heap / 16 (uint16, big-endian)
+  buffer[cursor++] = highByte(free_heap_div16);
+  buffer[cursor++] = lowByte(free_heap_div16);
+  // Offset 7-8: min_free_heap / 16 (uint16, big-endian)
+  buffer[cursor++] = highByte(min_heap_div16);
+  buffer[cursor++] = lowByte(min_heap_div16);
+  // Offset 9: reset_reason
+  buffer[cursor++] = reset_reason;
+  // Offset 10: flags1
+  buffer[cursor++] = flags1;
+  // Offset 11: flags2 (healthcheck_failures)
+  buffer[cursor++] = flags2;
+  // Offset 12: lora_rssi (valor absoluto)
+  buffer[cursor++] = lora_rssi;
+  // Offset 13: lora_snr (int8)
+  buffer[cursor++] = (uint8_t)lora_snr;
+  // Offset 14: nb_rssi (CSQ, 99=desconocido)
+  buffer[cursor++] = nb_rssi;
+  // Offset 15: nb_consecutiveFailures
+  buffer[cursor++] = nb_failures;
+  // Offset 16: flags3
+  buffer[cursor++] = flags3;
 }
 
 void PayloadConvert::addGPS(gpsStatus_t value) {
@@ -216,14 +231,24 @@ void PayloadConvert::addConfig(configData_t value) {
   writeVersion(value.version);
 }
 
-void PayloadConvert::addStatus(uint16_t voltage, uint64_t uptime, float cputemp,
-                               uint32_t mem, uint8_t reset1, uint8_t reset2) {
-  writeUint16(voltage);
-  writeUptime(uptime);
-  writeUint8((byte)cputemp);
-  writeUint32(mem);
-  writeUint8(reset1);
-  writeUint8(reset2);
+void PayloadConvert::addStatus(uint32_t uptime, uint8_t cputemp,
+                               uint16_t free_heap_div16, uint16_t min_heap_div16,
+                               uint8_t reset_reason, uint8_t flags1, uint8_t flags2,
+                               uint8_t lora_rssi, int8_t lora_snr,
+                               uint8_t nb_rssi, uint8_t nb_failures,
+                               uint8_t flags3) {
+  writeUint32(uptime);
+  writeUint8(cputemp);
+  writeUint16(free_heap_div16);
+  writeUint16(min_heap_div16);
+  writeUint8(reset_reason);
+  writeUint8(flags1);
+  writeUint8(flags2);
+  writeUint8(lora_rssi);
+  writeUint8((uint8_t)lora_snr);
+  writeUint8(nb_rssi);
+  writeUint8(nb_failures);
+  writeUint8(flags3);
 }
 
 void PayloadConvert::addGPS(gpsStatus_t value) {
@@ -405,19 +430,15 @@ void PayloadConvert::addConfig(configData_t value) {
   buffer[cursor++] = value.adrmode;
 }
 
-void PayloadConvert::addStatus(uint16_t voltage, uint64_t uptime, float celsius,
-                               uint32_t mem, uint8_t reset1, uint8_t reset2) {
-  uint16_t temp = celsius * 10;
-  uint16_t volt = voltage / 10;
-#if (defined BAT_MEASURE_ADC || defined HAS_PMU)
-#if (PAYLOAD_ENCODER == 3)
-  buffer[cursor++] = LPP_BATT_CHANNEL;
-#endif
-  buffer[cursor++] = LPP_ANALOG_INPUT;
-  buffer[cursor++] = highByte(volt);
-  buffer[cursor++] = lowByte(volt);
-#endif // BAT_MEASURE_ADC
-
+void PayloadConvert::addStatus(uint32_t uptime, uint8_t cputemp,
+                               uint16_t free_heap_div16, uint16_t min_heap_div16,
+                               uint8_t reset_reason, uint8_t flags1, uint8_t flags2,
+                               uint8_t lora_rssi, int8_t lora_snr,
+                               uint8_t nb_rssi, uint8_t nb_failures,
+                               uint8_t flags3) {
+  // Cayenne LPP: solo temperatura (no soporta todos los campos)
+  // Datos completos van en raw por TELEMETRYPORT
+  uint16_t temp = (uint16_t)cputemp * 10;
 #if (PAYLOAD_ENCODER == 3)
   buffer[cursor++] = LPP_TEMPERATURE_CHANNEL;
 #endif

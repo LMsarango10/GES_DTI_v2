@@ -105,4 +105,9 @@ esp_err_t nb_iot_init();
 
 #define NB_QUEUE_SIZE SEND_QUEUE_SIZE
 
+extern uint8_t nb_status_registered;
+extern uint8_t nb_status_connected;
+extern uint8_t nb_status_failures;
+extern uint8_t nb_status_rssi;
+
 #endif

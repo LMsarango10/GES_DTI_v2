@@ -7,6 +7,12 @@
 // Local logging tag
 static const char TAG[] = "wifi";
 
+// >>> CAMBIO: Variable global de estado operativo WiFi
+// Se usa en el health check (flags1 bit 7) para saber si el radio funciona.
+// wifi_sniffer_init() usa ESP_ERROR_CHECK que aborta si falla,
+// así que si llegamos al final de init, el radio está OK.
+bool wifi_radio_ok = false;
+
 TimerHandle_t WifiChanTimer;
 
 static wifi_country_t wifi_country = {WIFI_MY_COUNTRY, WIFI_CHANNEL_MIN,
@@ -58,10 +64,6 @@ void wifi_sniffer_init(void) {
   wificfg.nvs_enable = 0;        // we don't need any wifi settings from NVRAM
   wificfg.wifi_task_core_id = 0; // we want wifi task running on core 0
 
-  // wifi_promiscuous_filter_t filter = {
-  //    .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT}; // only MGMT frames
-  // .filter_mask = WIFI_PROMIS_FILTER_MASK_ALL}; // we use all frames
-
   wifi_promiscuous_filter_t filter = {.filter_mask =
                                           WIFI_PROMIS_FILTER_MASK_MGMT |
                                           WIFI_PROMIS_FILTER_MASK_DATA};
@@ -81,8 +83,12 @@ void wifi_sniffer_init(void) {
   // setup wifi channel rotation timer
   WifiChanTimer =
       xTimerCreate("WifiChannelTimer", pdMS_TO_TICKS(cfg.wifichancycle * 10),
-                   pdTRUE, (void *)0, switchWifiChannel);
+                    pdTRUE, (void *)0, switchWifiChannel);
   switch_wifi_sniffer(1);
+
+  // >>> CAMBIO: Si llegamos aquí sin abort, WiFi está operativo
+  wifi_radio_ok = true;
+  ESP_LOGI(TAG, "WiFi radio initialized OK");
 }
 
 void switch_wifi_sniffer(uint8_t state) {
@@ -92,11 +98,13 @@ void switch_wifi_sniffer(uint8_t state) {
     ESP_ERROR_CHECK(esp_wifi_start());
     xTimerStart(WifiChanTimer, 0);
     esp_wifi_set_promiscuous(true);
+    wifi_radio_ok = true;  // >>> CAMBIO: radio encendido
   } else {
     // switch wifi sniffer off
     xTimerStop(WifiChanTimer, 0);
     esp_wifi_set_promiscuous(false);
     ESP_ERROR_CHECK(esp_wifi_stop());
     macs_wifi = 0; // clear WIFI counter
+    wifi_radio_ok = false;  // >>> CAMBIO: radio apagado
   }
 }

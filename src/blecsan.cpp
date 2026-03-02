@@ -14,6 +14,15 @@ static const char TAG[] = "bluetooth";
 bool bt_module_ok = false;
 bool ble_module_ok = false;
 
+// >>> CAMBIO: Contadores de fallos consecutivos de escaneo.
+// Cuando un módulo que YA estaba inicializado falla al escanear
+// (timeout en BTCycle o error AT en BLECycle), se incrementa el contador.
+// Si llega a MAX_CONSECUTIVE_SCAN_FAILS, se marca el módulo como muerto
+// y se fuerza reinicialización en el siguiente ciclo.
+// Se resetea a 0 cuando el escaneo tiene éxito.
+uint8_t bt_consecutive_fails = 0;
+uint8_t ble_consecutive_fails = 0;
+
 int readResponse(HardwareSerial* port, char* buff, int b_size, uint32_t timeout=500)
 {
   port->setTimeout(timeout);
@@ -88,8 +97,6 @@ int getMacsFromBT(char* buff, int bytesRead)
   unsigned long btClass = strtoul(endPtr+1, &endPtr, 16) ;
   int16_t rssi = strtol(endPtr+1, NULL, 16) &0xFFFF;
 
-  //ESP_LOGV(TAG, "Parse input: MAC: %04X%02X%06X, BT Class: %06X, RSSI: %d", p1, p2, p3, btClass, rssi);
-
   uint8_t mac[6];
   mac[0] = (p1 >> 8) & 0xFF;
   mac[1] = (p1) & 0xFF;
@@ -98,13 +105,6 @@ int getMacsFromBT(char* buff, int bytesRead)
   mac[4] = (p3 >> 8) & 0xFF;
   mac[5] = (p3) & 0xFF;
 
-  /*char tempBuffer[64];
-  sprintf(tempBuffer, "Device MAC: ");
-  for (int n = 0; n < 6; n++)
-  {
-    sprintf(tempBuffer + 2*n, "%02X",mac[n]);
-  }
-  ESP_LOGV(TAG, "MAC parsed: %s", tempBuffer);*/
   mac_add((uint8_t *)mac, rssi, MAC_SNIFF_BT);
   return 0;
 }
@@ -227,7 +227,6 @@ void setSerialToBT() {
   BTSerial.flush();
   delay(100) ;
   BTSerial.updateBaudRate(BT_BAUD);
-  //initBTSerial(38400);
   digitalWrite(BLEBTMUX_A, LOW);
   delay(100);
 }
@@ -236,7 +235,6 @@ void setSerialToBLE() {
   BLESerial.flush();
   delay(100);
   BLESerial.updateBaudRate(9600);
-  //initBLESerial();
   digitalWrite(BLEBTMUX_A, HIGH);
   delay(100);
 }
@@ -246,15 +244,27 @@ bool initBLE()
   pinMode(EN_BLE, OUTPUT);
   pinMode(BLEBTMUX_A, OUTPUT);
   digitalWrite(EN_BLE, HIGH);
-  //initBLESerial();
   setSerialToBLE();
   return reinitBLE();
 }
 
+// =====================================================================
+// >>> CAMBIO: BLECycle ahora retorna bool
+//
+// Flujo de retorno:
+//   - !cfg.blescan         → return true  (scan deshabilitado, no es fallo)
+//   - Error en AT+INQ      → return false (módulo no respondió)
+//   - Error en +INQS       → return false (módulo no entró en inquiry)
+//   - Error en Scanning... → return false (módulo no comenzó scan)
+//   - Recibe +INQE         → return true  (scan completó normalmente)
+//   - Timeout/bytesRead<=0 → return true  (terminó sin error explícito)
+//   - Recibe +INQ: (MACs)  → sigue leyendo, al final return true
+// =====================================================================
+
 #ifdef OLD_BLE_METHOD
-void BLECycle(void)
+bool BLECycle(void)
 {
-  if(!cfg.blescan) return;
+  if(!cfg.blescan) return true; // >>> CAMBIO: scan deshabilitado no es fallo
   ESP_LOGV(TAG, "cycling ble scan");
   ESP_LOGV(TAG, "Set BLE inquiry mode");
   char buffer[64];
@@ -263,7 +273,7 @@ void BLECycle(void)
   if(! assertResponse("+INQS\r", buffer, bytesRead))
   {
     ESP_LOGD(TAG, "Error setting BLE INQ mode");
-    return;
+    return false; // >>> CAMBIO: fallo de comunicación con módulo
   }
 
   //ENTER INQ MODE
@@ -287,15 +297,17 @@ void BLECycle(void)
       }
 
       getMacsFromBLE(devicesDetected);
-      break;
+      return true; // >>> CAMBIO: scan completó OK
     }
   }
-  return;
+  // >>> CAMBIO: timeout sin recibir +INQE — se considera éxito parcial
+  // (el módulo respondió al AT+INQ con +INQS, solo no terminó a tiempo)
+  return true;
 }
 #else
-void BLECycle(void)
+bool BLECycle(void)
 {
-  if(!cfg.blescan) return;
+  if(!cfg.blescan) return true; // >>> CAMBIO: scan deshabilitado no es fallo
   ESP_LOGV(TAG, "cycling ble scan");
   ESP_LOGV(TAG, "Set BLE inquiry mode");
   char buffer[512];
@@ -309,14 +321,14 @@ void BLECycle(void)
   if(! assertResponse("OK", buffer, bytesRead))
   {
     ESP_LOGD(TAG, "Error setting BLE INQ mode");
-    return;
+    return false; // >>> CAMBIO: módulo no respondió OK
   }
   bytesRead = readResponse(&BLESerial, buffer, sizeof(buffer), 1000);
 #endif
   if(! assertResponse("+INQS\r", buffer, bytesRead))
   {
     ESP_LOGD(TAG, "Error setting BLE INQ mode");
-    return;
+    return false; // >>> CAMBIO: módulo no entró en inquiry mode
   }
   delay(1000);
   buffer[0] = 0;
@@ -325,7 +337,7 @@ void BLECycle(void)
   if(! assertResponse("Scanning...", buffer, bytesRead))
   {
     ESP_LOGD(TAG, "Error setting BLE INQ scanning mode");
-    return;
+    return false; // >>> CAMBIO: módulo no inició scanning
   }
 #endif
   delay(5000);
@@ -349,14 +361,15 @@ void BLECycle(void)
       } else {
         ESP_LOGV(TAG, "%d devices detected", devicesDetected);
       }
-      return;
+      return true; // >>> CAMBIO: scan terminó con +INQE
     }
     if(assertResponse("+INQ:", buffer, bytesRead))
     {
       devicesDetected += getMacsFromBLE(buffer, bytesRead);
     }
   }
-  return;
+  // >>> CAMBIO: salió del while sin error explícito → módulo respondió, scan OK
+  return true;
 }
 #endif
 
@@ -396,19 +409,26 @@ bool reinitBT()
 }
 bool initBT(long baud)
 {
-  pinMode(EN_BT, OUTPUT);  // this pin will pull the HC-05 pin 34 (key pin) HIGH to switch module to AT mode
+  pinMode(EN_BT, OUTPUT);
   pinMode(BLEBTMUX_A, OUTPUT);
   digitalWrite(EN_BT, HIGH);
-  //initBTSerial(baud);  // HC-05 default speed in AT command more
   setSerialToBT();
   ESP_LOGD(TAG, "Initialize BT inquiry mode at %d", baud);
   return reinitBT();
 }
 
-void BTCycle(long baud)
+// =====================================================================
+// >>> CAMBIO: BTCycle ahora retorna bool
+//
+// Flujo de retorno:
+//   - !cfg.btscan          → return true  (scan deshabilitado, no es fallo)
+//   - Recibe "OK\r"        → return true  (scan completó normalmente)
+//   - Recibe "+INQ:" (MAC) → procesa MAC, sigue leyendo
+//   - Timeout              → return false (módulo no respondió a tiempo)
+// =====================================================================
+bool BTCycle(long baud)
 {
-  if(!cfg.btscan) return;
-  //initBTSerial(baud);
+  if(!cfg.btscan) return true; // >>> CAMBIO: scan deshabilitado no es fallo
   ESP_LOGV(TAG, "cycling bt scan");
 
   long startTime = millis();
@@ -423,28 +443,55 @@ void BTCycle(long baud)
     if(assertResponse("OK\r", buffer, bytesRead))
     {
       ESP_LOGV(TAG, "finish INQ mode");
-      return;
+      return true; // >>> CAMBIO: scan completó OK
     }
     if(assertResponse("+INQ:", buffer, bytesRead))
     {
-      //ESP_LOGV(TAG, "Got message %s", buffer);
       getMacsFromBT(buffer, bytesRead);
     }
     delay(10);
   }
   ESP_LOGE(TAG, "Timeout while scanning BT");
-  return;
+  return false; // >>> CAMBIO: timeout = fallo de comunicación
 }
 
+// =====================================================================
+// >>> CAMBIO: btHandler con detección de degradación
+//
+// LÓGICA:
+// Antes:  Si el módulo inicializó OK, se asume OK para siempre.
+//         Si BTCycle/BLECycle fallan, nadie se entera.
+//
+// Ahora:  Cada vez que BTCycle/BLECycle retorna false, se incrementa
+//         un contador de fallos consecutivos. Si llega a
+//         MAX_CONSECUTIVE_SCAN_FAILS (3), se marca el módulo como
+//         muerto (bt_module_ok = false) y se fuerza reinicialización.
+//         Si el escaneo tiene éxito, el contador se resetea a 0.
+//
+// EJEMPLO DE CORRIDA:
+//
+// Ciclo 1: BTCycle() → true  → bt_consecutive_fails = 0, bt_module_ok = true
+// Ciclo 2: BTCycle() → true  → bt_consecutive_fails = 0, bt_module_ok = true
+// Ciclo 3: BTCycle() → false → bt_consecutive_fails = 1, bt_module_ok = true  (aún OK)
+// Ciclo 4: BTCycle() → false → bt_consecutive_fails = 2, bt_module_ok = true  (aún OK)
+// Ciclo 5: BTCycle() → false → bt_consecutive_fails = 3, bt_module_ok = false ← DETECTADO
+//          → btInitialized = false → siguiente ciclo intentará reinitBT()
+// Ciclo 6: reinitBT() → true → bt_module_ok = true, bt_consecutive_fails = 0
+//          (módulo recuperado)
+// Ciclo 6: reinitBT() → false → bt_module_ok = false
+//          (módulo sigue muerto, se reintentará en el siguiente ciclo)
+//
+// En el health check (flags3 bits 0-1), estos valores reflejan el estado
+// REAL del módulo, no solo el estado del init inicial.
+// =====================================================================
 void btHandler(void *pvParameters)
 {
   pinMode(BLEBTMUX_A, OUTPUT);
-  /*pinMode(BLEBTMUX_B, OUTPUT);
-  digitalWrite(BLEBTMUX_B, LOW);*/
   delay(100);
-initBTSerial(BT_BAUD);
+  initBTSerial(BT_BAUD);
   bool btInitialized = initBT(BT_BAUD);
   bt_module_ok = btInitialized;
+  bt_consecutive_fails = 0; // >>> CAMBIO: inicializar contador
   delay(100);
 
 #ifdef LEGACY_MODULE
@@ -452,28 +499,84 @@ initBTSerial(BT_BAUD);
 #endif
   bool bleInitialized = initBLE();
   ble_module_ok = bleInitialized;
+  ble_consecutive_fails = 0; // >>> CAMBIO: inicializar contador
   delay(100);
 
   ESP_LOGV(TAG,"start loop");
   while(true)
   {
+    // ======================== BT ========================
     setSerialToBT();
     if(btInitialized)
-      BTCycle(BT_BAUD);
+    {
+      // >>> CAMBIO: Evaluar resultado del escaneo
+      bool scanOk = BTCycle(BT_BAUD);
+      if(scanOk) {
+        // Escaneo exitoso → resetear contador, confirmar módulo OK
+        bt_consecutive_fails = 0;
+        bt_module_ok = true;
+      } else {
+        // Escaneo falló → incrementar contador
+        bt_consecutive_fails++;
+        ESP_LOGW(TAG, "BT scan failed (%d/%d consecutive)",
+                 bt_consecutive_fails, MAX_CONSECUTIVE_SCAN_FAILS);
+        if(bt_consecutive_fails >= MAX_CONSECUTIVE_SCAN_FAILS) {
+          // Demasiados fallos seguidos → módulo considerado muerto
+          ESP_LOGE(TAG, "BT module degraded after %d consecutive scan failures, forcing reinit",
+                   bt_consecutive_fails);
+          btInitialized = false;
+          bt_module_ok = false;
+          bt_consecutive_fails = 0; // resetear para el ciclo de reinit
+        }
+      }
+    }
     else {
+      // Módulo no inicializado → intentar reinicializar
       btInitialized = reinitBT();
       bt_module_ok = btInitialized;
+      if(btInitialized) {
+        bt_consecutive_fails = 0;
+        ESP_LOGI(TAG, "BT module recovered after reinit");
+      }
     }
 
     delay(5000);
 
+    // ======================== BLE ========================
     setSerialToBLE();
     if(bleInitialized)
-      BLECycle();
+    {
+      // >>> CAMBIO: Evaluar resultado del escaneo
+      bool scanOk = BLECycle();
+      if(scanOk) {
+        // Escaneo exitoso → resetear contador, confirmar módulo OK
+        ble_consecutive_fails = 0;
+        ble_module_ok = true;
+      } else {
+        // Escaneo falló → incrementar contador
+        ble_consecutive_fails++;
+        ESP_LOGW(TAG, "BLE scan failed (%d/%d consecutive)",
+                 ble_consecutive_fails, MAX_CONSECUTIVE_SCAN_FAILS);
+        if(ble_consecutive_fails >= MAX_CONSECUTIVE_SCAN_FAILS) {
+          // Demasiados fallos seguidos → módulo considerado muerto
+          ESP_LOGE(TAG, "BLE module degraded after %d consecutive scan failures, forcing reinit",
+                   ble_consecutive_fails);
+          bleInitialized = false;
+          ble_module_ok = false;
+          ble_consecutive_fails = 0; // resetear para el ciclo de reinit
+        }
+      }
+    }
     else {
+      // Módulo no inicializado → intentar reinicializar
       bleInitialized = reinitBLE();
       ble_module_ok = bleInitialized;
+      if(bleInitialized) {
+        ble_consecutive_fails = 0;
+        ESP_LOGI(TAG, "BLE module recovered after reinit");
+      }
     }
+
     delay(5000);
   }
 }

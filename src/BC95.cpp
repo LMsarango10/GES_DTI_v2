@@ -788,17 +788,36 @@ int connectMqtt(char *url, int port, char* username, char *password, char *clien
 }
 
 bool subscribeMqtt(char *topic) {
-  ESP_LOGD(TAG, "SENDING TO Modem: AT+QMTSUB=0,1,\"%s\",%d", topic, 0);
-  bc95serial.print("AT+QMTSUB=0,1,\"");
-  bc95serial.print(topic);
-  bc95serial.print("\",");
-  bc95serial.println("0");
-  char data[128];
-  int bytesRead = readResponseBC(&bc95serial, data, 128);
-  if (!assertResponseBC("OK\r", data, bytesRead)) {
-    return false;
-  }
-  return true;
+    ESP_LOGD(TAG, "SENDING TO Modem: AT+QMTSUB=0,1,\"%s\",%d", topic, 0);
+    bc95serial.print("AT+QMTSUB=0,1,\"");
+    bc95serial.print(topic);
+    bc95serial.print("\",");
+    bc95serial.println("0");
+    char data[128];
+    int bytesRead = readResponseBC(&bc95serial, data, 128);
+    if (!assertResponseBC("OK\r", data, bytesRead)) {
+        return false;
+    }
+
+    // La respuesta del modem viene en dos partes:
+    //   1. "OK"              ← ya la leímos arriba
+    //   2. "+QMTSUB: 0,1,0,0" ← confirmación asíncrona
+    // Si no consumimos la parte 2, queda en el buffer serial
+    // y contamina la siguiente lectura (checkMqttConnection)
+    for (int i = 0; i < 5; i++) {
+        bytesRead = readResponseBC(&bc95serial, data, 128, 1000);
+        if (bytesRead > 0 && strstr(data, "+QMTSUB:") != nullptr) {
+            ESP_LOGD(TAG, "QMTSUB confirmation consumed: %s", data);
+            break;
+        }
+        if (bytesRead == 0) {
+            ESP_LOGD(TAG, "Waiting for QMTSUB confirmation, attempt %d", i + 1);
+        } else {
+            ESP_LOGD(TAG, "Discarding unexpected data while waiting QMTSUB: %s", data);
+        }
+    }
+
+    return true;
 }
 
 int unsubscribeMqtt(char *topic, int qos) {}

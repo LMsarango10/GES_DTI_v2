@@ -312,20 +312,29 @@ void sendData() {
       uint8_t reset_reason = (uint8_t)esp_reset_reason();
 
       uint8_t flags1 = 0;
-      flags1 |= (cfg.wifiscan ? 1 : 0) << 7;
-      flags1 |= (cfg.blescan ? 1 : 0) << 6;
-      flags1 |= (cfg.btscan ? 1 : 0) << 5;
+
+      // Bit 7: WiFi radio — ¿inicializó y está escaneando?
+      flags1 |= (wifi_radio_ok ? 1 : 0) << 7;
+
+      // Bit 6: BLE módulo — ¿CC41-A responde y escanea?
+      flags1 |= (ble_module_ok ? 1 : 0) << 6;
+
+      // Bit 5: BT módulo — ¿HC-05 responde y escanea?
+      flags1 |= (bt_module_ok ? 1 : 0) << 5;
+
+      // Bit 4: LoRa — ¿joined? (devaddr != 0 = sesión activa)
 #if (HAS_LORA)
       flags1 |= (LMIC.devaddr ? 1 : 0) << 4;
 #endif
+
+      // Bit 3: NB-IoT módulo — ¿BC95-G inicializó y responde?
 #if (HAS_NBIOT)
-      flags1 |= (nb_isEnabled() ? 1 : 0) << 3;
+      flags1 |= (nb_module_ok ? 1 : 0) << 3;
 #endif
+
+      // Bit 2: SD card — ¿montada y accesible ahora mismo?
 #ifdef HAS_SDCARD
-      flags1 |= (1) << 2;
-#endif
-#if (HAS_GPS)
-      flags1 |= (gps_hasfix() ? 1 : 0) << 1;
+      flags1 |= (isSDCardAvailable() ? 1 : 0) << 2;
 #endif
 
       uint8_t flags2 = 0;
@@ -403,19 +412,30 @@ void sendData() {
       uint16_t min_heap_div16 = (uint16_t)(ESP.getMinFreeHeap() / 16);
       uint8_t reset_reason = (uint8_t)esp_reset_reason();
 
-      uint8_t flags1 = 0;
-      flags1 |= (cfg.wifiscan ? 1 : 0) << 7;
-      flags1 |= (cfg.blescan ? 1 : 0) << 6;
-      flags1 |= (cfg.btscan ? 1 : 0) << 5;
+uint8_t flags1 = 0;
+
+      // Bit 7: WiFi radio — ¿inicializó y está escaneando?
+      flags1 |= (wifi_radio_ok ? 1 : 0) << 7;
+
+      // Bit 6: BLE módulo — ¿CC41-A responde y escanea?
+      flags1 |= (ble_module_ok ? 1 : 0) << 6;
+
+      // Bit 5: BT módulo — ¿HC-05 responde y escanea?
+      flags1 |= (bt_module_ok ? 1 : 0) << 5;
+
+      // Bit 4: LoRa — ¿joined? (devaddr != 0 = sesión activa)
 #if (HAS_LORA)
       flags1 |= (LMIC.devaddr ? 1 : 0) << 4;
 #endif
-      flags1 |= (nb_isEnabled() ? 1 : 0) << 3;
-#ifdef HAS_SDCARD
-      flags1 |= (1) << 2;
+
+      // Bit 3: NB-IoT módulo — ¿BC95-G inicializó y responde?
+#if (HAS_NBIOT)
+      flags1 |= (nb_module_ok ? 1 : 0) << 3;
 #endif
-#if (HAS_GPS)
-      flags1 |= (gps_hasfix() ? 1 : 0) << 1;
+
+      // Bit 2: SD card — ¿montada y accesible ahora mismo?
+#ifdef HAS_SDCARD
+      flags1 |= (isSDCardAvailable() ? 1 : 0) << 2;
 #endif
 
       uint8_t flags2 = 0;

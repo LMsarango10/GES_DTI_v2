@@ -109,5 +109,7 @@ extern uint8_t nb_status_registered;
 extern uint8_t nb_status_connected;
 extern uint8_t nb_status_failures;
 extern uint8_t nb_status_rssi;
+extern bool nb_module_ok;
+
 
 #endif

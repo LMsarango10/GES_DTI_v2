@@ -13,6 +13,7 @@ uint8_t nb_status_registered = 0;
 uint8_t nb_status_connected = 0;
 uint8_t nb_status_failures = 0;
 uint8_t nb_status_rssi = 99;  // 99 = desconocido
+bool nb_module_ok = false;
 
 
 // Indica si NB puede usarse como transporte (no solo si la cola RAM existe)
@@ -383,6 +384,7 @@ void NbIotManager::nb_init() {
     }
     this->initializeFailures = 0;
     initialized = true;
+    nb_module_ok = true;
     this->lastUpdateCheck = millis() - UPDATES_CHECK_INTERVAL;
     this->updateReadyToInstall = false;
     nbTransportAvailable = true;  // NB vuelve a estar disponible para transportar mensajes
@@ -474,6 +476,7 @@ void NbIotManager::nb_resetStatus() {
     nb_status_registered = 0;
     nb_status_connected = 0;
     nb_status_failures = 0;
+    nb_module_ok = false;
 }
 
 bool NbIotManager::nb_checkNetworkRegister() {

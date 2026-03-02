@@ -58,14 +58,34 @@
 
 #define BTLE_SCAN_TIME 20
 
+// --- Umbral de fallos consecutivos para declarar módulo muerto ---
+// Si un módulo falla MAX_CONSECUTIVE_SCAN_FAILS veces seguidas,
+// se marca como no funcional y entra en ciclo de reinicialización.
+#define MAX_CONSECUTIVE_SCAN_FAILS 3
+
 void start_BLEscan(void);
 void stop_BLEscan(void);
 bool initBLE(void);
 bool initBT(long baud);
 void btHandler(void *pvParameters);
-void BLECycle(void);
-void BTCycle(void);
 
+// =====================================================================
+// CAMBIO: BTCycle y BLECycle ahora retornan bool
+// true  = escaneo completado (con o sin dispositivos encontrados)
+// false = fallo de comunicación con el módulo (timeout, sin respuesta AT)
+// =====================================================================
+bool BLECycle(void);
+bool BTCycle(long baud);
+
+// --- Estado de los módulos para health check ---
 extern bool bt_module_ok;
 extern bool ble_module_ok;
+
+// --- Contadores de diagnóstico (fase actual: detección de degradación) ---
+// bt_consecutive_fails:  fallos de escaneo consecutivos actuales del BT
+// ble_consecutive_fails: fallos de escaneo consecutivos actuales del BLE
+// Se resetean a 0 cada vez que un escaneo tiene éxito.
+extern uint8_t bt_consecutive_fails;
+extern uint8_t ble_consecutive_fails;
+
 #endif

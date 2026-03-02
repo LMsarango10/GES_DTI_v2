@@ -801,3 +801,4 @@ Los health checks por LoRa son **confirmed uplinks** que sirven como sonda activ
 ### NB-IoT como canal de monitorización siempre disponible
 
 Los health checks por NB-IoT van cada 1 minuto independientemente del estado de LoRa. Esto permite que el sistema de monitorización (Zabbix) siempre tenga visibilidad del dispositivo, incluso cuando LoRa funciona perfectamente. Si NB deja de enviar health checks, Zabbix sabe que el dispositivo tiene un problema real (no solo LoRa caído).
+s

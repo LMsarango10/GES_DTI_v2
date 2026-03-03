@@ -37,6 +37,7 @@
 
 #define NB_STATUS_CHECK_TIME_MS 60000 // NB status check time (milliseconds)
 
+#define MAX_MQTT_PUBLISH_FAILURES 3  // errores consecutivos AT+QMTPUB antes de reconectar
 
 
 class NbIotManager {
@@ -61,6 +62,8 @@ class NbIotManager {
 
     long nbLastStatusCheck;
 
+    int mqttPublishFailures;
+    
     char updatesServerResponse[1600];
     long lastUpdateCheck;
     bool updateReadyToInstall;

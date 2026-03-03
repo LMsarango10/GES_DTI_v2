@@ -477,6 +477,8 @@ void NbIotManager::nb_resetStatus() {
     nb_status_connected = 0;
     nb_status_failures = 0;
     nb_module_ok = false;
+
+    mqttPublishFailures = 0;
 }
 
 bool NbIotManager::nb_checkNetworkRegister() {
@@ -646,18 +648,28 @@ void NbIotManager::nb_sendMessages() {
             
 ESP_LOGE(TAG, "Could not send MQTT message");
 this->mqttSendFailures++;
+this->mqttPublishFailures++;
 SendBuffer.MessagePrio = prio_high;
 
 #if (HAS_LORA)
-  // Prefer LoRa if joined and there is room
   if (LMIC.devaddr && check_queue_available()) {
     ESP_LOGW(TAG, "NB failed -> moving message to LoRa queue (priority LoRa)");
     lora_enqueuedata(&SendBuffer);
+    this->mqttPublishFailures = 0; // LoRa se encargó, no es fallo MQTT puro
     continue;
   }
 #endif
 
-// Retry NB enqueue; if cannot, persist to SD
+if (this->mqttPublishFailures >= MAX_MQTT_PUBLISH_FAILURES) {
+    ESP_LOGW(TAG, "MQTT publish failures threshold reached (%d), forcing reconnect",
+             this->mqttPublishFailures);
+    this->mqttPublishFailures = 0;
+    this->mqttConnected = false;
+    this->subscribed = false;
+    nb_enqueuedata(&SendBuffer); // guardar el mensaje antes de salir
+    break;
+}
+
 if (!nb_enqueuedata(&SendBuffer)) {
 #ifdef HAS_SDCARD
   if (isSDCardAvailable()) {
@@ -666,7 +678,6 @@ if (!nb_enqueuedata(&SendBuffer)) {
   }
 #endif
 }
-// continue sending next messages (do not break hard)
 continue;
 
         }

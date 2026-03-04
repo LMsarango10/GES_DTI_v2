@@ -11,7 +11,7 @@ bool nbIotEnabled = false;
 uint8_t nb_status_registered = 0;
 uint8_t nb_status_connected = 0;
 uint8_t nb_status_failures = 0;
-uint8_t nb_status_rssi = 99;  // 99 = desconocido
+// nb_status_rssi eliminado — sustituido por nb_status_rsrp (en BC95.cpp)
 bool nb_module_ok = false;
 
 // Indica si NB puede usarse como transporte (no solo si la cola RAM existe)
@@ -194,13 +194,6 @@ int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui);
 
 // =============================================================================
 // nb_send_direct: envío inmediato por NB-IoT sin pasar por cola
-// Usado exclusivamente para respuestas a comandos remotos
-// (get_config, get_status, get_batt, get_gps, get_time, get_userSalt, IMEI, MSISDN)
-// Ventajas:
-//   - No compite con la cola de datos
-//   - No toca la SD
-//   - Respuesta llega inmediatamente al operador
-// Retorna 0 si éxito, -1 si el manager no está listo
 // =============================================================================
 int nb_send_direct(MessageBuffer_t *message) {
     if (!g_manager) {
@@ -371,6 +364,9 @@ void NbIotManager::nb_init() {
     sprintf(this->devEui, "%02x%02x%02x%02x%02x%02x%02x%02x",
             DEVEUI[0], DEVEUI[1], DEVEUI[2], DEVEUI[3],
             DEVEUI[4], DEVEUI[5], DEVEUI[6], DEVEUI[7]);
+
+    // === ADEMUX: primera lectura de señal tras inicialización ===
+    bc95_getNuestats();
 }
 
 void getSentiloTimestamp(char *buffer, uint32_t timestamp) {
@@ -515,6 +511,10 @@ bool NbIotManager::nb_checkStatus() {
         ESP_LOGD(TAG, "MQTT disconnected");
         return false;
     }
+
+    // === ADEMUX: actualizar métricas de señal en cada status check ===
+    bc95_getNuestats();
+
     return true;
 }
 

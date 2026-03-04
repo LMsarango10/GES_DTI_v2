@@ -337,10 +337,37 @@ void sendData() {
       lora_snr = (int8_t)LMIC.snr;
 #endif
 
-      uint8_t nb_rssi = 99;
+      // === ADEMUX: encoding NUESTATS para payload HC ===
+      // nb_rsrp: (-rsrp_dBm) - 44, rango 0-112, 0xFF=N/A
+      uint8_t nb_rsrp_encoded = 0xFF;
+#if (HAS_NBIOT)
+      if (nb_status_rsrp != 127) {
+        int rsrp_abs = -((int)nb_status_rsrp);  // ej: 78
+        if (rsrp_abs >= 44 && rsrp_abs <= 156) {
+          nb_rsrp_encoded = (uint8_t)(rsrp_abs - 44);  // ej: 34
+        }
+      }
+#endif
+
+      // nb_snr: snr_dB + 20, rango 0-50, 0xFF=N/A
+      uint8_t nb_snr_encoded = 0xFF;
+#if (HAS_NBIOT)
+      if (nb_status_snr_radio != 127) {
+        int snr_shifted = (int)nb_status_snr_radio + 20;  // ej: 8+20=28
+        if (snr_shifted >= 0 && snr_shifted <= 50) {
+          nb_snr_encoded = (uint8_t)snr_shifted;
+        }
+      }
+#endif
+
+      // nb_ecl: directo 0/1/2, 0xFF=N/A
+      uint8_t nb_ecl_val = 0xFF;
+#if (HAS_NBIOT)
+      nb_ecl_val = nb_status_ecl;
+#endif
+
       uint8_t nb_failures = 0;
 #if (HAS_NBIOT)
-      nb_rssi = nb_status_rssi;
       nb_failures = nb_status_failures;
 #endif
 
@@ -363,7 +390,8 @@ void sendData() {
       payload.addStatus(uptime, cputemp, free_heap_div16, min_heap_div16,
                         reset_reason, flags1, flags2,
                         lora_rssi, lora_snr,
-                        nb_rssi, nb_failures, flags3);
+                        nb_rsrp_encoded, nb_failures, flags3,
+                        nb_snr_encoded, nb_ecl_val);
 
       SendPayload(TELEMETRYPORT, prio_normal);
 
@@ -378,10 +406,11 @@ void sendData() {
       }
 #endif
 
-      ESP_LOGI(TAG, "Health check [Up:%u T:%u Heap:%u/%u Rst:%u F1:0x%02X F2:0x%02X RSSI:%u SNR:%d NbR:%u NbF:%u F3:0x%02X]",
+      ESP_LOGI(TAG, "Health check [Up:%u T:%u Heap:%u/%u Rst:%u F1:0x%02X F2:0x%02X RSSI:%u SNR:%d RSRP:%d SNRr:%d ECL:%d NbF:%u F3:0x%02X]",
                uptime, cputemp, free_heap_div16 * 16, min_heap_div16 * 16,
                reset_reason, flags1, flags2, lora_rssi, lora_snr,
-               nb_rssi, nb_failures, flags3);
+               nb_status_rsrp, nb_status_snr_radio, nb_status_ecl,
+               nb_failures, flags3);
     }
   }
 
@@ -405,9 +434,7 @@ void sendData() {
 #if (HAS_LORA)
       flags1 |= (LMIC.devaddr ? 1 : 0) << 4;
 #endif
-#if (HAS_NBIOT)
       flags1 |= (nb_module_ok ? 1 : 0) << 3;
-#endif
 #ifdef HAS_SDCARD
       flags1 |= (isSDCardAvailable() ? 1 : 0) << 2;
 #endif
@@ -424,7 +451,24 @@ void sendData() {
       lora_snr = (int8_t)LMIC.snr;
 #endif
 
-      uint8_t nb_rssi = nb_status_rssi;
+      // === ADEMUX: encoding NUESTATS (mismo cálculo que HC LoRa) ===
+      uint8_t nb_rsrp_encoded = 0xFF;
+      if (nb_status_rsrp != 127) {
+        int rsrp_abs = -((int)nb_status_rsrp);
+        if (rsrp_abs >= 44 && rsrp_abs <= 156) {
+          nb_rsrp_encoded = (uint8_t)(rsrp_abs - 44);
+        }
+      }
+
+      uint8_t nb_snr_encoded = 0xFF;
+      if (nb_status_snr_radio != 127) {
+        int snr_shifted = (int)nb_status_snr_radio + 20;
+        if (snr_shifted >= 0 && snr_shifted <= 50) {
+          nb_snr_encoded = (uint8_t)snr_shifted;
+        }
+      }
+
+      uint8_t nb_ecl_val = nb_status_ecl;
       uint8_t nb_failures = nb_status_failures;
 
       uint8_t flags3 = 0;
@@ -444,7 +488,8 @@ void sendData() {
       payload.addStatus(uptime, cputemp, free_heap_div16, min_heap_div16,
                         reset_reason, flags1, flags2,
                         lora_rssi, lora_snr,
-                        nb_rssi, nb_failures, flags3);
+                        nb_rsrp_encoded, nb_failures, flags3,
+                        nb_snr_encoded, nb_ecl_val);
 
       MessageBuffer_t nbMessage;
       nbMessage.MessageSize = payload.getSize();
@@ -453,10 +498,11 @@ void sendData() {
       memcpy(nbMessage.Message, payload.getBuffer(), payload.getSize());
       nb_send_direct(&nbMessage);
 
-      ESP_LOGI(TAG, "NB health check [Up:%u T:%u Heap:%u/%u Rst:%u F1:0x%02X F2:0x%02X RSSI:%u SNR:%d NbR:%u NbF:%u F3:0x%02X]",
+      ESP_LOGI(TAG, "NB health check [Up:%u T:%u Heap:%u/%u Rst:%u F1:0x%02X F2:0x%02X RSSI:%u SNR:%d RSRP:%d SNRr:%d ECL:%d NbF:%u F3:0x%02X]",
                uptime, cputemp, free_heap_div16 * 16, min_heap_div16 * 16,
                reset_reason, flags1, flags2, lora_rssi, lora_snr,
-               nb_rssi, nb_failures, flags3);
+               nb_status_rsrp, nb_status_snr_radio, nb_status_ecl,
+               nb_failures, flags3);
     }
   }
 #endif

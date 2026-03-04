@@ -5,6 +5,11 @@ HardwareSerial bc95serial(1);
 char globalBuff[4096];
 char TAG[] = "BC95";
 
+// === ADEMUX: variables globales NUESTATS ===
+int8_t  nb_status_rsrp      = 127;   // 127 = no disponible
+int8_t  nb_status_snr_radio = 127;   // 127 = no disponible
+uint8_t nb_status_ecl       = 0xFF;  // 0xFF = no disponible
+
 void cleanbuffer() {
   while (bc95serial.available())
     bc95serial.read();
@@ -68,13 +73,6 @@ bool sendAndReadOkResponseBC(HardwareSerial *port, const char *command,
 void initModem() {
   bc95serial.setRxBufferSize(4096);
   bc95serial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
-  // pinMode(RESET_PIN, OUTPUT);
-  //  digitalWrite(RESET_PIN, HIGH);
-
-  /*digitalWrite(RESET_PIN, HIGH);
-  delay(1000);
-  digitalWrite(RESET_PIN, LOW);
-  delay(5000);*/
 #ifdef DEBUG_MODEM
   // ESP_LOGD(TAG, bc95serial.readString().c_str());
 #endif
@@ -85,7 +83,6 @@ bool networkReady() {
   int bytesRead = readResponseBC(&bc95serial, globalBuff, sizeof(globalBuff));
   if (assertResponseBC("CEREG:0,1", globalBuff, bytesRead))
     return true;
-  // next conditional allows for network roaming
   else if (assertResponseBC("CEREG:0,5", globalBuff, bytesRead))
     return true;
   else
@@ -137,8 +134,7 @@ bool configModem() {
                                  sizeof(globalBuff));
 }
 
-bool attachNetwork()
-{
+bool attachNetwork() {
   return sendAndReadOkResponseBC(&bc95serial,
                               "AT+CGDCONT=1,\"IP\",\"" APN "\"",
                               globalBuff, sizeof(globalBuff)) &&
@@ -207,6 +203,7 @@ bool receiveData(char *data, int bytesRead, int bufferLen) {
   delete tempBuff;
   return true;
 }
+
 enum sendStatus { INIT, DATAOK, SENTOK, RECOK };
 
 int openSocket() {
@@ -231,8 +228,7 @@ bool connectSocket(int socket, char *ip, int port) {
 }
 
 int sendData(int socket, char *data, int datalen, char *responseBuff,
-             int responseBuffSize) // returns bytes read
-{
+             int responseBuffSize) {
   char outBuffer[256];
   sprintf(outBuffer, "AT+NSOSD=%d,%d,", socket, datalen);
   for (int i = 0; i < datalen; i++) {
@@ -255,7 +251,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
   sendStatus status = INIT;
   while (!timeout) {
     timeout = (millis() - startTime > NBSENDTIMEOUT);
-    //delay(100);
     while (bc95serial.available()) {
       responseBuff[buffPtr++] = bc95serial.read();
       if (buffPtr == responseBuffSize) {
@@ -267,7 +262,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     switch (status) {
     case INIT: {
       sprintf(expected, "%d,%d\r\n", socket, datalen);
-
       char *val = strstr(responseBuff, expected);
       if (val != nullptr) {
         scanPtr = val + strlen(expected);
@@ -278,7 +272,6 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
     }
     case DATAOK: {
       sprintf(expected, "OK\r\n");
-
       char *val = strstr(responseBuff, expected);
       if (val != nullptr) {
         scanPtr = val + strlen(expected);
@@ -288,7 +281,7 @@ int sendData(int socket, char *data, int datalen, char *responseBuff,
       break;
     }
     case SENTOK: {
-      sprintf(expected, "+NSOSTR:%d,101,1",socket);
+      sprintf(expected, "+NSOSTR:%d,101,1", socket);
       char *val = strstr(responseBuff, expected);
       if (val != nullptr) {
         scanPtr = val + strlen(expected);
@@ -365,8 +358,8 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
   unsigned long startT = millis();
   while (millis() < startT + HTTP_READ_TIMEOUT) {
     while (bc95serial.available()) {
-      buffer[buffPtr++] =  bc95serial.read();
-      readBytes+=1;
+      buffer[buffPtr++] = bc95serial.read();
+      readBytes += 1;
       if (buffPtr == bufferSize) {
         return -10;
       }
@@ -383,7 +376,6 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
     }
 
     std::string line = current.substr(0, pos + 2);
-
     scanPtr += line.length();
 
     sprintf(expected, "+NSONMI:%d", socket);
@@ -393,7 +385,6 @@ int getReceivedBytes(int socket, char *buffer, int bufferSize) {
       if (len < 0) {
         return len;
       }
-
       memcpy(responseBuffer + responseBufferPos, dataBuffer, len);
       responseBufferPos += len;
       continue;
@@ -446,44 +437,40 @@ int parseResponse(char *buff, int bytesReceived, int *responseCode) {
   return bodyLen;
 }
 
-int parseResponseCode(char* buff, int buffSize)
-{
+int parseResponseCode(char* buff, int buffSize) {
   std::string inputString = std::string(buff);
   size_t pos = inputString.find("\r\n");
-  if(pos == std::string::npos)
-  {
+  if (pos == std::string::npos) {
     return -1;
   }
 
-  std::string httpResponseLine = inputString.substr(0, pos+2);
+  std::string httpResponseLine = inputString.substr(0, pos + 2);
   ESP_LOGV(TAG, "Response line: %s", httpResponseLine.c_str());
 
   size_t responseCodePos = httpResponseLine.find(" ");
-  size_t responseCodePosEnd = httpResponseLine.find(" ", responseCodePos+1);
+  size_t responseCodePosEnd = httpResponseLine.find(" ", responseCodePos + 1);
 
-  std::string responseCodeStr = httpResponseLine.substr(responseCodePos+1, responseCodePosEnd-responseCodePos-1);
+  std::string responseCodeStr = httpResponseLine.substr(responseCodePos + 1, responseCodePosEnd - responseCodePos - 1);
   ESP_LOGV(TAG, "Response code: %s", responseCodeStr.c_str());
   return strtoul(responseCodeStr.c_str(), NULL, 10);
 }
 
-int parseContentLength(char* buff, int buffSize)
-{
+int parseContentLength(char* buff, int buffSize) {
   std::string inputString = std::string(buff);
   size_t pos = inputString.find("\r\n\r\n");
-  if(pos == std::string::npos)
-  {
+  if (pos == std::string::npos) {
     return -1;
   }
 
-  std::string httpString = inputString.substr(0, pos+4);
+  std::string httpString = inputString.substr(0, pos + 4);
 
   std::for_each(httpString.begin(), httpString.end(), [](char & c) {
-        c = ::tolower(c);
-    });
+    c = ::tolower(c);
+  });
 
   size_t contentLengthPos = httpString.find("content-length:");
-  size_t contentLengthPosEnd = httpString.find("\r\n", contentLengthPos+1);
-  std::string contentLengthStr = httpString.substr(contentLengthPos+15, contentLengthPosEnd-contentLengthPos-15);
+  size_t contentLengthPosEnd = httpString.find("\r\n", contentLengthPos + 1);
+  std::string contentLengthStr = httpString.substr(contentLengthPos + 15, contentLengthPosEnd - contentLengthPos - 15);
 
   ESP_LOGV(TAG, "Content Length str: %s", contentLengthStr.c_str());
 
@@ -491,17 +478,14 @@ int parseContentLength(char* buff, int buffSize)
   return contentLength;
 }
 
-int parseData(char* buff, int dataSize, char* outBuff, int outBuffSize)
-{
+int parseData(char* buff, int dataSize, char* outBuff, int outBuffSize) {
   std::string inputString = std::string(buff);
   size_t pos = inputString.find("\r\n\r\n");
-  if(pos == std::string::npos)
-  {
+  if (pos == std::string::npos) {
     return -1;
   }
 
   char* dataPos = buff + pos + 4;
-  //ESP_LOGV(TAG, "Data: %s", dataPos);
   memcpy(outBuff, dataPos, dataSize);
   return dataSize;
 }
@@ -513,21 +497,17 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
           DEVEUI[7]);
 
   char outBuf[256];
-
   int responseCode = 0;
 
-  // Open socket
   int socketN = openSocket();
-
   bool connected = connectSocket(socketN, ip, port);
 
   char pageWithParams[256];
   std::string version = std::string(PROGVERSION);
-  std::replace( version.begin(), version.end(), '.', '_'); // replace all '.' to '_'
+  std::replace(version.begin(), version.end(), '.', '_');
 
   char localBuff[4096];
   sprintf(pageWithParams, "%s?deveui=%s&version=%s", page, devEui, version.c_str());
-  // send the header
   localBuff[0] = 0;
   sprintf(outBuf, "GET %s HTTP/1.1\r\n", pageWithParams);
   strcat(localBuff, outBuf);
@@ -535,8 +515,7 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
   strcat(localBuff, outBuf);
   strcat(localBuff, "\r\n");
 
-  int sentOk = sendData(socketN, localBuff, strlen(localBuff), localBuff,
-                        sizeof(localBuff));
+  int sentOk = sendData(socketN, localBuff, strlen(localBuff), localBuff, sizeof(localBuff));
 
   if (sentOk < 0) {
     ESP_LOGE(TAG, "Error sending data");
@@ -544,8 +523,6 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
   }
 
   int bytesReceived = getReceivedBytes(socketN, localBuff, sizeof(localBuff));
-
-  //ESP_LOGV(TAG, "Data received: %s", globalBuff);
 
   if (bytesReceived < 0) {
     ESP_LOGE(TAG, "failed sending data with error code: %d", bytesReceived);
@@ -589,7 +566,6 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData,
 
   if (connectModem(domainBuffer, thisPort)) {
     ESP_LOGI(TAG, "connected");
-    // send the header
     globalBuff[0] = 0;
     sprintf(outBuf, "PUT %s HTTP/1.1\r\n", page);
     strcat(globalBuff, outBuf);
@@ -602,12 +578,10 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData,
     sprintf(outBuf, "Content-Length: %u\r\n", strlen(thisData));
     strcat(globalBuff, outBuf);
     strcat(globalBuff, "\r\n");
-
-    // send the body (variables)
     strcat(globalBuff, thisData);
+
     int responseCode = 0;
-    int bytesReceived = sendData(1, globalBuff, strlen(globalBuff), globalBuff,
-                                 sizeof(globalBuff));
+    int bytesReceived = sendData(1, globalBuff, strlen(globalBuff), globalBuff, sizeof(globalBuff));
     if (bytesReceived < 0) {
       cleanbuffer();
       ESP_LOGE(TAG, "failed sending data with error code: %d", bytesReceived);
@@ -646,7 +620,6 @@ int postPage(char *domainBuffer, int thisPort, char *page, char *thisData,
 
 bool checkMqttConnection() {
   ESP_LOGD(TAG, "SENDING TO Modem: AT+QMTCONN?");
-
   bc95serial.println("AT+QMTCONN?");
   char data[128];
   int bytesRead = readResponseBC(&bc95serial, data, 128);
@@ -662,36 +635,25 @@ int readMqttSubData(char *buff, int bufflen) {
 
   std::string response = std::string(data);
   int firstResponse = response.find("+QMTRECV: 0,0,");
-  if (firstResponse == std::string::npos) {
-    return -1;
-  }
+  if (firstResponse == std::string::npos) return -1;
+
   int topicFirstQuote = response.find("\"", firstResponse);
-  if (topicFirstQuote == std::string::npos) {
-    return -2;
-  }
+  if (topicFirstQuote == std::string::npos) return -2;
+
   int topicSecondQuote = response.find("\"", topicFirstQuote + 1);
-  if (topicSecondQuote == std::string::npos) {
-    return -3;
-  }
+  if (topicSecondQuote == std::string::npos) return -3;
+
   int messageComma = response.find(",", topicSecondQuote + 1);
-  if (messageComma == std::string::npos) {
-    return -4;
-  }
+  if (messageComma == std::string::npos) return -4;
 
   int messageEnd = response.find("\n", messageComma + 1);
-  if (messageEnd == std::string::npos) {
-    return -5;
-  }
+  if (messageEnd == std::string::npos) return -5;
 
-  // extract message between quotes
-  std::string topic = response.substr(topicFirstQuote + 1,
-                                      topicSecondQuote - topicFirstQuote - 1);
-  std::string message =
-      response.substr(messageComma + 1, messageEnd - messageComma - 1);
+  std::string topic = response.substr(topicFirstQuote + 1, topicSecondQuote - topicFirstQuote - 1);
+  std::string message = response.substr(messageComma + 1, messageEnd - messageComma - 1);
   ESP_LOGD(TAG, "Message in Topic: %s", topic.c_str());
   ESP_LOGD(TAG, "Message: %s", message.c_str());
 
-  // copy message to buffer
   strncpy(buff, message.c_str(), bufflen);
   return message.length();
 }
@@ -704,7 +666,6 @@ bool dataAvailable() {
 }
 
 void configureMqtt() {
-
   bc95serial.println("AT+QMTCFG=\"version\",0,4");
   char data[128];
   int bytesRead = readResponseBC(&bc95serial, data, 128);
@@ -738,9 +699,7 @@ int connectMqtt(char *url, int port, char* username, char *password, char *clien
   if (!assertResponseBC("+QMTOPEN: 0,0", data, bytesRead)) {
     for (int i = 0; i < 30; i++) {
       responseBytes = readResponseBC(&bc95serial, data, 128, 1000);
-      if (responseBytes != 0) {
-        break;
-      }
+      if (responseBytes != 0) break;
       ESP_LOGI(TAG, "Wait for conn");
       delay(2000);
     }
@@ -769,13 +728,10 @@ int connectMqtt(char *url, int port, char* username, char *password, char *clien
     return -3;
   }
 
-  if (!assertResponseBC("+QMTCONN: 0,0,0", data, bytesRead))
-  {
+  if (!assertResponseBC("+QMTCONN: 0,0,0", data, bytesRead)) {
     for (int i = 0; i < 30; i++) {
       responseBytes = readResponseBC(&bc95serial, data, 128, 1000);
-      if (responseBytes != 0) {
-        break;
-      }
+      if (responseBytes != 0) break;
       ESP_LOGI(TAG, "Wait for conn");
       delay(2000);
     }
@@ -788,40 +744,36 @@ int connectMqtt(char *url, int port, char* username, char *password, char *clien
 }
 
 bool subscribeMqtt(char *topic) {
-    ESP_LOGD(TAG, "SENDING TO Modem: AT+QMTSUB=0,1,\"%s\",%d", topic, 0);
-    bc95serial.print("AT+QMTSUB=0,1,\"");
-    bc95serial.print(topic);
-    bc95serial.print("\",");
-    bc95serial.println("0");
-    char data[128];
-    int bytesRead = readResponseBC(&bc95serial, data, 128);
-    if (!assertResponseBC("OK\r", data, bytesRead)) {
-        return false;
-    }
+  ESP_LOGD(TAG, "SENDING TO Modem: AT+QMTSUB=0,1,\"%s\",%d", topic, 0);
+  bc95serial.print("AT+QMTSUB=0,1,\"");
+  bc95serial.print(topic);
+  bc95serial.print("\",");
+  bc95serial.println("0");
+  char data[128];
+  int bytesRead = readResponseBC(&bc95serial, data, 128);
+  if (!assertResponseBC("OK\r", data, bytesRead)) {
+    return false;
+  }
 
-    // La respuesta del modem viene en dos partes:
-    //   1. "OK"              ← ya la leímos arriba
-    //   2. "+QMTSUB: 0,1,0,0" ← confirmación asíncrona
-    // Si no consumimos la parte 2, queda en el buffer serial
-    // y contamina la siguiente lectura (checkMqttConnection)
-    for (int i = 0; i < 5; i++) {
-        bytesRead = readResponseBC(&bc95serial, data, 128, 1000);
-        if (bytesRead > 0 && strstr(data, "+QMTSUB:") != nullptr) {
-            ESP_LOGD(TAG, "QMTSUB confirmation consumed: %s", data);
-            break;
-        }
-        if (bytesRead == 0) {
-            ESP_LOGD(TAG, "Waiting for QMTSUB confirmation, attempt %d", i + 1);
-        } else {
-            ESP_LOGD(TAG, "Discarding unexpected data while waiting QMTSUB: %s", data);
-        }
+  for (int i = 0; i < 5; i++) {
+    bytesRead = readResponseBC(&bc95serial, data, 128, 1000);
+    if (bytesRead > 0 && strstr(data, "+QMTSUB:") != nullptr) {
+      ESP_LOGD(TAG, "QMTSUB confirmation consumed: %s", data);
+      break;
     }
+    if (bytesRead == 0) {
+      ESP_LOGD(TAG, "Waiting for QMTSUB confirmation, attempt %d", i + 1);
+    } else {
+      ESP_LOGD(TAG, "Discarding unexpected data while waiting QMTSUB: %s", data);
+    }
+  }
 
-    return true;
+  return true;
 }
 
 int unsubscribeMqtt(char *topic, int qos) {}
 int checkSubscriptionMqtt(char *message) {}
+
 int publishMqtt(char *topic, char *message, int qos) {
   ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTPUB=0,0,0,0,\"%s\"", topic);
 
@@ -840,8 +792,7 @@ int publishMqtt(char *topic, char *message, int qos) {
   bc95serial.print(message);
   bc95serial.write(26);
 
-  responseBytes =
-      readResponseWithStop(&bc95serial, data, 512, "+QMTPUB: 0,0,0", 5000);
+  responseBytes = readResponseWithStop(&bc95serial, data, 512, "+QMTPUB: 0,0,0", 5000);
   while (bc95serial.available()) {
     bc95serial.read();
   }
@@ -849,11 +800,10 @@ int publishMqtt(char *topic, char *message, int qos) {
     return responseBytes;
   return 0;
 }
+
 int disconnectMqtt() {
   ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTDISC=0");
   bc95serial.println("AT+QMTDISC=0");
-  // ESP_LOGI(TAG, "SENDING TO Modem: AT+QMTCLOSE=0");
-  // bc95serial.println("AT+QMTCLOSE=0");
   char data[64];
   int responseBytes = readResponseBC(&bc95serial, data, 64);
   if (!assertResponseBC("OK", data, responseBytes)) {
@@ -862,104 +812,198 @@ int disconnectMqtt() {
   return 0;
 }
 
-
 // =========================================================
 //  Obtener IMEI del modem Quectel BC95-G  (AT+CGSN=1)
-//  Respuesta esperada: +CGSN:<imei> ... OK
 // =========================================================
 String bc95_getImei() {
-    char buffer[256];
+  char buffer[256];
 
-    ESP_LOGI(TAG, "Solicitando IMEI del módulo BC95-G...");
+  ESP_LOGI(TAG, "Solicitando IMEI del módulo BC95-G...");
+  cleanbuffer();
+  sendAndReadOkResponseBC(&bc95serial, "ATE0", buffer, sizeof(buffer), 800);
 
-    // Limpia buffer antes de enviar comandos
-    cleanbuffer();
-
-    // Desactivar eco para respuesta más limpia
-    sendAndReadOkResponseBC(&bc95serial, "ATE0", buffer, sizeof(buffer), 800);
-
-    // Comando oficial BC95-G para IMEI: AT+CGSN=1  [1](https://github.com/chirpstack/chirpstack-rest-api/issues/8)
-    bc95serial.println("AT+CGSN=1");
-
-    int len = readResponseBC(&bc95serial, buffer, sizeof(buffer), 2000);
-    if (len <= 0) {
-        ESP_LOGE(TAG, "No hubo respuesta al comando AT+CGSN=1");
-        return "";
-    }
-
-    ESP_LOGD(TAG, "Respuesta cruda IMEI: %s", buffer);
-
-    // Buscar +CGSN:
-    String resp = buffer;
-    int p = resp.indexOf("+CGSN:");
-    if (p < 0) {
-        ESP_LOGE(TAG, "No se encontró +CGSN: en la respuesta");
-        return "";
-    }
-    p += 6; // saltar "+CGSN:"
-
-    // Extraer 15 dígitos consecutivos
-    String imei = "";
-    for (int i = p; i < resp.length(); i++) {
-        char c = resp[i];
-        if (c >= '0' && c <= '9') imei += c;
-        else if (imei.length() > 0) break;
-    }
-
-    if (imei.length() == 15) {
-        ESP_LOGI(TAG, "IMEI del BC95-G: %s", imei.c_str());
-        return imei;
-    }
-
-    ESP_LOGE(TAG, "IMEI inválido o incompleto: %s", imei.c_str());
+  bc95serial.println("AT+CGSN=1");
+  int len = readResponseBC(&bc95serial, buffer, sizeof(buffer), 2000);
+  if (len <= 0) {
+    ESP_LOGE(TAG, "No hubo respuesta al comando AT+CGSN=1");
     return "";
-}
+  }
 
+  ESP_LOGD(TAG, "Respuesta cruda IMEI: %s", buffer);
+
+  String resp = buffer;
+  int p = resp.indexOf("+CGSN:");
+  if (p < 0) {
+    ESP_LOGE(TAG, "No se encontró +CGSN: en la respuesta");
+    return "";
+  }
+  p += 6;
+
+  String imei = "";
+  for (int i = p; i < resp.length(); i++) {
+    char c = resp[i];
+    if (c >= '0' && c <= '9') imei += c;
+    else if (imei.length() > 0) break;
+  }
+
+  if (imei.length() == 15) {
+    ESP_LOGI(TAG, "IMEI del BC95-G: %s", imei.c_str());
+    return imei;
+  }
+
+  ESP_LOGE(TAG, "IMEI inválido o incompleto: %s", imei.c_str());
+  return "";
+}
 
 // =========================================================
 // Obtener MSISDN del modem Quectel BC95-G (AT+CNUM)
-// Ejemplo respuesta: +CNUM: "Voice","346XXXXXXXX",129
 // =========================================================
 String bc95_getMsisdn() {
-    char buffer[256];
+  char buffer[256];
 
-    ESP_LOGI(TAG, "Solicitando MSISDN (numero telefonico SIM)...");
+  ESP_LOGI(TAG, "Solicitando MSISDN (numero telefonico SIM)...");
+  cleanbuffer();
+  sendAndReadOkResponseBC(&bc95serial, "ATE0", buffer, sizeof(buffer), 800);
 
-    cleanbuffer();
-    sendAndReadOkResponseBC(&bc95serial, "ATE0", buffer, sizeof(buffer), 800);
+  bc95serial.println("AT+CNUM");
+  int len = readResponseBC(&bc95serial, buffer, sizeof(buffer), 2000);
 
-    bc95serial.println("AT+CNUM");
-    int len = readResponseBC(&bc95serial, buffer, sizeof(buffer), 2000);
+  if (len <= 0) {
+    ESP_LOGE(TAG, "No hubo respuesta al comando AT+CNUM");
+    return "";
+  }
 
-    if (len <= 0) {
-        ESP_LOGE(TAG, "No hubo respuesta al comando AT+CNUM");
-        return "";
+  ESP_LOGD(TAG, "Respuesta cruda MSISDN: %s", buffer);
+
+  String resp = buffer;
+  int p = resp.indexOf("+CNUM:");
+  if (p < 0) {
+    ESP_LOGE(TAG, "No se encontró +CNUM: en la respuesta");
+    return "";
+  }
+
+  int q1 = resp.indexOf('"', p + 6);
+  if (q1 < 0) return "";
+  int q2 = resp.indexOf('"', q1 + 1);
+  if (q2 < 0) return "";
+  int q3 = resp.indexOf('"', q2 + 1);
+  if (q3 < 0) return "";
+  int q4 = resp.indexOf('"', q3 + 1);
+  if (q4 < 0) return "";
+
+  String msisdn = resp.substring(q3 + 1, q4);
+  ESP_LOGI(TAG, "MSISDN de la SIM: %s", msisdn.c_str());
+  return msisdn;
+}
+
+// =========================================================
+//  ADEMUX: Leer métricas de señal NB-IoT
+//
+//  Paso 1 — AT+NUESTATS=CELL (sin comillas, según datasheet BC95-G v1.4)
+//  Respuesta: una línea CSV por celda:
+//    NUESTATS:CELL,<earfcn>,<pci>,<primarycell>,<rsrp>,<rsrq>,<rssi>,<snr>
+//  Todos los valores en centibels (÷10 para dBm/dB)
+//  Campos (0-indexed tras el prefijo):
+//    0=earfcn  1=pci  2=primarycell  3=rsrp  4=rsrq  5=rssi  6=snr
+//
+//  Paso 2 — AT+NUESTATS=RADIO (para ECL)
+//  Respuesta multilínea, buscar:
+//    NUESTATS:RADIO,ECL:<valor>
+//
+//  Actualiza globales: nb_status_rsrp, nb_status_snr_radio, nb_status_ecl
+// =========================================================
+bool bc95_getNuestats() {
+  char buffer[512];
+
+  // -------------------------------------------------------
+  // PASO 1: AT+NUESTATS=CELL → RSRP y SNR
+  // -------------------------------------------------------
+  cleanbuffer();
+  bc95serial.println("AT+NUESTATS=CELL");
+
+  int len = readResponseWithStop(&bc95serial, buffer, sizeof(buffer), "OK\r\n", 5000);
+
+  if (len <= 0) {
+    ESP_LOGE(TAG, "NUESTATS=CELL: sin respuesta o timeout (len=%d)", len);
+    nb_status_rsrp      = 127;
+    nb_status_snr_radio = 127;
+    nb_status_ecl       = 0xFF;
+    return false;
+  }
+
+  ESP_LOGD(TAG, "NUESTATS=CELL raw: %s", buffer);
+
+  // Buscar la primera línea "NUESTATS:CELL,"
+  // Formato: NUESTATS:CELL,earfcn,pci,primarycell,rsrp,rsrq,rssi,snr
+  char *line = strstr(buffer, "NUESTATS:CELL,");
+  if (line == nullptr) {
+    ESP_LOGE(TAG, "NUESTATS=CELL: no se encontró 'NUESTATS:CELL,'");
+    nb_status_rsrp      = 127;
+    nb_status_snr_radio = 127;
+    nb_status_ecl       = 0xFF;
+    return false;
+  }
+
+  // Avanzar tras el prefijo
+  line += 14; // len("NUESTATS:CELL,") == 14
+
+  // Parsear 7 campos CSV: earfcn,pci,primarycell,rsrp,rsrq,rssi,snr
+  int fields[7];
+  int nfields = 0;
+  char *tok = strtok(line, ",\r\n");
+  while (tok != nullptr && nfields < 7) {
+    fields[nfields++] = atoi(tok);
+    tok = strtok(nullptr, ",\r\n");
+  }
+
+  if (nfields < 7) {
+    ESP_LOGE(TAG, "NUESTATS=CELL: solo %d campos (esperados 7)", nfields);
+    nb_status_rsrp      = 127;
+    nb_status_snr_radio = 127;
+    nb_status_ecl       = 0xFF;
+    return false;
+  }
+
+  // campo[3] = rsrp en centibels → /10 = dBm
+  nb_status_rsrp = (int8_t)(fields[3] / 10);
+  // campo[6] = snr (unidad directa, dB entero según datasheet)
+  nb_status_snr_radio = (int8_t)fields[6];
+
+  ESP_LOGD(TAG, "NUESTATS CELL: earfcn=%d pci=%d rsrp=%d(%d dBm) rsrq=%d rssi=%d snr=%d",
+           fields[0], fields[1], fields[3], nb_status_rsrp,
+           fields[4], fields[5], fields[6]);
+
+  // -------------------------------------------------------
+  // PASO 2: AT+NUESTATS=RADIO → ECL
+  // Respuesta multilínea, buscar "NUESTATS:RADIO,ECL:<val>"
+  // -------------------------------------------------------
+  delay(200);
+  cleanbuffer();
+  bc95serial.println("AT+NUESTATS=RADIO");
+
+  len = readResponseWithStop(&bc95serial, buffer, sizeof(buffer), "OK\r\n", 5000);
+
+  if (len <= 0) {
+    ESP_LOGW(TAG, "NUESTATS=RADIO: sin respuesta (ECL quedará N/A)");
+    nb_status_ecl = 0xFF;
+  } else {
+    ESP_LOGV(TAG, "NUESTATS=RADIO raw: %s", buffer);
+
+    // Buscar "NUESTATS:RADIO,ECL:"
+    char *ecl_ptr = strstr(buffer, "NUESTATS:RADIO,ECL:");
+    if (ecl_ptr != nullptr) {
+      ecl_ptr += 19; // len("NUESTATS:RADIO,ECL:") == 19
+      uint8_t ecl = (uint8_t)atoi(ecl_ptr);
+      nb_status_ecl = (ecl <= 2) ? ecl : 0xFF;
+      ESP_LOGD(TAG, "NUESTATS RADIO: ECL=%d", nb_status_ecl);
+    } else {
+      ESP_LOGW(TAG, "NUESTATS=RADIO: no se encontró 'ECL'");
+      nb_status_ecl = 0xFF;
     }
+  }
 
-    ESP_LOGD(TAG, "Respuesta cruda MSISDN: %s", buffer);
+  ESP_LOGI(TAG, "NUESTATS → RSRP:%d dBm  SNR:%d dB  ECL:%d",
+           nb_status_rsrp, nb_status_snr_radio, nb_status_ecl);
 
-    String resp = buffer;
-    int p = resp.indexOf("+CNUM:");
-    if (p < 0) {
-        ESP_LOGE(TAG, "No se encontró +CNUM: en la respuesta");
-        return "";
-    }
-
-    // Extraer segunda cadena entre comillas (el número)
-    int q1 = resp.indexOf('"', p + 6);
-    if (q1 < 0) return "";
-
-    int q2 = resp.indexOf('"', q1 + 1);
-    if (q2 < 0) return "";
-
-    int q3 = resp.indexOf('"', q2 + 1);
-    if (q3 < 0) return "";
-
-    int q4 = resp.indexOf('"', q3 + 1);
-    if (q4 < 0) return "";
-
-    String msisdn = resp.substring(q3 + 1, q4);
-
-    ESP_LOGI(TAG, "MSISDN de la SIM: %s", msisdn.c_str());
-    return msisdn;
+  return (nb_status_rsrp != 127);
 }

@@ -1,4 +1,3 @@
-
 // Basic Config
 #include "globals.h"
 #include "rcommand.h"
@@ -14,20 +13,34 @@
 static const char TAG[] = __FILE__;
 
 // =========================================================
+//  Helper: construye MessageBuffer y envía directo por NB-IoT
+//  Usado por todos los comandos remotos que responden datos
+// =========================================================
+static void send_response_direct(uint8_t port, sendprio_t prio) {
+  MessageBuffer_t buf;
+  buf.MessageSize = payload.getSize();
+  buf.MessagePort = port;
+  buf.MessagePrio = prio;
+  memcpy(buf.Message, payload.getBuffer(), buf.MessageSize);
+  int result = nb_send_direct(&buf);
+  if (result != 0) {
+    // NB-IoT no disponible todavía (manager no listo) → fallback a SendPayload
+    ESP_LOGW(TAG, "nb_send_direct failed (port=%u), fallback to SendPayload", port);
+    SendPayload(port, prio);
+  }
+}
+
+// =========================================================
 //  IMEI over LoRa remote command (BC95) - OPCODE 0x8A
-//  Downlink: 0x8A  (Base64: ig==) on RCMDPORT (FPort 2)
-//  Uplink response (RCMDPORT): 0x8A + 15 ASCII digits (IMEI)  OR 0x8A 0x00 on error
 // =========================================================
 #if (HAS_NBIOT)
-extern String bc95_getImei(); // tu función en BC95.cpp (AT+CGSN=1) [2](https://github.com/chirpstack/chirpstack-rest-api/issues/8)
+extern String bc95_getImei();
 static TaskHandle_t imeiTaskHandle = NULL;
-
 
 extern String bc95_getMsisdn();
 static TaskHandle_t msisdnTaskHandle = NULL;
 static void msisdnTask(void *param);
 static void get_msisdn(uint8_t val[]);
-
 
 static void imeiTask(void *param);
 static void get_imei(uint8_t val[]);
@@ -36,32 +49,32 @@ static void get_imei(uint8_t val[]);
 // set of functions that can be triggered by remote commands
 void set_reset(uint8_t val[]) {
   switch (val[0]) {
-  case 0: // restart device with cold start (clear RTC saved variables)
+  case 0:
     ESP_LOGI(TAG, "Remote command: restart device cold");
     do_reset(false);
     break;
-  case 1: // reset MAC counter
+  case 1:
     ESP_LOGI(TAG, "Remote command: reset MAC counter");
-    reset_counters(); // clear macs
-    get_salt();       // get new salt
+    reset_counters();
+    get_salt();
     break;
-  case 2: // reset device to factory settings
+  case 2:
     ESP_LOGI(TAG, "Remote command: reset device to factory settings");
     eraseConfig();
     break;
-  case 3: // reset send queues
+  case 3:
     ESP_LOGI(TAG, "Remote command: flush send queue");
     flushQueues();
     break;
-  case 4: // restart device with warm start (keep RTC saved variables)
+  case 4:
     ESP_LOGI(TAG, "Remote command: restart device warm");
     do_reset(true);
     break;
-  case 9: // reset and ask for software update via Wifi OTA
+  case 9:
     ESP_LOGI(TAG, "Remote command: software update via Wifi");
 #if (USE_OTA)
     RTC_runmode = RUNMODE_UPDATE;
-#endif // USE_OTA
+#endif
     break;
   default:
     ESP_LOGW(TAG, "Remote command: reset called with invalid parameter(s)");
@@ -73,7 +86,7 @@ void set_rssi(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set RSSI limit to %d", cfg.rssilimit);
 }
 
-void set_salt(uint8_t val[]) { // salt receives 8 values, 4 for the salt and 4 for the version
+void set_salt(uint8_t val[]) {
   cfg.salt = (val[3] * 256 * 256 * 256) + (val[2] * 256 * 256) +
              (val[1] * 256) + val[0];
   cfg.saltVersion = (val[7] * 256 * 256 * 256) + (val[6] * 256 * 256) +
@@ -91,12 +104,11 @@ void get_userSalt(uint8_t val[]) {
   payload.addSalt(cfg.salt);
   payload.addSaltVersion(cfg.saltVersion);
   payload.addSaltTimestamp(cfg.saltTimestamp);
-  SendPayload(CONFIGPORT, prio_high);
+  send_response_direct(CONFIGPORT, prio_high);
 }
 
 void set_sendcycle(uint8_t val[]) {
   cfg.sendcycle = val[0] * 256 + val[1];
-  // update send cycle interrupt [seconds
   sendcycler.detach();
   sendcycler.attach(cfg.sendcycle * 2, sendcycle);
   ESP_LOGI(TAG, "Remote command: set send cycle to %d seconds", cfg.sendcycle * 2);
@@ -104,7 +116,6 @@ void set_sendcycle(uint8_t val[]) {
 
 void set_wifichancycle(uint8_t val[]) {
   cfg.wifichancycle = val[0];
-  // update Wifi channel rotation timer period
   xTimerChangePeriod(WifiChanTimer, pdMS_TO_TICKS(cfg.wifichancycle * 10), 100);
   ESP_LOGI(TAG, "Remote command: set Wifi channel switch interval to %.1f seconds",
            cfg.wifichancycle / float(100));
@@ -114,31 +125,30 @@ void set_blescantime(uint8_t val[]) {
   cfg.blescantime = val[0];
   ESP_LOGI(TAG, "Remote command: set BLE scan time to %.1f seconds",
            cfg.blescantime / float(100));
-  // stop & restart BLE scan task to apply new parameter
   if (cfg.blescan) {
   }
 }
 
 void set_countmode(uint8_t val[]) {
   switch (val[0]) {
-  case 0: // cyclic unconfirmed
+  case 0:
     cfg.countermode = 0;
     ESP_LOGI(TAG, "Remote command: set counter mode to cyclic unconfirmed");
     break;
-  case 1: // cumulative
+  case 1:
     cfg.countermode = 1;
     ESP_LOGI(TAG, "Remote command: set counter mode to cumulative");
     break;
-  case 2: // cyclic confirmed
+  case 2:
     cfg.countermode = 2;
     ESP_LOGI(TAG, "Remote command: set counter mode to cyclic confirmed");
     break;
-  default: // invalid parameter
+  default:
     ESP_LOGW(TAG, "Remote command: set counter mode called with invalid parameter(s)");
     return;
   }
-  reset_counters(); // clear macs
-  get_salt();       // get new salt
+  reset_counters();
+  get_salt();
 }
 
 void set_screensaver(uint8_t val[]) {
@@ -154,27 +164,27 @@ void set_display(uint8_t val[]) {
 void set_gps(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set GPS mode to %s", val[0] ? "on" : "off");
   if (val[0]) {
-    cfg.payloadmask = (uint8_t)GPS_DATA; // set bit in mask
+    cfg.payloadmask = (uint8_t)GPS_DATA;
   } else {
-    cfg.payloadmask &= (uint8_t)~GPS_DATA; // clear bit in mask
+    cfg.payloadmask &= (uint8_t)~GPS_DATA;
   }
 }
 
 void set_bme(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set BME mode to %s", val[0] ? "on" : "off");
   if (val[0]) {
-    cfg.payloadmask = (uint8_t)MEMS_DATA; // set bit in mask
+    cfg.payloadmask = (uint8_t)MEMS_DATA;
   } else {
-    cfg.payloadmask &= (uint8_t)~MEMS_DATA; // clear bit in mask
+    cfg.payloadmask &= (uint8_t)~MEMS_DATA;
   }
 }
 
 void set_batt(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set battery mode to %s", val[0] ? "on" : "off");
   if (val[0]) {
-    cfg.payloadmask = (uint8_t)BATT_DATA; // set bit in mask
+    cfg.payloadmask = (uint8_t)BATT_DATA;
   } else {
-    cfg.payloadmask &= (uint8_t)~BATT_DATA; // clear bit in mask
+    cfg.payloadmask &= (uint8_t)~BATT_DATA;
   }
 }
 
@@ -185,29 +195,29 @@ void set_payloadmask(uint8_t val[]) {
 
 void set_sensor(uint8_t val[]) {
 #if (HAS_SENSORS)
-  switch (val[0]) { // check if valid sensor number 1...4
+  switch (val[0]) {
   case 1:
   case 2:
   case 3:
-    break; // valid sensor number -> continue
+    break;
   default:
     ESP_LOGW(TAG, "Remote command set sensor mode called with invalid sensor number");
-    return; // invalid sensor number -> exit
+    return;
   }
   ESP_LOGI(TAG, "Remote command: set sensor #%d mode to %s", val[0], val[1] ? "on" : "off");
   if (val[1])
-    cfg.payloadmask = sensor_mask(val[0]); // set bit
+    cfg.payloadmask = sensor_mask(val[0]);
   else
-    cfg.payloadmask &= ~sensor_mask(val[0]); // clear bit
+    cfg.payloadmask &= ~sensor_mask(val[0]);
 #endif
 }
 
 void set_beacon(uint8_t val[]) {
-  uint8_t id = val[0];     // use first parameter as beacon storage id
-  memmove(val, val + 1, 6); // strip off storage id
-  beacons[id] = macConvert(val); // store beacon MAC in array
+  uint8_t id = val[0];
+  memmove(val, val + 1, 6);
+  beacons[id] = macConvert(val);
   ESP_LOGI(TAG, "Remote command: set beacon ID#%d", id);
-  printKey("MAC", val, 6, false); // show beacon MAC
+  printKey("MAC", val, 6, false);
 }
 
 void set_monitor(uint8_t val[]) {
@@ -229,7 +239,7 @@ void set_loradr(uint8_t val[]) {
     ESP_LOGI(TAG, "Remote command: set LoRa Datarate called with illegal datarate %d", val[0]);
 #else
   ESP_LOGW(TAG, "Remote command: LoRa not implemented");
-#endif // HAS_LORA
+#endif
 }
 
 void set_loraadr(uint8_t val[]) {
@@ -239,7 +249,7 @@ void set_loraadr(uint8_t val[]) {
   LMIC_setAdrMode(cfg.adrmode);
 #else
   ESP_LOGW(TAG, "Remote command: LoRa not implemented");
-#endif // HAS_LORA
+#endif
 }
 
 void set_blescan(uint8_t val[]) {
@@ -247,7 +257,7 @@ void set_blescan(uint8_t val[]) {
   cfg.blescan = val[0] ? 1 : 0;
   if (cfg.blescan) {
   } else {
-    macs_ble = 0; // clear BLE counter
+    macs_ble = 0;
   }
 }
 
@@ -280,14 +290,12 @@ void set_vendorfilter(uint8_t val[]) {
 }
 
 void set_rgblum(uint8_t val[]) {
-  // Avoid wrong parameters
   cfg.rgblum = (val[0] >= 0 && val[0] <= 100) ? (uint8_t)val[0] : RGBLUMINOSITY;
   ESP_LOGI(TAG, "Remote command: set RGB Led luminosity %d", cfg.rgblum);
 };
 
 void set_lorapower(uint8_t val[]) {
 #if (HAS_LORA)
-  // set data rate and transmit power only if we have no ADR
   if (!cfg.adrmode) {
     cfg.txpower = val[0];
     ESP_LOGI(TAG, "Remote command: set LoRa TXPOWER to %d", cfg.txpower);
@@ -296,14 +304,14 @@ void set_lorapower(uint8_t val[]) {
     ESP_LOGI(TAG, "Remote command: set LoRa TXPOWER, not executed because ADR is on");
 #else
   ESP_LOGW(TAG, "Remote command: LoRa not implemented");
-#endif // HAS_LORA
+#endif
 };
 
 void get_config(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: get device configuration");
   payload.reset();
   payload.addConfig(cfg);
-  SendPayload(CONFIGPORT, prio_high);
+  send_response_direct(CONFIGPORT, prio_high);
 };
 
 void get_status(uint8_t val[]) {
@@ -371,7 +379,7 @@ void get_status(uint8_t val[]) {
                     reset_reason, flags1, flags2,
                     lora_rssi, lora_snr,
                     nb_rssi, nb_failures, flags3);
-  SendPayload(STATUSPORT, prio_high);
+  send_response_direct(STATUSPORT, prio_high);
 };
 
 void get_gps(uint8_t val[]) {
@@ -381,7 +389,7 @@ void get_gps(uint8_t val[]) {
   gps_storelocation(&gps_status);
   payload.reset();
   payload.addGPS(gps_status);
-  SendPayload(GPSPORT, prio_high);
+  send_response_direct(GPSPORT, prio_high);
 #else
   ESP_LOGW(TAG, "GPS function not supported");
 #endif
@@ -392,7 +400,7 @@ void get_bme(uint8_t val[]) {
 #if (HAS_BME)
   payload.reset();
   payload.addBME(bme_status);
-  SendPayload(BMEPORT, prio_high);
+  SendPayload(BMEPORT, prio_high);  // BME no es comando remoto crítico, flujo normal
 #else
   ESP_LOGW(TAG, "BME sensor not supported");
 #endif
@@ -403,7 +411,7 @@ void get_batt(uint8_t val[]) {
 #if (defined BAT_MEASURE_ADC || defined HAS_PMU)
   payload.reset();
   payload.addVoltage(read_voltage());
-  SendPayload(BATTPORT, prio_normal);
+  send_response_direct(BATTPORT, prio_normal);
 #else
   ESP_LOGW(TAG, "Battery voltage not supported");
 #endif
@@ -414,7 +422,7 @@ void get_time(uint8_t val[]) {
   payload.reset();
   payload.addTime(now());
   payload.addByte(timeStatus() << 4 | timeSource);
-  SendPayload(TIMEPORT, prio_high);
+  send_response_direct(TIMEPORT, prio_high);
 };
 
 void set_time(uint8_t val[]) {
@@ -432,8 +440,6 @@ void set_rtc_timestamp(uint8_t val[]) {
 
 void set_flush(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: flush");
-  // does nothing
-  // used to open receive window on LoRaWAN class a nodes
 };
 
 void set_nb_server(uint8_t val[]) {
@@ -442,12 +448,8 @@ void set_nb_server(uint8_t val[]) {
   sdLoadNbConfig(&conf);
   for (int i = 0; i < 45; i++) {
     conf.ServerAddress[i] = val[i];
-    if (val[i] == 0) {
-      break;
-    }
-    if (i == 44) {
-      val[45] = 0;
-    }
+    if (val[i] == 0) break;
+    if (i == 44) val[45] = 0;
   }
   ESP_LOGI(TAG, "Setting NB server to: %s", conf.ServerAddress);
   sdSaveNbConfig(&conf);
@@ -459,12 +461,8 @@ void set_nb_username(uint8_t val[]) {
   sdLoadNbConfig(&conf);
   for (int i = 0; i < 45; i++) {
     conf.ServerUsername[i] = val[i];
-    if (val[i] == 0) {
-      break;
-    }
-    if (i == 44) {
-      val[45] = 0;
-    }
+    if (val[i] == 0) break;
+    if (i == 44) val[45] = 0;
   }
   ESP_LOGI(TAG, "Setting NB username to: %s", conf.ServerUsername);
   sdSaveNbConfig(&conf);
@@ -476,12 +474,8 @@ void set_nb_password(uint8_t val[]) {
   sdLoadNbConfig(&conf);
   for (int i = 0; i < 45; i++) {
     conf.ServerPassword[i] = val[i];
-    if (val[i] == 0) {
-      break;
-    }
-    if (i == 44) {
-      val[45] = 0;
-    }
+    if (val[i] == 0) break;
+    if (i == 44) val[45] = 0;
   }
   ESP_LOGI(TAG, "Setting NB pass to: %s", conf.ServerPassword);
   sdSaveNbConfig(&conf);
@@ -493,12 +487,8 @@ void set_nb_gateway_id(uint8_t val[]) {
   sdLoadNbConfig(&conf);
   for (int i = 0; i < 45; i++) {
     conf.GatewayId[i] = val[i];
-    if (val[i] == 0) {
-      break;
-    }
-    if (i == 44) {
-      val[45] = 0;
-    }
+    if (val[i] == 0) break;
+    if (i == 44) val[45] = 0;
   }
   ESP_LOGI(TAG, "Setting NB gateway ID to: %s", conf.GatewayId);
   sdSaveNbConfig(&conf);
@@ -510,12 +500,8 @@ void set_nb_app_id(uint8_t val[]) {
   sdLoadNbConfig(&conf);
   for (int i = 0; i < 5; i++) {
     conf.ApplicationId[i] = val[i];
-    if (val[i] == 0) {
-      break;
-    }
-    if (i == 4) {
-      val[5] = 0;
-    }
+    if (val[i] == 0) break;
+    if (i == 4) val[5] = 0;
   }
   ESP_LOGI(TAG, "Setting NB app id to: %s", conf.ApplicationId);
   sdSaveNbConfig(&conf);
@@ -527,12 +513,8 @@ void set_nb_app_name(uint8_t val[]) {
   sdLoadNbConfig(&conf);
   for (int i = 0; i < 31; i++) {
     conf.ApplicationName[i] = val[i];
-    if (val[i] == 0) {
-      break;
-    }
-    if (i == 30) {
-      val[31] = 0;
-    }
+    if (val[i] == 0) break;
+    if (i == 30) val[31] = 0;
   }
   ESP_LOGI(TAG, "Setting NB app name to: %s", conf.ApplicationId);
   sdSaveNbConfig(&conf);
@@ -554,34 +536,27 @@ void set_reset_time(uint8_t val[]) {
 };
 
 #if (HAS_NBIOT)
-// Task que lee IMEI del BC95 y responde por LoRa (no bloquea el parser/callback)
 static void imeiTask(void *param) {
   (void)param;
 
-  String imei = bc95_getImei(); // AT+CGSN=1 -> +CGSN:<imei> [2](https://github.com/chirpstack/chirpstack-rest-api/issues/8)
+  String imei = bc95_getImei();
 
   payload.reset();
-  payload.addByte(0x8A); // marcador de respuesta
+  payload.addByte(0x8A);
 
   if (imei.length() == 15) {
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < 15; i++)
       payload.addByte((uint8_t)imei[i]);
-    }
   } else {
-    payload.addByte(0x00); // error
+    payload.addByte(0x00);
   }
 
-  // Responder por el mismo puerto de comandos (FPort 2 / RCMDPORT)
-  SendPayload(RCMDPORT, prio_high);
+  send_response_direct(RCMDPORT, prio_high);
 
   imeiTaskHandle = NULL;
   vTaskDelete(NULL);
 }
 
-
-// =========================================================
-// MSISDN over LoRa (BC95) — OPCODE 0x8B
-// =========================================================
 static void msisdnTask(void *param) {
     (void)param;
 
@@ -597,7 +572,7 @@ static void msisdnTask(void *param) {
         payload.addByte(0x00);
     }
 
-    SendPayload(RCMDPORT, prio_high);
+    send_response_direct(RCMDPORT, prio_high);
 
     msisdnTaskHandle = NULL;
     vTaskDelete(NULL);
@@ -612,8 +587,6 @@ static void get_msisdn(uint8_t val[]) {
     xTaskCreatePinnedToCore(msisdnTask, "msisdnTask", 4096, NULL, 1, &msisdnTaskHandle, 1);
 }
 
-
-// Función asignada al opcode 0x8A
 static void get_imei(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: get IMEI (BC95)");
 
@@ -626,9 +599,6 @@ static void get_imei(uint8_t val[]) {
 }
 #endif
 
-// assign previously defined functions to set of numeric remote commands
-// format: opcode, function, #bytes params,
-// flag (true = do make settings persistent / false = don't)
 static cmd_t table[] = {
     {0x01, set_rssi, 1, true},      {0x02, set_countmode, 1, true},
     {0x03, set_gps, 1, true},       {0x04, set_display, 1, true},
@@ -659,10 +629,7 @@ static cmd_t table[] = {
     {0x89, set_reset_time, 1, true},
 
 #if (HAS_NBIOT)
-    // ✅ Nuevo comando: GET IMEI (BC95) - opcode 0x8A
     {0x8A, get_imei, 0, false},
-    // ✅ Nuevo comando: GET telephone number (BC95) - opcode 0x8B
-
     {0x8B, get_msisdn, 0, false},
 #endif
 
@@ -670,9 +637,8 @@ static cmd_t table[] = {
 };
 
 static const uint8_t cmdtablesize =
-    sizeof(table) / sizeof(table[0]); // number of commands in command table
+    sizeof(table) / sizeof(table[0]);
 
-// check and execute remote command
 void rcommand(const uint8_t cmd[], const uint8_t cmdlength) {
   if (cmdlength == 0)
     return;
@@ -683,28 +649,28 @@ void rcommand(const uint8_t cmd[], const uint8_t cmdlength) {
   while (cursor < cmdlength) {
     int i = cmdtablesize;
     while (i--) {
-      if (cmd[cursor] == table[i].opcode) { // lookup command in opcode table
-        cursor++; // strip 1 byte opcode
+      if (cmd[cursor] == table[i].opcode) {
+        cursor++;
         if ((cursor + table[i].params) <= cmdlength) {
-          memmove(foundcmd, cmd + cursor, table[i].params); // strip opcode from cmd array
+          memmove(foundcmd, cmd + cursor, table[i].params);
           cursor += table[i].params;
-          if (table[i].store) // check if function needs to store configuration
+          if (table[i].store)
             storeflag = true;
-          table[i].func(foundcmd); // execute assigned function with given parameters
+          table[i].func(foundcmd);
         } else
           ESP_LOGI(TAG,
                    "Remote command x%02X called with missing parameter(s), skipped",
                    table[i].opcode);
-        break; // command found -> exit table lookup loop
-      } // end of command validation
-    }   // end of command table lookup loop
+        break;
+      }
+    }
 
-    if (i < 0) { // command not found -> exit parser
+    if (i < 0) {
       ESP_LOGI(TAG, "Unknown remote command x%02X, ignored", cmd[cursor]);
       break;
     }
-  } // command parsing loop
+  }
 
   if (storeflag)
     saveConfig();
-} // rcommand()
+}

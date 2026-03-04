@@ -1,4 +1,3 @@
-
 #include "nbiot.h"
 // Local logging Tag
 static const char TAG[] = "nbiot";
@@ -15,42 +14,29 @@ uint8_t nb_status_failures = 0;
 uint8_t nb_status_rssi = 99;  // 99 = desconocido
 bool nb_module_ok = false;
 
-
 // Indica si NB puede usarse como transporte (no solo si la cola RAM existe)
 bool nbTransportAvailable = true;
+
+// === ADEMUX: puntero global al manager para nb_send_direct() ===
+static NbIotManager *g_manager = nullptr;
 
 
 // =============================================================================
 // VERSIÓN MEJORADA DE nb_enqueuedata() CON GESTIÓN INTELIGENTE DE COLAS
 // =============================================================================
 
-/**
- * @brief Encola un mensaje para envío por NB-IoT con fallback automático a SD
- * 
- * Estrategia:
- * 1. Intenta encolar en RAM (NbSendQueue) según prioridad
- * 2. Si es prioritario y cola llena: expulsa mensaje viejo a SD y encola nuevo
- * 3. Si falla todo: guarda en SD como último recurso
- * 
- * @param message Puntero al mensaje a encolar
- * @return true si el mensaje fue encolado (RAM o SD), false si se perdió
- */
-
 bool nb_enqueuedata(MessageBuffer_t *message) {
-    // Validación de entrada
     if (!message) {
         ESP_LOGE(TAG, "nb_enqueuedata: message is NULL");
         return false;
     }
 
-    // Validación de tamaño del mensaje
     if (message->MessageSize == 0 ||
         message->MessageSize > PAYLOAD_BUFFER_SIZE) {
         ESP_LOGE(TAG, "nb_enqueuedata: invalid MessageSize=%u", message->MessageSize);
         return false;
     }
 
-    // 🔴 Si NB no está disponible como transporte, mandamos directo a SD
     if (!nbTransportAvailable) {
     #ifdef HAS_SDCARD
         if (isSDCardAvailable()) {
@@ -79,21 +65,16 @@ bool nb_enqueuedata(MessageBuffer_t *message) {
     #endif
     }
 
-    // =======================
-    // LÓGICA ORIGINAL NB RAM
-    // =======================
     BaseType_t     ret  = pdFALSE;
     MessageBuffer_t DummyBuffer;
     sendprio_t     prio = message->MessagePrio;
 
-    // Variables para estadísticas
     static uint32_t total_enqueued = 0;
     static uint32_t ram_enqueued   = 0;
     static uint32_t sd_fallback    = 0;
     static uint32_t evictions      = 0;
     static uint32_t failures       = 0;
 
-    // Información de estado actual de la cola
     UBaseType_t spaces_available = uxQueueSpacesAvailable(NbSendQueue);
     UBaseType_t messages_waiting = uxQueueMessagesWaiting(NbSendQueue);
 
@@ -104,20 +85,14 @@ bool nb_enqueuedata(MessageBuffer_t *message) {
              messages_waiting,
              messages_waiting + spaces_available);
 
-    // =================================================================
-    // ESTRATEGIA 1: MENSAJE DE ALTA PRIORIDAD
-    // =================================================================
     if (prio == prio_high) {
-        // Si no hay espacio, forzar hueco expulsando mensaje antiguo
         if (spaces_available == 0) {
             ESP_LOGW(TAG,
                      "NB Queue full (%u msgs), evicting oldest for high-priority",
                      messages_waiting);
 
-            // Extraer el mensaje más antiguo
             if (xQueueReceive(NbSendQueue, &DummyBuffer, (TickType_t)0) == pdTRUE) {
                 evictions++;
-                // Intentar salvarlo en SD
             #ifdef HAS_SDCARD
                 if (isSDCardAvailable()) {
                     if (sdqueueEnqueue(&DummyBuffer)) {
@@ -145,7 +120,6 @@ bool nb_enqueuedata(MessageBuffer_t *message) {
             }
         }
 
-        // Intentar insertar al frente (máxima prioridad)
         ret = xQueueSendToFront(NbSendQueue, (void *)message, (TickType_t)0);
         if (ret == pdTRUE) {
             ram_enqueued++;
@@ -156,11 +130,7 @@ bool nb_enqueuedata(MessageBuffer_t *message) {
             return true;
         }
     }
-    // =================================================================
-    // ESTRATEGIA 2: MENSAJE NORMAL/BAJA PRIORIDAD
-    // =================================================================
     else {
-        // Intentar insertar normalmente al final
         ret = xQueueSendToBack(NbSendQueue, (void *)message, (TickType_t)0);
         if (ret == pdTRUE) {
             ram_enqueued++;
@@ -172,9 +142,6 @@ bool nb_enqueuedata(MessageBuffer_t *message) {
         }
     }
 
-    // =================================================================
-    // FALLBACK: GUARDAR EN SD SI FALLÓ LA COLA RAM
-    // =================================================================
     if (ret != pdTRUE) {
         ESP_LOGW(TAG,
                  "NB RAM queue full, attempting SD fallback (port=%u, prio=%u)",
@@ -189,57 +156,86 @@ bool nb_enqueuedata(MessageBuffer_t *message) {
                          message->MessagePort,
                          message->MessageSize,
                          sd_fallback);
-                // Imprimir estadísticas cada 10 mensajes a SD
                 if (sd_fallback % 10 == 0) {
                     ESP_LOGI(TAG,
                              "📊 NB Stats: Total=%u RAM=%u SD=%u Evictions=%u Failures=%u",
                              total_enqueued, ram_enqueued, sd_fallback, evictions, failures);
                 }
-                return true; // ✓ Mensaje a salvo en SD
+                return true;
             } else {
                 failures++;
                 ESP_LOGE(TAG,
                          "✗ CRITICAL: SD enqueue FAILED - MESSAGE LOST! (port=%u, size=%u)",
                          message->MessagePort, message->MessageSize);
-                return false; // ✗ Dato perdido
+                return false;
             }
         } else {
             failures++;
             ESP_LOGE(TAG,
                      "✗ CRITICAL: SD not available - MESSAGE LOST! (port=%u, size=%u)",
                      message->MessagePort, message->MessageSize);
-            return false; // ✗ Dato perdido (sin SD)
+            return false;
         }
     #else
         failures++;
         ESP_LOGE(TAG,
                  "✗ CRITICAL: NB queue full, no SD support - MESSAGE LOST! (port=%u, size=%u)",
                  message->MessagePort, message->MessageSize);
-        return false; // ✗ Dato perdido (sin soporte SD)
+        return false;
     #endif
     }
 
-    // umm teoricamente No debería llegar aquí, pero por seguridad lo dejo 
     return false;
 }
 
 
+// Forward declaration necesaria porque sendNbMqtt se define más abajo en el archivo
+int sendNbMqtt(MessageBuffer_t *message, ConfigBuffer_t *config, char *devEui);
+
 // =============================================================================
-// FUNCIÓN AUXILIAR: Obtener estadísticas de la cola NB-IoT
+// nb_send_direct: envío inmediato por NB-IoT sin pasar por cola
+// Usado exclusivamente para respuestas a comandos remotos
+// (get_config, get_status, get_batt, get_gps, get_time, get_userSalt, IMEI, MSISDN)
+// Ventajas:
+//   - No compite con la cola de datos
+//   - No toca la SD
+//   - Respuesta llega inmediatamente al operador
+// Retorna 0 si éxito, -1 si el manager no está listo
+// =============================================================================
+int nb_send_direct(MessageBuffer_t *message) {
+    if (!g_manager) {
+        ESP_LOGE(TAG, "nb_send_direct: manager not ready");
+        return -1;
+    }
+    if (!message) {
+        ESP_LOGE(TAG, "nb_send_direct: message is NULL");
+        return -1;
+    }
+    ESP_LOGI(TAG, "nb_send_direct: sending port=%u size=%u directly",
+             message->MessagePort, message->MessageSize);
+    int result = sendNbMqtt(message, &g_manager->nbConfig, g_manager->devEui);
+    if (result == 0) {
+        ESP_LOGI(TAG, "nb_send_direct: ✓ sent ok (port=%u)", message->MessagePort);
+    } else {
+        ESP_LOGE(TAG, "nb_send_direct: ✗ failed (port=%u, result=%d)",
+                 message->MessagePort, result);
+    }
+    return result;
+}
+
+
+// =============================================================================
+// ESTADÍSTICAS
 // =============================================================================
 
-/**
- * @brief Obtiene estadísticas actuales de la cola NB-IoT
- * @param stats Estructura donde se almacenarán las estadísticas
- */
 void nb_get_queue_stats(struct nb_queue_stats_t *stats) {
     if (!stats) return;
-    
+
     stats->messages_waiting = uxQueueMessagesWaiting(NbSendQueue);
     stats->spaces_available = uxQueueSpacesAvailable(NbSendQueue);
     stats->queue_size = stats->messages_waiting + stats->spaces_available;
     stats->usage_percent = (stats->messages_waiting * 100) / stats->queue_size;
-    
+
 #ifdef HAS_SDCARD
     stats->sd_queue_count = isSDCardAvailable() ? sdqueueCount() : 0;
 #else
@@ -247,18 +243,15 @@ void nb_get_queue_stats(struct nb_queue_stats_t *stats) {
 #endif
 }
 
-/**
- * @brief Imprime estadísticas de la cola NB-IoT
- */
 void nb_print_queue_stats() {
     struct nb_queue_stats_t stats;
     nb_get_queue_stats(&stats);
-    
-    ESP_LOGI(TAG, "📊 NB Queue: %u/%u messages (%u%% full)", 
+
+    ESP_LOGI(TAG, "📊 NB Queue: %u/%u messages (%u%% full)",
              stats.messages_waiting,
              stats.queue_size,
              stats.usage_percent);
-    
+
 #ifdef HAS_SDCARD
     if (stats.sd_queue_count > 0) {
         ESP_LOGI(TAG, "📊 SD Queue: %u messages pending", stats.sd_queue_count);
@@ -266,31 +259,15 @@ void nb_print_queue_stats() {
 #endif
 }
 
-/**
- * @brief Verifica si la cola NB-IoT tiene espacio disponible
- * @return true si hay espacio, false si está llena
- */
 bool nb_queue_has_space() {
     return uxQueueSpacesAvailable(NbSendQueue) > 0;
 }
 
-/**
- * @brief Verifica si la cola NB-IoT está críticamente llena (>80%)
- * @return true si está críticamente llena
- */
 bool nb_queue_is_critical() {
     UBaseType_t waiting = uxQueueMessagesWaiting(NbSendQueue);
     UBaseType_t total = waiting + uxQueueSpacesAvailable(NbSendQueue);
     return (waiting * 100 / total) > 80;
 }
-
-// =============================================================================
-// ESTRUCTURA DE DATOS PARA ESTADÍSTICAS (Añadir al header .h)
-// =============================================================================
-
-/*
-
-*/
 
 
 uint32_t getUint32FromBuffer(uint8_t *buffer) {
@@ -332,7 +309,8 @@ bool NbIotManager::nb_checkLastSoftwareVersion() {
 
 void nb_send(void *pvParameters) {
     configASSERT(((uint32_t)pvParameters) == 1); // FreeRTOS check
-    NbIotManager manager = NbIotManager();
+    static NbIotManager manager;
+    g_manager = &manager;  // === ADEMUX: exponer manager para nb_send_direct() ===
     while (1) {
         manager.loop();
         if (uxQueueMessagesWaiting(NbControlQueue) > 0) {
@@ -387,7 +365,12 @@ void NbIotManager::nb_init() {
     nb_module_ok = true;
     this->lastUpdateCheck = millis() - UPDATES_CHECK_INTERVAL;
     this->updateReadyToInstall = false;
-    nbTransportAvailable = true;  // NB vuelve a estar disponible para transportar mensajes
+    nbTransportAvailable = true;
+
+    // Inicializar devEui para nb_send_direct()
+    sprintf(this->devEui, "%02x%02x%02x%02x%02x%02x%02x%02x",
+            DEVEUI[0], DEVEUI[1], DEVEUI[2], DEVEUI[3],
+            DEVEUI[4], DEVEUI[5], DEVEUI[6], DEVEUI[7]);
 }
 
 void getSentiloTimestamp(char *buffer, uint32_t timestamp) {
@@ -472,7 +455,6 @@ void NbIotManager::nb_resetStatus() {
     mqttConnectFailures = 0;
     subscribeFailures = 0;
 
-    // Actualizar estado global para health check
     nb_status_registered = 0;
     nb_status_connected = 0;
     nb_status_failures = 0;
@@ -537,7 +519,6 @@ bool NbIotManager::nb_checkStatus() {
 }
 
 void NbIotManager::loop() {
-// Exportar contador de fallos para health check
 nb_status_failures = (uint8_t)this->consecutiveFailures;
 
 if ( this->consecutiveFailures > MAX_CONSECUTIVE_FAILURES  ||
@@ -550,10 +531,8 @@ if ( this->consecutiveFailures > MAX_CONSECUTIVE_FAILURES  ||
     ESP_LOGE(TAG, "Too many consecutive failures");
     this->nb_resetStatus();
 
-    // Marcar NB como NO disponible para transporte
     nbTransportAvailable = false;
 
-    // Opcional: volcar cola NB en RAM hacia SD para no perder nada
     MessageBuffer_t buf;
     while (uxQueueMessagesWaiting(NbSendQueue) > 0) {
         if (xQueueReceive(NbSendQueue, &buf, 0) == pdTRUE) {
@@ -580,7 +559,6 @@ if ( this->consecutiveFailures > MAX_CONSECUTIVE_FAILURES  ||
         this->lastUpdateCheck + UPDATES_CHECK_INTERVAL < millis();
 #endif
 
-// Siempre mantener la conexión NB-IoT activa (ADEMUX)
     if (!this->registered) {
         this->nb_registerNetwork();
         return;
@@ -623,10 +601,8 @@ if ( this->consecutiveFailures > MAX_CONSECUTIVE_FAILURES  ||
     }
 #endif
 
-// Leer mensajes siempre (comandos remotos)
     this->nb_readMessages();
 
-    // Enviar mensajes si hay algo en la cola
     if (uxQueueMessagesWaiting(NbSendQueue) > 0) {
         this->nb_sendMessages();
     }
@@ -637,7 +613,6 @@ void NbIotManager::nb_sendMessages() {
     MessageBuffer_t SendBuffer;
     if (uxQueueMessagesWaiting(NbSendQueue) > 0) {
         ESP_LOGD(TAG, "NB messages pending, sending");
-        // fetch next or wait for payload to send from queue
         while (uxQueueMessagesWaiting(NbSendQueue) > 0) {
             xQueueReceive(NbSendQueue, &SendBuffer, portMAX_DELAY);
             int result = sendNbMqtt(&SendBuffer, &this->nbConfig, this->devEui);
@@ -645,7 +620,7 @@ void NbIotManager::nb_sendMessages() {
                 mqttSendFailures = 0;
                 continue;
             }
-            
+
 ESP_LOGE(TAG, "Could not send MQTT message");
 this->mqttSendFailures++;
 this->mqttPublishFailures++;
@@ -655,7 +630,7 @@ SendBuffer.MessagePrio = prio_high;
   if (LMIC.devaddr && check_queue_available()) {
     ESP_LOGW(TAG, "NB failed -> moving message to LoRa queue (priority LoRa)");
     lora_enqueuedata(&SendBuffer);
-    this->mqttPublishFailures = 0; // LoRa se encargó, no es fallo MQTT puro
+    this->mqttPublishFailures = 0;
     continue;
   }
 #endif
@@ -666,7 +641,7 @@ if (this->mqttPublishFailures >= MAX_MQTT_PUBLISH_FAILURES) {
     this->mqttPublishFailures = 0;
     this->mqttConnected = false;
     this->subscribed = false;
-    nb_enqueuedata(&SendBuffer); // guardar el mensaje antes de salir
+    nb_enqueuedata(&SendBuffer);
     break;
 }
 
@@ -686,7 +661,6 @@ continue;
     if (this->temporaryEnabled && uxQueueMessagesWaiting(NbSendQueue) == 0) {
         this->temporaryEnabled = false;
         ESP_LOGI(TAG, "NBIOT temporary mode disabled");
-        // No desactivar NB-IoT, solo quitar el modo temporal (ADEMUX)
     }
 }
 

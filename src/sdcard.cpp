@@ -271,11 +271,14 @@ static uint16_t crc16_ccitt(const uint8_t *data, size_t len, uint16_t crc = 0xFF
 }
 
 static bool sdq_lock() {
-  if (!sdqMutex) sdqMutex = xSemaphoreCreateMutex();
-  return sdqMutex && (xSemaphoreTake(sdqMutex, pdMS_TO_TICKS(2000)) == pdTRUE);
+  if (!sdqMutex) sdqMutex = xSemaphoreCreateRecursiveMutex(); // ← CAMBIO 1
+  return sdqMutex &&
+         (xSemaphoreTakeRecursive(sdqMutex,                   // ← CAMBIO 2
+                                  pdMS_TO_TICKS(2000)) == pdTRUE);
 }
+
 static void sdq_unlock() {
-  if (sdqMutex) xSemaphoreGive(sdqMutex);
+  if (sdqMutex) xSemaphoreGiveRecursive(sdqMutex);            // ← CAMBIO 3
 }
 
 static uint16_t header_crc(const PaxQHeader &h) {
@@ -895,7 +898,7 @@ extern bool nb_enqueuedata(MessageBuffer_t *message);
 
 static void sdqueueFlusher(void *param) {
   (void)param;
-  const int MAX_PER_CYCLE = 16; // era 8 
+  const int MAX_PER_CYCLE = 16;
 
   ESP_LOGI("SD_FLUSH", "🔄 SD Queue Flusher task started");
 
@@ -905,55 +908,75 @@ static void sdqueueFlusher(void *param) {
       continue;
     }
 
-// DESPUÉS:
     uint32_t pending = sdqueueCount();
     if (pending == 0) {
       vTaskDelay(pdMS_TO_TICKS(2000));
       continue;
     }
-    
+
     ESP_LOGI("SD_FLUSH", "📤 Starting flush cycle: %u messages pending", pending);
 
     for (int i = 0; i < MAX_PER_CYCLE; i++) {
+
+      // =========================================================
+      // CAMBIO CLAVE: tomar el mutex ANTES del peek y mantenerlo
+      // hasta DESPUÉS del dequeue. Como es recursivo, peek() y
+      // dequeue() internamente pueden volver a tomarlo sin deadlock.
+      // Durante este bloque, enqueue() de otra tarea quedará
+      // bloqueado → imposible truncar el archivo entre medio.
+      // =========================================================
+      if (!sdq_lock()) {
+        ESP_LOGW("SD_FLUSH", "⚠️ Could not acquire SD mutex, skipping cycle");
+        break;
+      }
+
       MessageBuffer_t msg;
+      bool has_msg = sdqueuePeek(&msg);   // internamente llama sdq_lock() recursivo → ok
 
-      if (!sdqueuePeek(&msg)) break;
+      if (!has_msg) {
+        sdq_unlock();
+        break;
+      }
 
+      // Intentar entregar mientras tenemos el lock
+      // NOTA: nb_enqueuedata() y lora_enqueuedata() NO usan sdqMutex,
+      //       así que no hay riesgo de deadlock cruzado.
       bool delivered = false;
 
       #if (HAS_LORA)
-            // Prefer LoRa if joined and queue has space
-            if (LMIC.devaddr && check_queue_available()) {
-              delivered = lora_enqueuedata(&msg);
-            }
+        if (LMIC.devaddr && check_queue_available()) {
+          delivered = lora_enqueuedata(&msg);
+        }
       #endif
 
       #if (HAS_NBIOT)
-            // Use NB only if LoRa not available
-            if (!delivered) {
-              nb_enable(true);
-              delivered = nb_enqueuedata(&msg);
-            }
+        if (!delivered) {
+          nb_enable(true);
+          delivered = nb_enqueuedata(&msg);
+        }
       #endif
 
       if (delivered) {
-            MessageBuffer_t dumped;
-            sdqueueDequeue(&dumped);
-            
-            // AÑADIR ESTE LOG:
-            ESP_LOGI("SD_FLUSH", "✅ Message delivered from SD (port %u, %u bytes, %u remaining)", 
-                    msg.MessagePort, msg.MessageSize, sdqueueCount());
-            
-            vTaskDelay(pdMS_TO_TICKS(20));
-          } else {
-            // AÑADIR ESTE LOG:
-            ESP_LOGW("SD_FLUSH", "⏸️ Cannot deliver - queues full, will retry");
-            break;
-          }
+        MessageBuffer_t dumped;
+        sdqueueDequeue(&dumped);          // internamente llama sdq_lock() recursivo → ok
+        uint32_t remaining = sdqueueCount(); // también usa sdq_lock() recursivo → ok
+        sdq_unlock();                     // liberar el lock externo
+
+        ESP_LOGI("SD_FLUSH",
+                 "✅ Message delivered from SD (port %u, %u bytes, %u remaining)",
+                 msg.MessagePort, msg.MessageSize, remaining);
+
+        vTaskDelay(pdMS_TO_TICKS(20));    // yield breve fuera del lock
+
+      } else {
+        sdq_unlock();                     // liberar antes del break
+        ESP_LOGW("SD_FLUSH", "⏸Cannot deliver - queues full, will retry");
+        break;
+      }
     }
 
-          uint32_t delay = (sdqueueCount() > 10) ? 100 : 300;
-          vTaskDelay(pdMS_TO_TICKS(delay));
+    uint32_t delay = (sdqueueCount() > 10) ? 100 : 300;
+    vTaskDelay(pdMS_TO_TICKS(delay));
   }
 }
 

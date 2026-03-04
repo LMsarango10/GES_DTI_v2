@@ -16,6 +16,23 @@ void sendcycle() {
   xTaskNotifyFromISR(irqHandlerTask, SENDCYCLE_IRQ, eSetBits, NULL);
 }
 
+// =======================================================
+// ADEMUX: Puertos efímeros — respuestas a comandos remotos
+// Estos mensajes NO deben persistir en SD:
+//   - Son respuestas inmediatas a comandos (get_config, get_status, etc.)
+//   - Si no pueden salir en el momento, ya no tienen utilidad
+//   - Guardarlos en SD solo causaría corrupción de la cola sin beneficio
+// Puertos que SÍ persisten: COUNTERPORT(1), BTMACSPORT(5),
+//   BLEMACSPORT(7), WIFIMACSPORT(10), TELEMETRYPORT(14)
+// =======================================================
+static bool isEphemeralPort(uint8_t port) {
+  return (port == RCMDPORT   ||   // 2: respuestas genéricas + get_status
+          port == CONFIGPORT ||   // 3: get_config
+          port == GPSPORT    ||   // 4: get_gps
+          port == BATTPORT   ||   // 8: get_batt
+          port == TIMEPORT);      // 9: get_time
+}
+
 // put data to send in RTos Queues used for transmit over channels Lora and SPI
 void SendPayload(uint8_t port, sendprio_t prio) {
 
@@ -85,9 +102,16 @@ void SendPayload(uint8_t port, sendprio_t prio) {
       if (!nb_enqueuedata(&SendBuffer)) {
 #ifdef HAS_SDCARD
         if (isSDCardAvailable()) {
-          sdqueueEnqueue(&SendBuffer);
-          lastSendChannel = 3;
-          ESP_LOGI(TAG, "Message saved to SD (port %u)", SendBuffer.MessagePort);
+          if (isEphemeralPort(SendBuffer.MessagePort)) {
+            // Respuesta a comando remoto: no guardar en SD
+            // Si no puede salir ahora, ya no tiene utilidad
+            ESP_LOGW(TAG, "Ephemeral port %u - not saving to SD, message discarded",
+                     SendBuffer.MessagePort);
+          } else {
+            sdqueueEnqueue(&SendBuffer);
+            lastSendChannel = 3;
+            ESP_LOGI(TAG, "Message saved to SD (port %u)", SendBuffer.MessagePort);
+          }
         } else {
           ESP_LOGE(TAG, "SD not available - MESSAGE LOST!");
         }
@@ -100,9 +124,15 @@ void SendPayload(uint8_t port, sendprio_t prio) {
       // Estábamos en NB y falló → SD
 #ifdef HAS_SDCARD
       if (isSDCardAvailable()) {
-        sdqueueEnqueue(&SendBuffer);
-        lastSendChannel = 3;
-        ESP_LOGI(TAG, "NB full, message saved to SD (port %u)", SendBuffer.MessagePort);
+        if (isEphemeralPort(SendBuffer.MessagePort)) {
+          // Respuesta a comando remoto: no guardar en SD
+          ESP_LOGW(TAG, "Ephemeral port %u - not saving to SD, message discarded",
+                   SendBuffer.MessagePort);
+        } else {
+          sdqueueEnqueue(&SendBuffer);
+          lastSendChannel = 3;
+          ESP_LOGI(TAG, "NB full, message saved to SD (port %u)", SendBuffer.MessagePort);
+        }
       } else {
         ESP_LOGE(TAG, "SD not available - MESSAGE LOST!");
       }
@@ -111,8 +141,14 @@ void SendPayload(uint8_t port, sendprio_t prio) {
 #else
 #ifdef HAS_SDCARD
     if (isSDCardAvailable()) {
-      sdqueueEnqueue(&SendBuffer);
-      lastSendChannel = 3;
+      if (isEphemeralPort(SendBuffer.MessagePort)) {
+        // Respuesta a comando remoto: no guardar en SD
+        ESP_LOGW(TAG, "Ephemeral port %u - not saving to SD, message discarded",
+                 SendBuffer.MessagePort);
+      } else {
+        sdqueueEnqueue(&SendBuffer);
+        lastSendChannel = 3;
+      }
     } else {
       ESP_LOGE(TAG, "SD not available - MESSAGE LOST!");
     }
@@ -127,7 +163,11 @@ void SendPayload(uint8_t port, sendprio_t prio) {
     lastSendChannel = 2;
   if (!enqueued) {
 #ifdef HAS_SDCARD
-    if (isSDCardAvailable()) sdqueueEnqueue(&SendBuffer);
+    if (isSDCardAvailable() && !isEphemeralPort(SendBuffer.MessagePort))
+      sdqueueEnqueue(&SendBuffer);
+    else if (isSDCardAvailable() && isEphemeralPort(SendBuffer.MessagePort))
+      ESP_LOGW(TAG, "Ephemeral port %u - not saving to SD, message discarded",
+               SendBuffer.MessagePort);
 #endif
   }
 #endif
@@ -412,7 +452,7 @@ void sendData() {
       uint16_t min_heap_div16 = (uint16_t)(ESP.getMinFreeHeap() / 16);
       uint8_t reset_reason = (uint8_t)esp_reset_reason();
 
-uint8_t flags1 = 0;
+      uint8_t flags1 = 0;
 
       // Bit 7: WiFi radio — ¿inicializó y está escaneando?
       flags1 |= (wifi_radio_ok ? 1 : 0) << 7;

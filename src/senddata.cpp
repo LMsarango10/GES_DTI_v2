@@ -374,7 +374,7 @@ void sendData() {
         nbMessage.MessagePort = TELEMETRYPORT;
         nbMessage.MessagePrio = prio_normal;
         memcpy(nbMessage.Message, payload.getBuffer(), payload.getSize());
-        nb_enqueuedata(&nbMessage);
+        nb_send_direct(&nbMessage);
       }
 #endif
 
@@ -451,7 +451,7 @@ void sendData() {
       nbMessage.MessagePort = TELEMETRYPORT;
       nbMessage.MessagePrio = prio_normal;
       memcpy(nbMessage.Message, payload.getBuffer(), payload.getSize());
-      nb_enqueuedata(&nbMessage);
+      nb_send_direct(&nbMessage);
 
       ESP_LOGI(TAG, "NB health check [Up:%u T:%u Heap:%u/%u Rst:%u F1:0x%02X F2:0x%02X RSSI:%u SNR:%d NbR:%u NbF:%u F3:0x%02X]",
                uptime, cputemp, free_heap_div16 * 16, min_heap_div16 * 16,

@@ -415,9 +415,19 @@ bool sdqueueInit() {
   f.close();
 
   if (!ok) {
-    ESP_LOGW(TAG, "paxqueue.q corrupted -> rebuilding");
-    mySD.remove(PAXQUEUE_FILE);
-    return sdqueueInit();
+      ESP_LOGW(TAG, "paxqueue.q corrupted -> rebuilding");
+      mySD.remove(PAXQUEUE_FILE);
+      
+      // Crear archivo limpio directamente aquí, sin recursión
+      FileMySD f = mySD.open(PAXQUEUE_FILE, FILE_WRITE);
+      if (!f) return false;
+      PaxQHeader h{};
+      h.head  = sizeof(PaxQHeader);
+      h.tail  = sizeof(PaxQHeader);
+      h.count = 0;
+      bool created = writeHeader(f, h);
+      f.close();
+      return created;
   }
   return true;
 }
@@ -520,14 +530,12 @@ bool sdqueueEnqueue(MessageBuffer_t *message) {
     if (f) f.close();
 
     if (!ok) {
-        // Si hay corrupción, reconstruimos la cola
         ESP_LOGW(TAG, "paxqueue.q corrupta en enqueue -> rebuilding");
         mySD.remove(PAXQUEUE_FILE);
-        if (!sdqueueInit()) {
+        if (!sdqueueInit()) {       // ← puede entrar en recursión
             sdq_unlock();
             return false;
         }
-        // Reabrimos ya inicializada
         f = mySD.open(PAXQUEUE_FILE, FILE_READ);
         if (!f || !readHeader(f, h)) {
             if (f) f.close();

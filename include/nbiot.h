@@ -41,10 +41,8 @@
 
 
 class NbIotManager {
-    ConfigBuffer_t nbConfig;
     bool enabled;
     bool temporaryEnabled;
-    char devEui[17];
     bool initialized;
     bool registered;
     bool connected;
@@ -63,12 +61,16 @@ class NbIotManager {
     long nbLastStatusCheck;
 
     int mqttPublishFailures;
-    
+
     char updatesServerResponse[1600];
     long lastUpdateCheck;
     bool updateReadyToInstall;
 
     public:
+        // === ADEMUX: públicos para nb_send_direct() ===
+        ConfigBuffer_t nbConfig;
+        char devEui[17];
+
         void loop();
         void set_enabled(int control);
     private:
@@ -105,6 +107,11 @@ void nb_enable(bool temporary);
 void nb_disable(void);
 bool nb_isEnabled(void);
 esp_err_t nb_iot_init();
+
+// === ADEMUX: envío directo por NB-IoT sin pasar por cola ===
+// Usado para respuestas a comandos remotos (get_config, get_status, etc.)
+// No toca la SD, no compite con la cola de datos
+int nb_send_direct(MessageBuffer_t *message);
 
 #define NB_QUEUE_SIZE SEND_QUEUE_SIZE
 

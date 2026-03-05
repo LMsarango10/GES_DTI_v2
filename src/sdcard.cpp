@@ -448,8 +448,9 @@ bool sdqueueInit() {
         delay(100);
         useSDCard = mySD.begin(SDCARD_CS, SDCARD_MOSI, SDCARD_MISO, SDCARD_SCLK);
         if (!useSDCard) {
-          ESP_LOGE(TAG, "DIAG init: SD reinit FAILED");
-          return false;
+          ESP_LOGE(TAG, "DIAG init: SD reinit FAILED -> rebooting");
+          delay(200);
+          esp_restart();
         }
         ESP_LOGI(TAG, "DIAG init: SD reinit OK, retrying...");
         sdq_resume_csv();
@@ -537,6 +538,7 @@ bool sdqueueDequeue(MessageBuffer_t *msg) {
   sdq_pause_csv();
 
   FileMySD f = mySD.open(PAXQUEUE_FILE, FILE_READ);
+  ESP_LOGI(TAG, "DIAG peek: open=%d exists=%d filesize=%u", (bool)f, mySD.exists(PAXQUEUE_FILE), f ? f.size() : 0);
   if (!f) { sdq_resume_csv(); sdq_unlock(); return false; }
 
   PaxQHeader h;
@@ -691,15 +693,26 @@ bool sdqueuePeek(MessageBuffer_t *msg) {
   sdq_pause_csv();
 
   FileMySD f = mySD.open(PAXQUEUE_FILE, FILE_READ);
+  ESP_LOGI(TAG, "DIAG peek: open=%d exists=%d", (bool)f, mySD.exists(PAXQUEUE_FILE));
   if (!f) { sdq_resume_csv(); sdq_unlock(); return false; }
 
   PaxQHeader h;
   bool ok = readHeader(f, h);
+  ESP_LOGI(TAG, "DIAG peek: readHeader=%d count=%u head=%u tail=%u", ok, h.count, h.head, h.tail);
+
   if (!ok || h.count == 0) { f.close(); sdq_resume_csv(); sdq_unlock(); return false; }
 
   uint32_t nextOffset = 0;
   ok = sdq_read_record_at(f, h.head, msg, nextOffset);
-
+  if (!ok) {
+      ESP_LOGE(TAG, "DIAG peek: record corrupted, purging queue");
+      f.close();
+      mySD.remove(PAXQUEUE_FILE);
+      sdqueueInit();
+      sdq_resume_csv();
+      sdq_unlock();
+      return false;
+  }
   f.close();
   sdq_resume_csv();
   sdq_unlock();
@@ -1016,6 +1029,7 @@ static void sdqueueFlusher(void *param) {
 
       MessageBuffer_t msg;
       bool has_msg = sdqueuePeek(&msg);
+      ESP_LOGI("SD_FLUSH", "DIAG peek result: %d", has_msg);
 
       if (!has_msg) {
         sdq_unlock();

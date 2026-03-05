@@ -109,8 +109,6 @@ bool nb_isEnabled(void);
 esp_err_t nb_iot_init();
 
 // === ADEMUX: envío directo por NB-IoT sin pasar por cola ===
-// Usado para respuestas a comandos remotos (get_config, get_status, etc.)
-// No toca la SD, no compite con la cola de datos
 int nb_send_direct(MessageBuffer_t *message);
 
 #define NB_QUEUE_SIZE SEND_QUEUE_SIZE
@@ -118,8 +116,7 @@ int nb_send_direct(MessageBuffer_t *message);
 extern uint8_t nb_status_registered;
 extern uint8_t nb_status_connected;
 extern uint8_t nb_status_failures;
-extern uint8_t nb_status_rssi;
+// nb_status_rssi eliminado — sustituido por nb_status_rsrp en BC95.hpp
 extern bool nb_module_ok;
-
 
 #endif

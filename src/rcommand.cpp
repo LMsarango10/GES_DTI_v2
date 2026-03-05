@@ -353,10 +353,23 @@ void get_status(uint8_t val[]) {
   lora_snr = (int8_t)LMIC.snr;
 #endif
 
-  uint8_t nb_rssi = 99;
-  uint8_t nb_failures = 0;
+  // === ADEMUX: encoding NUESTATS (mismo que senddata.cpp) ===
+  uint8_t nb_rsrp_encoded = 0xFF;
+  uint8_t nb_snr_encoded  = 0xFF;
+  uint8_t nb_ecl_val      = 0xFF;
+  uint8_t nb_failures     = 0;
 #if (HAS_NBIOT)
-  nb_rssi = nb_status_rssi;
+  if (nb_status_rsrp != 127) {
+    int rsrp_abs = -((int)nb_status_rsrp);
+    if (rsrp_abs >= 44 && rsrp_abs <= 156)
+      nb_rsrp_encoded = (uint8_t)(rsrp_abs - 44);
+  }
+  if (nb_status_snr_radio != 127) {
+    int snr_shifted = (int)nb_status_snr_radio + 20;
+    if (snr_shifted >= 0 && snr_shifted <= 50)
+      nb_snr_encoded = (uint8_t)snr_shifted;
+  }
+  nb_ecl_val  = nb_status_ecl;
   nb_failures = nb_status_failures;
 #endif
 
@@ -378,7 +391,8 @@ void get_status(uint8_t val[]) {
   payload.addStatus(up, cputemp, free_heap_div16, min_heap_div16,
                     reset_reason, flags1, flags2,
                     lora_rssi, lora_snr,
-                    nb_rssi, nb_failures, flags3);
+                    nb_rsrp_encoded, nb_failures, flags3,
+                    nb_snr_encoded, nb_ecl_val);
   send_response_direct(STATUSPORT, prio_high);
 };
 
@@ -400,7 +414,7 @@ void get_bme(uint8_t val[]) {
 #if (HAS_BME)
   payload.reset();
   payload.addBME(bme_status);
-  SendPayload(BMEPORT, prio_high);  // BME no es comando remoto crítico, flujo normal
+  SendPayload(BMEPORT, prio_high);
 #else
   ESP_LOGW(TAG, "BME sensor not supported");
 #endif

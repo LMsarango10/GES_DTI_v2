@@ -44,4 +44,10 @@ int getData(char *ip, int port, char *page, char *responseBuffer, int responseBu
 String bc95_getImei();
 String bc95_getMsisdn();
 
+// === ADEMUX: métricas de señal NB-IoT via AT+NUESTATS="CELL" ===
+bool bc95_getNuestats();
+extern int8_t  nb_status_rsrp;       // dBm, -44 a -156, 127=no disponible
+extern int8_t  nb_status_snr_radio;  // dB,  -20 a +30,  127=no disponible
+extern uint8_t nb_status_ecl;        // 0/1/2,            0xFF=no disponible
+
 #endif

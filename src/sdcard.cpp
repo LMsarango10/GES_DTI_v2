@@ -38,6 +38,12 @@ FileMySD fileSDCard; // global active log file handle
 static int currentFileIndex = 0;
 int fileIndex = 0;
 
+// CSV log filename (for pause/resume during queue operations)
+static char sdLogFilename[16] = {0};
+
+// Flag: queue operation in progress, CSV writers must not touch SD
+static volatile bool sdqBusy = false;
+
 // ----------------------- Helpers forward -----------------------
 static void createFile(void);
 static void checkAndRotateLogFile(void);
@@ -141,8 +147,7 @@ static bool nb_encrypt_and_write(const char* path, const uint8_t* plain, size_t 
   uint8_t tag[NB_TAG_LEN];
   sha256(iv_cipher.get(), NB_IV_LEN + encLen, tag);
 
-  // CORREGIDO: Casting explícito a (char*) para mySD.open
-  FileMySD f = mySD.open((char*)path, FILE_WRITE); 
+  FileMySD f = mySD.open((char*)path, FILE_WRITE);
   if (!f) return false;
 
   uint32_t magic = NB_MAGIC, clen = (uint32_t)encLen;
@@ -227,24 +232,23 @@ static bool nb_read_and_decrypt(const char* path, std::string& outJson) {
 //             SD PERSISTENT FIFO QUEUE: paxqueue.q
 // =======================================================
 
-// IMPORTANT: define as char[] to satisfy mySD APIs requiring char*
-static char PAXQUEUE_FILE[] = "/paxqueue.q"; // Changed to absolute path just in case
+static char PAXQUEUE_FILE[] = "/paxqueue.q";
 static char PAXQUEUE_TMP[]  = "/paxqueue.tmp";
 
 static SemaphoreHandle_t sdqMutex = NULL;
 
-static const uint32_t PAXQ_MAGIC = 0x31515850; // 'P''X''Q''1' little-endian
+static const uint32_t PAXQ_MAGIC = 0x31515850;
 static const uint8_t  PAXQ_VER   = 1;
 
 #pragma pack(push, 1)
 struct PaxQHeader {
-  uint32_t magic;     // PAXQ_MAGIC
-  uint8_t  version;   // PAXQ_VER
+  uint32_t magic;
+  uint8_t  version;
   uint8_t  reserved[3];
-  uint32_t head;      // offset of first record
-  uint32_t tail;      // offset to append
-  uint32_t count;     // number of records
-  uint16_t hdrCrc;    // CRC16 of header except hdrCrc/pad
+  uint32_t head;
+  uint32_t tail;
+  uint32_t count;
+  uint16_t hdrCrc;
   uint16_t pad;
 };
 #pragma pack(pop)
@@ -255,7 +259,7 @@ struct PaxQRecHdr {
   uint8_t  port;
   uint8_t  prio;
   uint32_t ts;
-  uint16_t crc;  // CRC16 over (len,port,prio,ts,payload)
+  uint16_t crc;
 };
 #pragma pack(pop)
 
@@ -271,14 +275,32 @@ static uint16_t crc16_ccitt(const uint8_t *data, size_t len, uint16_t crc = 0xFF
 }
 
 static bool sdq_lock() {
-  if (!sdqMutex) sdqMutex = xSemaphoreCreateRecursiveMutex(); // ← CAMBIO 1
+  if (!sdqMutex) sdqMutex = xSemaphoreCreateRecursiveMutex();
   return sdqMutex &&
-         (xSemaphoreTakeRecursive(sdqMutex,                   // ← CAMBIO 2
-                                  pdMS_TO_TICKS(2000)) == pdTRUE);
+         (xSemaphoreTakeRecursive(sdqMutex, pdMS_TO_TICKS(2000)) == pdTRUE);
 }
 
 static void sdq_unlock() {
-  if (sdqMutex) xSemaphoreGiveRecursive(sdqMutex);            // ← CAMBIO 3
+  if (sdqMutex) xSemaphoreGiveRecursive(sdqMutex);
+}
+
+// --- CSV pause/resume for SPI bus sharing ---
+static void sdq_pause_csv() {
+  sdqBusy = true;
+  if (fileSDCard) {
+    fileSDCard.flush();
+    fileSDCard.close();
+  }
+}
+
+static void sdq_resume_csv() {
+  if (sdLogFilename[0]) {
+    fileSDCard = mySD.open(sdLogFilename, FILE_WRITE);
+    if (fileSDCard) {
+      fileSDCard.seek(fileSDCard.size());
+    }
+  }
+  sdqBusy = false;
 }
 
 static uint16_t header_crc(const PaxQHeader &h) {
@@ -287,9 +309,30 @@ static uint16_t header_crc(const PaxQHeader &h) {
 
 static bool readHeader(FileMySD &f, PaxQHeader &h) {
   f.seek(0);
-  if (f.read((uint8_t*)&h, sizeof(h)) != (int)sizeof(h)) return false;
-  if (h.magic != PAXQ_MAGIC || h.version != PAXQ_VER) return false;
-  return (header_crc(h) == h.hdrCrc);
+  int bytesRead = f.read((uint8_t*)&h, sizeof(h));
+  if (bytesRead != (int)sizeof(h)) {
+    ESP_LOGE(TAG, "readHeader: read %d bytes, expected %d, filesize=%u",
+             bytesRead, (int)sizeof(h), f.size());
+    return false;
+  }
+  if (h.magic != PAXQ_MAGIC) {
+    ESP_LOGE(TAG, "readHeader: bad magic 0x%08X (expected 0x%08X)",
+             h.magic, PAXQ_MAGIC);
+    return false;
+  }
+  if (h.version != PAXQ_VER) {
+    ESP_LOGE(TAG, "readHeader: bad version %d (expected %d)",
+             h.version, PAXQ_VER);
+    return false;
+  }
+  uint16_t calc = header_crc(h);
+  if (calc != h.hdrCrc) {
+    ESP_LOGE(TAG, "readHeader: CRC fail calc=0x%04X stored=0x%04X "
+             "head=%u tail=%u count=%u filesize=%u",
+             calc, h.hdrCrc, h.head, h.tail, h.count, f.size());
+    return false;
+  }
+  return true;
 }
 
 static bool writeHeader(FileMySD &f, PaxQHeader &h) {
@@ -302,12 +345,10 @@ static bool writeHeader(FileMySD &f, PaxQHeader &h) {
   return true;
 }
 
-// Manual "rename": copy tmp -> dst, remove tmp
 static bool copyFileAndRemove(char* srcPath, char* dstPath) {
   FileMySD src = mySD.open(srcPath, FILE_READ);
   if (!src) return false;
 
-  // Remove destination if exists
   if (mySD.exists(dstPath)) mySD.remove(dstPath);
 
   FileMySD dst = mySD.open(dstPath, FILE_WRITE);
@@ -326,7 +367,6 @@ static bool copyFileAndRemove(char* srcPath, char* dstPath) {
   return true;
 }
 
-// Compact queue: rewrite remaining [head..tail) into new file
 static bool sdq_compact_locked() {
   if (!useSDCard) return false;
   if (!mySD.exists(PAXQUEUE_FILE)) return true;
@@ -362,7 +402,6 @@ static bool sdq_compact_locked() {
 
   if (!writeHeader(out, nh)) { in.close(); out.close(); return false; }
 
-  // Copy payload region
   const size_t BUFSZ = 256;
   uint8_t buf[BUFSZ];
 
@@ -378,32 +417,62 @@ static bool sdq_compact_locked() {
     remaining -= r;
   }
 
-  // Rewrite header with new tail
   writeHeader(out, nh);
 
   in.close();
   out.flush();
   out.close();
 
-  // Replace old with tmp (manual rename)
   mySD.remove(PAXQUEUE_FILE);
   return copyFileAndRemove(PAXQUEUE_TMP, PAXQUEUE_FILE);
 }
 
 bool sdqueueInit() {
   if (!useSDCard) return false;
-  if (!sdqMutex) sdqMutex = xSemaphoreCreateMutex();
+  if (!sdqMutex) sdqMutex = xSemaphoreCreateRecursiveMutex();
   if (!sdqMutex) return false;
 
   if (!mySD.exists(PAXQUEUE_FILE)) {
+    ESP_LOGW(TAG, "DIAG init: file not found, creating...");
     FileMySD f = mySD.open(PAXQUEUE_FILE, FILE_WRITE);
-    if (!f) return false;
+    if (!f) {
+      ESP_LOGE(TAG, "DIAG init: open(FILE_WRITE) FAILED");
+      bool sdAlive = mySD.exists("/");
+      ESP_LOGE(TAG, "DIAG init: mySD.exists('/')=%d", sdAlive);
+
+      if (!sdAlive) {
+        ESP_LOGW(TAG, "DIAG init: SD not responding, reinitializing...");
+        if (fileSDCard) {
+          fileSDCard.close();
+        }
+        delay(100);
+        useSDCard = mySD.begin(SDCARD_CS, SDCARD_MOSI, SDCARD_MISO, SDCARD_SCLK);
+        if (!useSDCard) {
+          ESP_LOGE(TAG, "DIAG init: SD reinit FAILED");
+          return false;
+        }
+        ESP_LOGI(TAG, "DIAG init: SD reinit OK, retrying...");
+        sdq_resume_csv();
+        f = mySD.open(PAXQUEUE_FILE, FILE_WRITE);
+        if (!f) {
+          ESP_LOGE(TAG, "DIAG init: open(FILE_WRITE) FAILED after reinit");
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
     PaxQHeader h{};
     h.head  = sizeof(PaxQHeader);
     h.tail  = sizeof(PaxQHeader);
     h.count = 0;
     bool ok = writeHeader(f, h);
     f.close();
+    if (ok) {
+      ESP_LOGI(TAG, "DIAG init: file created OK");
+    } else {
+      ESP_LOGE(TAG, "DIAG init: writeHeader FAILED");
+    }
     return ok;
   }
 
@@ -415,19 +484,9 @@ bool sdqueueInit() {
   f.close();
 
   if (!ok) {
-      ESP_LOGW(TAG, "paxqueue.q corrupted -> rebuilding");
-      mySD.remove(PAXQUEUE_FILE);
-      
-      // Crear archivo limpio directamente aquí, sin recursión
-      FileMySD f = mySD.open(PAXQUEUE_FILE, FILE_WRITE);
-      if (!f) return false;
-      PaxQHeader h{};
-      h.head  = sizeof(PaxQHeader);
-      h.tail  = sizeof(PaxQHeader);
-      h.count = 0;
-      bool created = writeHeader(f, h);
-      f.close();
-      return created;
+    ESP_LOGW(TAG, "paxqueue.q corrupted -> rebuilding");
+    mySD.remove(PAXQUEUE_FILE);
+    return sdqueueInit();
   }
   return true;
 }
@@ -475,13 +534,15 @@ bool sdqueueDequeue(MessageBuffer_t *msg) {
   if (!useSDCard || !msg) return false;
   if (!sdq_lock()) return false;
 
+  sdq_pause_csv();
+
   FileMySD f = mySD.open(PAXQUEUE_FILE, FILE_READ);
-  if (!f) { sdq_unlock(); return false; }
+  if (!f) { sdq_resume_csv(); sdq_unlock(); return false; }
 
   PaxQHeader h;
-  if (!readHeader(f, h)) { f.close(); sdq_unlock(); return false; }
+  if (!readHeader(f, h)) { f.close(); sdq_resume_csv(); sdq_unlock(); return false; }
 
-  if (h.count == 0) { f.close(); sdq_unlock(); return false; }
+  if (h.count == 0) { f.close(); sdq_resume_csv(); sdq_unlock(); return false; }
 
   uint32_t nextOffset = 0;
   bool ok = sdq_read_record_at(f, h.head, msg, nextOffset);
@@ -490,14 +551,11 @@ bool sdqueueDequeue(MessageBuffer_t *msg) {
   if (ok) {
     h.head = nextOffset;
     h.count--;
-    
-    // Reopen for write header update
-    f = mySD.open(PAXQUEUE_FILE, FILE_WRITE); // r+ simulation
+
+    f = mySD.open(PAXQUEUE_FILE, FILE_WRITE);
     if (f) {
       writeHeader(f, h);
       f.close();
-      
-      // LOG DE SALIDA (Para ver cuando vacía la cola)
       ESP_LOGI("SD_QUEUE", "🚀 Recuperado de SD y enviado. Pendientes: %d", h.count);
     }
 
@@ -506,22 +564,20 @@ bool sdqueueDequeue(MessageBuffer_t *msg) {
     }
   }
 
+  sdq_resume_csv();
   sdq_unlock();
   return ok;
 }
 
-
-// =================================================================================
-// sdqueueEnqueue: escribe un MessageBuffer_t en paxqueue.q usando PaxQHeader/PaxQRecHdr
-// =================================================================================
 bool sdqueueEnqueue(MessageBuffer_t *message) {
 #ifdef HAS_SDCARD
     if (!useSDCard || !message)
         return false;
 
-    // Mutex para acceso concurrente
     if (!sdq_lock())
         return false;
+
+    sdq_pause_csv();
 
     // 1. Leer cabecera actual
     FileMySD f = mySD.open(PAXQUEUE_FILE, FILE_READ);
@@ -530,29 +586,51 @@ bool sdqueueEnqueue(MessageBuffer_t *message) {
     if (f) f.close();
 
     if (!ok) {
+        // --- DIAGNÓSTICO TEMPORAL ---
+        FileMySD dbg = mySD.open(PAXQUEUE_FILE, FILE_READ);
+        if (dbg) {
+            uint32_t fsize = dbg.size();
+            uint8_t raw[24];
+            int n = dbg.read(raw, sizeof(raw));
+            dbg.close();
+            ESP_LOGE(TAG, "DIAG enqueue: filesize=%u, read %d bytes", fsize, n);
+            if (n > 0) {
+                char hex[80];
+                int pos = 0;
+                for (int i = 0; i < n && pos < 72; i++)
+                    pos += snprintf(hex + pos, sizeof(hex) - pos, "%02X ", raw[i]);
+                ESP_LOGE(TAG, "DIAG hex: %s", hex);
+            }
+        } else {
+            ESP_LOGE(TAG, "DIAG enqueue: file does not exist or cannot open");
+        }
+        // --- FIN DIAGNÓSTICO ---
+
         ESP_LOGW(TAG, "paxqueue.q corrupta en enqueue -> rebuilding");
         mySD.remove(PAXQUEUE_FILE);
-        if (!sdqueueInit()) {       // ← puede entrar en recursión
+        if (!sdqueueInit()) {
+            sdq_resume_csv();
             sdq_unlock();
             return false;
         }
         f = mySD.open(PAXQUEUE_FILE, FILE_READ);
         if (!f || !readHeader(f, h)) {
             if (f) f.close();
+            sdq_resume_csv();
             sdq_unlock();
             return false;
         }
         f.close();
     }
 
-    // 2. Abrir para escritura (modo "r+")
+    // 2. Abrir para escritura
     FileMySD wf = mySD.open(PAXQUEUE_FILE, FILE_WRITE);
     if (!wf) {
+        sdq_resume_csv();
         sdq_unlock();
         return false;
     }
 
-    // Ir al final lógico (tail)
     wf.seek(h.tail);
 
     // 3. Construir cabecera de registro
@@ -560,34 +638,36 @@ bool sdqueueEnqueue(MessageBuffer_t *message) {
     rh.len  = message->MessageSize;
     rh.port = message->MessagePort;
     rh.prio = (uint8_t)message->MessagePrio;
-    rh.ts   = (uint32_t)now();  // timestamp actual (si no quieres usarlo, puedes poner 0)
+    rh.ts   = (uint32_t)now();
 
-    // CRC sobre (len,port,prio,ts,payload)
     uint16_t crc = 0xFFFF;
     crc = crc16_ccitt((const uint8_t *)&rh, sizeof(PaxQRecHdr) - sizeof(uint16_t), crc);
     crc = crc16_ccitt(message->Message, rh.len, crc);
     rh.crc = crc;
 
-    // 4. Escribir registro: header + payload
+    // 4. Escribir registro
     bool okWrite = true;
     okWrite &= wf.write((uint8_t *)&rh, sizeof(rh)) == (int)sizeof(rh);
-    okWrite &= wf.write(message->Message, rh.len)      == (int)rh.len;
+    okWrite &= wf.write(message->Message, rh.len) == (int)rh.len;
 
     if (!okWrite) {
         wf.close();
+        sdq_resume_csv();
         sdq_unlock();
         ESP_LOGE("SD_QUEUE", "⚠️ Error escribiendo registro en paxqueue.q");
         return false;
     }
 
-    // 5. Actualizar cabecera en RAM
+    // 5. Actualizar cabecera
     h.tail += sizeof(PaxQRecHdr) + rh.len;
     h.count++;
 
-    // 6. Reescribir cabecera en el fichero
+    // 6. Reescribir cabecera
     okWrite = writeHeader(wf, h);
     wf.flush();
     wf.close();
+
+    sdq_resume_csv();
     sdq_unlock();
 
     if (okWrite) {
@@ -608,23 +688,24 @@ bool sdqueuePeek(MessageBuffer_t *msg) {
   if (!useSDCard) return false;
   if (!sdq_lock()) return false;
 
+  sdq_pause_csv();
+
   FileMySD f = mySD.open(PAXQUEUE_FILE, FILE_READ);
-  if (!f) { sdq_unlock(); return false; }
+  if (!f) { sdq_resume_csv(); sdq_unlock(); return false; }
 
   PaxQHeader h;
   bool ok = readHeader(f, h);
-  if (!ok || h.count == 0) { f.close(); sdq_unlock(); return false; }
+  if (!ok || h.count == 0) { f.close(); sdq_resume_csv(); sdq_unlock(); return false; }
 
   uint32_t nextOffset = 0;
   ok = sdq_read_record_at(f, h.head, msg, nextOffset);
 
   f.close();
+  sdq_resume_csv();
   sdq_unlock();
   return ok;
 }
 
-
-// Optional wrapper for old calls: "write frame to SD"
 void sdcardWriteFrame(MessageBuffer_t *message) {
   if (!useSDCard) return;
   sdqueueEnqueue(message);
@@ -634,7 +715,6 @@ void sdcardWriteFrame(MessageBuffer_t *message) {
 //                 SD BASE FUNCTIONS (LOG)
 // =======================================================
 
-// Mount + open log file paxcount.xx
 bool sdcardInit() {
   ESP_LOGI("SD", "🔍 Checking SD-card status...");
 
@@ -654,7 +734,6 @@ bool sdcardInit() {
     return false;
   }
 
-  // Detect last log index
   for (int i = 0; i < 100; i++) {
     char testname[16];
     sprintf(testname, SDCARD_FILE_NAME, i);
@@ -666,9 +745,9 @@ bool sdcardInit() {
 
   ESP_LOGI("SD", "📂 Current log index set to %d", currentFileIndex);
 
-  // Open or create current log
   char filename[16];
   sprintf(filename, SDCARD_FILE_NAME, currentFileIndex);
+  strncpy(sdLogFilename, filename, sizeof(sdLogFilename) - 1);
 
   if (mySD.exists(filename)) {
     ESP_LOGI("SD", "📂 Existing log file found: %s", filename);
@@ -689,10 +768,7 @@ bool sdcardInit() {
     return false;
   }
 
-  // Init persistent queue (paxqueue.q)
   sdqueueInit();
-
-  // Start flusher
   sdqueueStartFlusher();
 
   ESP_LOGI("SD", "✅ SD-card initialized and ready for logging + persistent queue.");
@@ -701,9 +777,9 @@ bool sdcardInit() {
 
 bool isSDCardAvailable() { return useSDCard; }
 
-// PLAIN log line write
 void sdcardWriteLine(const char *line) {
   if (!useSDCard) return;
+  if (sdqBusy) return;
   if (!fileSDCard) {
     ESP_LOGW("SD", "File closed, recreating...");
     createFile();
@@ -715,19 +791,19 @@ void sdcardWriteLine(const char *line) {
 
 void sdcardWriteData(uint16_t noWifi, uint16_t noBle) {
   if (!useSDCard) return;
+  if (sdqBusy) return;
 
   if (!fileSDCard) createFile();
 
-  // Construcción del string CSV
   String dataLine = String(noWifi) + "," + String(noBle);
-  
+
   #if (defined BAT_MEASURE_ADC || defined HAS_PMU)
     float voltage = read_voltage() / 1000.0;
     dataLine += "," + String(voltage, 2);
   #endif
 
   fileSDCard.println(dataLine);
-  
+
   ESP_LOGI("SD_CSV", "📝 Dato escrito en SD: WiFi=%d BLE=%d", noWifi, noBle);
 
   static int writeCntr = 0;
@@ -774,11 +850,11 @@ static void saveDefaultNbConfig() {
   ConfigBuffer_t conf;
   memset(&conf, 0, sizeof(conf));
 
-  strncpy(conf.ServerAddress,   DEFAULT_URL,      sizeof(conf.ServerAddress) - 1);
-  strncpy(conf.ServerUsername,  DEFAULT_USERNAME, sizeof(conf.ServerUsername) - 1);
-  strncpy(conf.ServerPassword,  DEFAULT_PASS,     sizeof(conf.ServerPassword) - 1);
-  strncpy(conf.ApplicationId,   DEFAULT_APPID,    sizeof(conf.ApplicationId) - 1);
-  strncpy(conf.ApplicationName, DEFAULT_APPNAME,  sizeof(conf.ApplicationName) - 1);
+  strncpy(conf.ServerAddress,   DEFAULT_URL,        sizeof(conf.ServerAddress) - 1);
+  strncpy(conf.ServerUsername,  DEFAULT_USERNAME,   sizeof(conf.ServerUsername) - 1);
+  strncpy(conf.ServerPassword,  DEFAULT_PASS,       sizeof(conf.ServerPassword) - 1);
+  strncpy(conf.ApplicationId,   DEFAULT_APPID,      sizeof(conf.ApplicationId) - 1);
+  strncpy(conf.ApplicationName, DEFAULT_APPNAME,    sizeof(conf.ApplicationName) - 1);
   strncpy(conf.GatewayId,       DEFAULT_GATEWAY_ID, sizeof(conf.GatewayId) - 1);
   conf.port = DEFAULT_PORT;
 
@@ -826,12 +902,12 @@ int sdLoadNbConfig(ConfigBuffer_t *config) {
     return -14;
   }
 
-  const char *serverAddress  = doc["serverAddress"];
-  const char *serverPassword = doc["serverPassword"];
-  const char *serverUsername = doc["serverUsername"];
-  const char *applicationId  = doc["applicationId"];
-  const char *applicationName= doc["applicationName"];
-  const char *gatewayId      = doc["gatewayId"];
+  const char *serverAddress   = doc["serverAddress"];
+  const char *serverPassword  = doc["serverPassword"];
+  const char *serverUsername  = doc["serverUsername"];
+  const char *applicationId   = doc["applicationId"];
+  const char *applicationName = doc["applicationName"];
+  const char *gatewayId       = doc["gatewayId"];
   config->port = doc["port"] | 0;
 
   if (!serverAddress || !serverPassword || !serverUsername ||
@@ -840,12 +916,12 @@ int sdLoadNbConfig(ConfigBuffer_t *config) {
     return -15;
   }
 
-  strncpy(config->ServerAddress,   serverAddress,  sizeof(config->ServerAddress) - 1);
-  strncpy(config->ServerUsername,  serverUsername, sizeof(config->ServerUsername) - 1);
-  strncpy(config->ServerPassword,  serverPassword, sizeof(config->ServerPassword) - 1);
-  strncpy(config->ApplicationId,   applicationId,  sizeof(config->ApplicationId) - 1);
-  strncpy(config->ApplicationName, applicationName,sizeof(config->ApplicationName) - 1);
-  strncpy(config->GatewayId,       gatewayId,      sizeof(config->GatewayId) - 1);
+  strncpy(config->ServerAddress,   serverAddress,   sizeof(config->ServerAddress) - 1);
+  strncpy(config->ServerUsername,  serverUsername,  sizeof(config->ServerUsername) - 1);
+  strncpy(config->ServerPassword,  serverPassword,  sizeof(config->ServerPassword) - 1);
+  strncpy(config->ApplicationId,   applicationId,   sizeof(config->ApplicationId) - 1);
+  strncpy(config->ApplicationName, applicationName, sizeof(config->ApplicationName) - 1);
+  strncpy(config->GatewayId,       gatewayId,       sizeof(config->GatewayId) - 1);
 
   ESP_LOGI(TAG, "✅ nb.cnf loaded (encrypted at rest).");
   return 0;
@@ -858,6 +934,7 @@ int sdLoadNbConfig(ConfigBuffer_t *config) {
 static void createFile(void) {
   char bufferFilename[16];
   sprintf(bufferFilename, SDCARD_FILE_NAME, 0);
+  strncpy(sdLogFilename, bufferFilename, sizeof(sdLogFilename) - 1);
   fileIndex = 0;
 
   if (mySD.exists(bufferFilename)) mySD.remove(bufferFilename);
@@ -872,17 +949,24 @@ static void createFile(void) {
 
 static void checkAndRotateLogFile(void) {
   if (!fileSDCard) return;
-  
+
   size_t size = fileSDCard.size();
+
+  // Sanity check: si size() devuelve un valor absurdo, ignorar
+  if (size > (2ULL * 1024 * 1024 * 1024)) {
+    ESP_LOGW("SD_ROT", "⚠️ fileSDCard.size() returned invalid value: %u, skipping rotation", size);
+    return;
+  }
+
   if (size < MAX_LOG_FILE_SIZE) return;
 
   ESP_LOGW("SD_ROT", "🔄 Archivo lleno (%.2f MB). Rotando log...", size / (1024.0 * 1024.0));
 
   fileSDCard.flush();
   fileSDCard.close();
-  
+
   currentFileIndex++;
-  createFile(); 
+  createFile();
 }
 
 // =======================================================
@@ -925,30 +1009,19 @@ static void sdqueueFlusher(void *param) {
     ESP_LOGI("SD_FLUSH", "📤 Starting flush cycle: %u messages pending", pending);
 
     for (int i = 0; i < MAX_PER_CYCLE; i++) {
-
-      // =========================================================
-      // CAMBIO CLAVE: tomar el mutex ANTES del peek y mantenerlo
-      // hasta DESPUÉS del dequeue. Como es recursivo, peek() y
-      // dequeue() internamente pueden volver a tomarlo sin deadlock.
-      // Durante este bloque, enqueue() de otra tarea quedará
-      // bloqueado → imposible truncar el archivo entre medio.
-      // =========================================================
       if (!sdq_lock()) {
         ESP_LOGW("SD_FLUSH", "⚠️ Could not acquire SD mutex, skipping cycle");
         break;
       }
 
       MessageBuffer_t msg;
-      bool has_msg = sdqueuePeek(&msg);   // internamente llama sdq_lock() recursivo → ok
+      bool has_msg = sdqueuePeek(&msg);
 
       if (!has_msg) {
         sdq_unlock();
         break;
       }
 
-      // Intentar entregar mientras tenemos el lock
-      // NOTA: nb_enqueuedata() y lora_enqueuedata() NO usan sdqMutex,
-      //       así que no hay riesgo de deadlock cruzado.
       bool delivered = false;
 
       #if (HAS_LORA)
@@ -966,18 +1039,17 @@ static void sdqueueFlusher(void *param) {
 
       if (delivered) {
         MessageBuffer_t dumped;
-        sdqueueDequeue(&dumped);          // internamente llama sdq_lock() recursivo → ok
-        uint32_t remaining = sdqueueCount(); // también usa sdq_lock() recursivo → ok
-        sdq_unlock();                     // liberar el lock externo
+        sdqueueDequeue(&dumped);
+        uint32_t remaining = sdqueueCount();
+        sdq_unlock();
 
         ESP_LOGI("SD_FLUSH",
                  "✅ Message delivered from SD (port %u, %u bytes, %u remaining)",
                  msg.MessagePort, msg.MessageSize, remaining);
 
-        vTaskDelay(pdMS_TO_TICKS(20));    // yield breve fuera del lock
-
+        vTaskDelay(pdMS_TO_TICKS(20));
       } else {
-        sdq_unlock();                     // liberar antes del break
+        sdq_unlock();
         ESP_LOGW("SD_FLUSH", "⏸Cannot deliver - queues full, will retry");
         break;
       }
@@ -992,7 +1064,6 @@ void sdqueueStartFlusher() {
   if (sdqFlusherTask) return;
   xTaskCreatePinnedToCore(sdqueueFlusher, "sdqFlusher", 4096, NULL, 1, &sdqFlusherTask, 1);
 }
-
 
 // ==========================================================
 //  COMPATIBILIDAD CON updates.cpp (NO BORRAR)
@@ -1031,12 +1102,9 @@ bool deleteFile(std::string path) {
 bool createFile(std::string filename, FileMySD &file) {
 #ifdef HAS_SDCARD
     if (!useSDCard) return false;
-
-    // Remove previous if exists
     if (mySD.exists((char*)filename.c_str())) {
         mySD.remove((char*)filename.c_str());
     }
-
     file = mySD.open((char*)filename.c_str(), FILE_WRITE);
     return file ? true : false;
 #else
@@ -1047,10 +1115,8 @@ bool createFile(std::string filename, FileMySD &file) {
 bool openFile(std::string filename, FileMySD &file) {
 #ifdef HAS_SDCARD
     if (!useSDCard) return false;
-
     if (!mySD.exists((char*)filename.c_str()))
         return false;
-
     file = mySD.open((char*)filename.c_str(), FILE_READ);
     return file ? true : false;
 #else

@@ -26,7 +26,6 @@ void PayloadConvert::addCount(uint16_t value, uint8_t snifftype) {
 }
 
 void PayloadConvert::addSalt(uint32_t value) {
-// esto es para nueva version de METIS
   buffer[cursor++] = (value >> 24) & 0xFF;
   buffer[cursor++] = (value >> 16) & 0xFF;
   buffer[cursor++] = (value >> 8) & 0xFF;
@@ -91,12 +90,17 @@ void PayloadConvert::addConfig(configData_t value) {
   cursor += 10;
 }
 
+// === ADEMUX: addStatus extendido a 19 bytes ===
+// Offset 14: nb_rsrp (antes nb_rssi/CSQ) — encoding: (-rsrp_dBm)-44, 0xFF=N/A
+// Offset 17: nb_snr  — encoding: snr_dB+20, 0xFF=N/A
+// Offset 18: nb_ecl  — directo 0/1/2, 0xFF=N/A
 void PayloadConvert::addStatus(uint32_t uptime, uint8_t cputemp,
                                uint16_t free_heap_div16, uint16_t min_heap_div16,
                                uint8_t reset_reason, uint8_t flags1, uint8_t flags2,
                                uint8_t lora_rssi, int8_t lora_snr,
-                               uint8_t nb_rssi, uint8_t nb_failures,
-                               uint8_t flags3) {
+                               uint8_t nb_rsrp, uint8_t nb_failures,
+                               uint8_t flags3,
+                               uint8_t nb_snr_encoded, uint8_t nb_ecl) {
   // Offset 0-3: uptime (uint32, big-endian)
   buffer[cursor++] = (byte)((uptime & 0xFF000000) >> 24);
   buffer[cursor++] = (byte)((uptime & 0x00FF0000) >> 16);
@@ -120,12 +124,16 @@ void PayloadConvert::addStatus(uint32_t uptime, uint8_t cputemp,
   buffer[cursor++] = lora_rssi;
   // Offset 13: lora_snr (int8)
   buffer[cursor++] = (uint8_t)lora_snr;
-  // Offset 14: nb_rssi (CSQ, 99=desconocido)
-  buffer[cursor++] = nb_rssi;
+  // Offset 14: nb_rsrp — encoding: (-rsrp_dBm)-44, 0xFF=N/A
+  buffer[cursor++] = nb_rsrp;
   // Offset 15: nb_consecutiveFailures
   buffer[cursor++] = nb_failures;
   // Offset 16: flags3
   buffer[cursor++] = flags3;
+  // Offset 17: nb_snr — encoding: snr_dB+20, 0xFF=N/A
+  buffer[cursor++] = nb_snr_encoded;
+  // Offset 18: nb_ecl — 0/1/2 directo, 0xFF=N/A
+  buffer[cursor++] = nb_ecl;
 }
 
 void PayloadConvert::addGPS(gpsStatus_t value) {
@@ -152,16 +160,16 @@ void PayloadConvert::addSensor(uint8_t buf[]) {
 #if(HAS_SENSORS)
   uint8_t length = buf[0];
   memcpy(buffer, buf + 1, length);
-  cursor += length; // length of buffer
+  cursor += length;
 #endif
 }
 
 void PayloadConvert::addBME(bmeStatus_t value) {
 #if(HAS_BME)
-  int16_t temperature = (int16_t)(value.temperature); // float -> int
-  uint16_t humidity = (uint16_t)(value.humidity);     // float -> int
-  uint16_t pressure = (uint16_t)(value.pressure);     // float -> int
-  uint16_t iaq = (uint16_t)(value.iaq);               // float -> int
+  int16_t temperature = (int16_t)(value.temperature);
+  uint16_t humidity = (uint16_t)(value.humidity);
+  uint16_t pressure = (uint16_t)(value.pressure);
+  uint16_t iaq = (uint16_t)(value.iaq);
   buffer[cursor++] = highByte(temperature);
   buffer[cursor++] = lowByte(temperature);
   buffer[cursor++] = highByte(pressure);
@@ -187,10 +195,7 @@ void PayloadConvert::addTime(time_t value) {
   buffer[cursor++] = (byte)((time & 0x000000FF));
 }
 
-/* ---------------- packed format with LoRa serialization Encoder ----------
- */
-// derived from
-// https://github.com/thesolarnomad/lora-serialization/blob/master/src/LoraEncoder.cpp
+/* ---------------- packed format with LoRa serialization Encoder ---------- */
 
 #elif (PAYLOAD_ENCODER == 2)
 
@@ -231,24 +236,28 @@ void PayloadConvert::addConfig(configData_t value) {
   writeVersion(value.version);
 }
 
+// === ADEMUX: addStatus extendido a 19 bytes ===
 void PayloadConvert::addStatus(uint32_t uptime, uint8_t cputemp,
                                uint16_t free_heap_div16, uint16_t min_heap_div16,
                                uint8_t reset_reason, uint8_t flags1, uint8_t flags2,
                                uint8_t lora_rssi, int8_t lora_snr,
-                               uint8_t nb_rssi, uint8_t nb_failures,
-                               uint8_t flags3) {
-  writeUint32(uptime);
-  writeUint8(cputemp);
-  writeUint16(free_heap_div16);
-  writeUint16(min_heap_div16);
-  writeUint8(reset_reason);
-  writeUint8(flags1);
-  writeUint8(flags2);
-  writeUint8(lora_rssi);
-  writeUint8((uint8_t)lora_snr);
-  writeUint8(nb_rssi);
-  writeUint8(nb_failures);
-  writeUint8(flags3);
+                               uint8_t nb_rsrp, uint8_t nb_failures,
+                               uint8_t flags3,
+                               uint8_t nb_snr_encoded, uint8_t nb_ecl) {
+  writeUint32(uptime);           // 0-3
+  writeUint8(cputemp);           // 4
+  writeUint16(free_heap_div16);  // 5-6
+  writeUint16(min_heap_div16);   // 7-8
+  writeUint8(reset_reason);      // 9
+  writeUint8(flags1);            // 10
+  writeUint8(flags2);            // 11
+  writeUint8(lora_rssi);         // 12
+  writeUint8((uint8_t)lora_snr); // 13
+  writeUint8(nb_rsrp);           // 14 (antes CSQ, ahora RSRP)
+  writeUint8(nb_failures);       // 15
+  writeUint8(flags3);            // 16
+  writeUint8(nb_snr_encoded);    // 17 nuevo
+  writeUint8(nb_ecl);            // 18 nuevo
 }
 
 void PayloadConvert::addGPS(gpsStatus_t value) {
@@ -266,7 +275,7 @@ void PayloadConvert::addSensor(uint8_t buf[]) {
 #if(HAS_SENSORS)
   uint8_t length = buf[0];
   memcpy(buffer, buf + 1, length);
-  cursor += length; // length of buffer
+  cursor += length;
 #endif
 }
 
@@ -301,9 +310,7 @@ void PayloadConvert::uintToBytes(uint64_t value, uint8_t byteSize) {
   }
 }
 
-void PayloadConvert::writeUptime(uint64_t uptime) {
-  writeUint64(uptime);
-}
+void PayloadConvert::writeUptime(uint64_t uptime) { writeUint64(uptime); }
 
 void PayloadConvert::writeVersion(char *version) {
   memcpy(buffer + cursor, version, 10);
@@ -311,31 +318,18 @@ void PayloadConvert::writeVersion(char *version) {
 }
 
 void PayloadConvert::writeLatLng(double latitude, double longitude) {
-  // Tested to at least work with int32_t, which are processed correctly.
   writeUint32(latitude);
   writeUint32(longitude);
 }
 
 void PayloadConvert::writeUint64(uint64_t i) { uintToBytes(i, 8); }
-
 void PayloadConvert::writeUint32(uint32_t i) { uintToBytes(i, 4); }
-
 void PayloadConvert::writeUint16(uint16_t i) { uintToBytes(i, 2); }
+void PayloadConvert::writeUint8(uint8_t i)   { uintToBytes(i, 1); }
 
-void PayloadConvert::writeUint8(uint8_t i) { uintToBytes(i, 1); }
+void PayloadConvert::writeUFloat(float value) { writeUint16(value * 100); }
+void PayloadConvert::writePressure(float value) { writeUint16(value * 10); }
 
-void PayloadConvert::writeUFloat(float value) {
-  writeUint16(value * 100);
-}
-
-void PayloadConvert::writePressure(float value) {
-  writeUint16(value * 10);
-}
-
-/**
- * Uses a 16bit two's complement with two decimals, so the range is
- * -327.68 to +327.67 degrees
- */
 void PayloadConvert::writeFloat(float value) {
   int16_t t = (int16_t)(value * 100);
   if (value < 0) {
@@ -349,7 +343,6 @@ void PayloadConvert::writeFloat(float value) {
 void PayloadConvert::writeBitmap(bool a, bool b, bool c, bool d, bool e, bool f,
                                  bool g, bool h) {
   uint8_t bitmap = 0;
-  // LSB first
   bitmap |= (a & 1) << 7;
   bitmap |= (b & 1) << 6;
   bitmap |= (c & 1) << 5;
@@ -362,19 +355,10 @@ void PayloadConvert::writeBitmap(bool a, bool b, bool c, bool d, bool e, bool f,
 }
 
 /* ---------------- Cayenne LPP 2.0 format ---------- */
-// see specs
-// http://community.mydevices.com/t/cayenne-lpp-2-0/7510 (LPP 2.0)
-// https://github.com/myDevicesIoT/cayenne-docs/blob/master/docs/LORA.md
-// (LPP 1.0) PAYLOAD_ENCODER == 3 -> Dynamic Sensor Payload, using channels ->
-// FPort 1 PAYLOAD_ENCODER == 4 -> Packed Sensor Payload, not using channels ->
-// FPort 2
 
 #elif ((PAYLOAD_ENCODER == 3) || (PAYLOAD_ENCODER == 4))
 
-void PayloadConvert::addByte(uint8_t value) {
-  /*
-  not implemented
-  */ }
+void PayloadConvert::addByte(uint8_t value) { }
 
 void PayloadConvert::addCount(uint16_t value, uint8_t snifftype) {
   switch (snifftype) {
@@ -382,8 +366,7 @@ void PayloadConvert::addCount(uint16_t value, uint8_t snifftype) {
 #if (PAYLOAD_ENCODER == 3)
     buffer[cursor++] = LPP_COUNT_WIFI_CHANNEL;
 #endif
-    buffer[cursor++] =
-        LPP_LUMINOSITY; // workaround since cayenne has no data type meter
+    buffer[cursor++] = LPP_LUMINOSITY;
     buffer[cursor++] = highByte(value);
     buffer[cursor++] = lowByte(value);
     break;
@@ -391,8 +374,7 @@ void PayloadConvert::addCount(uint16_t value, uint8_t snifftype) {
 #if (PAYLOAD_ENCODER == 3)
     buffer[cursor++] = LPP_COUNT_BLE_CHANNEL;
 #endif
-    buffer[cursor++] =
-        LPP_LUMINOSITY; // workaround since cayenne has no data type meter
+    buffer[cursor++] = LPP_LUMINOSITY;
     buffer[cursor++] = highByte(value);
     buffer[cursor++] = lowByte(value);
     break;
@@ -430,14 +412,15 @@ void PayloadConvert::addConfig(configData_t value) {
   buffer[cursor++] = value.adrmode;
 }
 
+// Cayenne LPP: firma actualizada para mantener compatibilidad de compilación
 void PayloadConvert::addStatus(uint32_t uptime, uint8_t cputemp,
                                uint16_t free_heap_div16, uint16_t min_heap_div16,
                                uint8_t reset_reason, uint8_t flags1, uint8_t flags2,
                                uint8_t lora_rssi, int8_t lora_snr,
-                               uint8_t nb_rssi, uint8_t nb_failures,
-                               uint8_t flags3) {
-  // Cayenne LPP: solo temperatura (no soporta todos los campos)
-  // Datos completos van en raw por TELEMETRYPORT
+                               uint8_t nb_rsrp, uint8_t nb_failures,
+                               uint8_t flags3,
+                               uint8_t nb_snr_encoded, uint8_t nb_ecl) {
+  // Cayenne LPP solo envía temperatura; datos completos van en raw por TELEMETRYPORT
   uint16_t temp = (uint16_t)cputemp * 10;
 #if (PAYLOAD_ENCODER == 3)
   buffer[cursor++] = LPP_TEMPERATURE_CHANNEL;
@@ -465,56 +448,41 @@ void PayloadConvert::addGPS(gpsStatus_t value) {
   buffer[cursor++] = (byte)((alt & 0xFF0000) >> 16);
   buffer[cursor++] = (byte)((alt & 0x00FF00) >> 8);
   buffer[cursor++] = (byte)(alt & 0x0000FF);
-#endif // HAS_GPS
+#endif
 }
 
-void PayloadConvert::addSensor(uint8_t buf[]) {
-#if(HAS_SENSORS)
-// to come
-/*
-  uint8_t length = buf[0];
-  memcpy(buffer, buf+1, length);
-  cursor += length; // length of buffer
-*/
-#endif // HAS_SENSORS
-}
+void PayloadConvert::addSensor(uint8_t buf[]) { }
 
 void PayloadConvert::addBME(bmeStatus_t value) {
 #if(HAS_BME)
-
-  // data value conversions to meet cayenne data type definition
-  // 0.1Â°C per bit => -3276,7 .. +3276,7 Â°C
   int16_t temperature = (int16_t)(value.temperature * 10.0);
-  // 0.1 hPa per bit => 0 .. 6553,6 hPa
   uint16_t pressure = (uint16_t)(value.pressure * 10);
-  // 0.5% per bit => 0 .. 128 %C
   uint8_t humidity = (uint8_t)(value.humidity * 2.0);
   int16_t iaq = (int16_t)(value.iaq);
-
 #if (PAYLOAD_ENCODER == 3)
   buffer[cursor++] = LPP_TEMPERATURE_CHANNEL;
 #endif
-  buffer[cursor++] = LPP_TEMPERATURE; // 2 bytes 0.1 Â°C Signed MSB
+  buffer[cursor++] = LPP_TEMPERATURE;
   buffer[cursor++] = highByte(temperature);
   buffer[cursor++] = lowByte(temperature);
 #if (PAYLOAD_ENCODER == 3)
   buffer[cursor++] = LPP_BAROMETER_CHANNEL;
 #endif
-  buffer[cursor++] = LPP_BAROMETER; // 2 bytes 0.1 hPa Unsigned MSB
+  buffer[cursor++] = LPP_BAROMETER;
   buffer[cursor++] = highByte(pressure);
   buffer[cursor++] = lowByte(pressure);
 #if (PAYLOAD_ENCODER == 3)
   buffer[cursor++] = LPP_HUMIDITY_CHANNEL;
 #endif
-  buffer[cursor++] = LPP_HUMIDITY; // 1 byte 0.5 % Unsigned
+  buffer[cursor++] = LPP_HUMIDITY;
   buffer[cursor++] = humidity;
 #if (PAYLOAD_ENCODER == 3)
   buffer[cursor++] = LPP_AIR_CHANNEL;
 #endif
-  buffer[cursor++] = LPP_LUMINOSITY; // 2 bytes, 1.0 unsigned
+  buffer[cursor++] = LPP_LUMINOSITY;
   buffer[cursor++] = highByte(iaq);
   buffer[cursor++] = lowByte(iaq);
-#endif // HAS_BME
+#endif
 }
 
 void PayloadConvert::addButton(uint8_t value) {
@@ -524,20 +492,18 @@ void PayloadConvert::addButton(uint8_t value) {
 #endif
   buffer[cursor++] = LPP_DIGITAL_INPUT;
   buffer[cursor++] = value;
-#endif // HAS_BUTTON
+#endif
 }
 
 void PayloadConvert::addTime(time_t value) {
 #if (PAYLOAD_ENCODER == 4)
   uint32_t t = (uint32_t)value;
   uint32_t tx_period = (uint32_t)SENDCYCLE * 2;
-  buffer[cursor++] = 0x03; // set config mask to UTCTime + TXPeriod
-  // UTCTime in seconds
+  buffer[cursor++] = 0x03;
   buffer[cursor++] = (byte)((t & 0xFF000000) >> 24);
   buffer[cursor++] = (byte)((t & 0x00FF0000) >> 16);
   buffer[cursor++] = (byte)((t & 0x0000FF00) >> 8);
   buffer[cursor++] = (byte)((t & 0x000000FF));
-  // TXPeriod in seconds
   buffer[cursor++] = (byte)((tx_period & 0xFF000000) >> 24);
   buffer[cursor++] = (byte)((tx_period & 0x00FF0000) >> 16);
   buffer[cursor++] = (byte)((tx_period & 0x0000FF00) >> 8);
